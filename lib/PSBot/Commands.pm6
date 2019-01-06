@@ -110,6 +110,6 @@ our sub nick(Str $target, PSBot::User $user, PSBot::Room $room,
         $connection.send: "/trn $username,0,$assertion";
         "Successfully nicked to $username!"
     } else {
-        "There was an error nicking to $username."
+        "There was an error nicking to $username: {$assertion.exception.message}"
     }
 }
