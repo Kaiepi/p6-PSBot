@@ -3,22 +3,16 @@
     "Ben Davies"
   ],
   "build-depends" : [ ],
-  "depends" : [ "JSON::Fast", "Cro::WebSocket::Client", "Terminal::ANSIColor" ],
-  "description" : "blah blah blah",
+  "depends" : [ "Cro::WebSocket::Client" ],
+  "description" : "Pokémon Showdown chat bot",
   "license" : "Artistic-2.0",
   "name" : "PSBot",
-  "perl" : "6.c",
+  "perl" : "6.d",
   "provides" : {
-    "PSBot" : "lib/PSBot.pm6",
-	"PSBot::Config": "lib/PSBot/Config.pm6",
-	"PSBot::Connection": "lib/PSBot/Connection.pm6",
-	"PSBot::LoginServer": "lib/PSBot/LoginServer.pm6",
-	"PSBot::Parser": "lib/PSBot/Parser.pm6",
-	"PSBot::StateManager": "lib/PSBot/StateManager.pm6",
-	"PSBot::Tools": "lib/PSBot/Tools.pm6"
+    "PSBot" : "lib/PSBot.pm6"
   },
   "resources" : [ ],
-  "source-url" : "",
+  "source-url" : "https://github.com/Kaiepi/p6-PSBot.git",
   "tags" : [ ],
   "test-depends" : [ "Test" ],
   "version" : "0.0.1"

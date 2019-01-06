@@ -9,7 +9,7 @@ sub EXPORT(--> Hash) {
         exit 1;
     }
 
-    with from-json slurp "$*HOME/.config/psbot.json" -> %config {
+    INIT with from-json slurp "$*HOME/.config/psbot.json" -> %config {
         %(
             USERNAME => %config<username>,
             PASSWORD => %config<password>,
