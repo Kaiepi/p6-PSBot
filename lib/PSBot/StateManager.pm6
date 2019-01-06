@@ -15,6 +15,12 @@ has Lock::Async $.chat-mux .= new;
 has PSBot::User %.users;
 has PSBot::Room %.rooms;
 
+method authenticate(Str $username!, Str $password?, Str $challstr? --> Str) {
+    $!challstr = $challstr if defined $challstr;
+    return PSBot::LoginServer.get-assertion($username, $!challstr) unless defined $password;
+    return PSBot::LoginServer.log-in($username, $password, $!challstr)
+}
+
 method update-user(Str $username, Str $guest, Str $avatar) {
     $!username = $username;
     $!guest    = $guest eq '0';
