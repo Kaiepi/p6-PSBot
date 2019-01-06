@@ -1,5 +1,6 @@
 use v6.d;
 use Cro::WebSocket::Client;
+use Cro::Uri;
 use PSBot::Config;
 use PSBot::Tools;
 unit class PSBot::Connection;
@@ -18,7 +19,7 @@ method new(Str $host!, Int $port!, Bool $ssl = False) {
     self.bless: :$client;
 }
 
-method uri(--> Str) { $!client.uri }
+method uri(--> Cro::Uri) { $!client.uri }
 
 method connect() {
     debug '[DEBUG] Connecting...';
