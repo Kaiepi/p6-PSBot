@@ -9,7 +9,10 @@ unit module PSBot::Commands;
 our sub eval(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     return "{COMMAND}eval access is limited to admins" unless ADMINS ∋ $user.id;
-    $state.eval: $target
+
+    use MONKEY-SEE-NO-EVAL;
+    my Str $result = try EVAL $target;
+    $result // $!
 }
 
 our sub primal(Str $target, PSBot::User $user, PSBot::Room $room,
