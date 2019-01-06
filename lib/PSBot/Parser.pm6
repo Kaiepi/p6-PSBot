@@ -2,6 +2,7 @@ use v6.d;
 use PSBot::Commands;
 use PSBot::Config;
 use PSBot::Connection;
+use PSBot::LoginServer;
 use PSBot::Room;
 use PSBot::StateManager;
 use PSBot::Tools;
@@ -31,7 +32,7 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
         given $type {
             when 'challstr' {
                 my Str $challstr = @rest.join: '|';
-                my Str $assertion = $state.authenticate: USERNAME, PASSWORD, $challstr;
+                my Str $assertion = PSBot::LoginServer.authenticate: USERNAME, PASSWORD, $challstr;
                 $connection.send: "/trn {USERNAME},0,$assertion";
             }
             when 'updateuser' {

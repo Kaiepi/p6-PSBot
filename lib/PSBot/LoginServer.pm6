@@ -31,3 +31,9 @@ method log-in(Str $username!, Str $password!, Str $challstr! --> Str) {
 
     %data<assertion>
 }
+
+method authenticate(Str $username!, Str $password?, Str $challstr? --> Str) {
+    $!challstr = $challstr if defined $challstr;
+    return PSBot::LoginServer.get-assertion($username, $!challstr) unless defined $password;
+    return PSBot::LoginServer.log-in($username, $password, $!challstr)
+}
