@@ -64,18 +64,20 @@ our sub pick(Str $target, PSBot::User $user, PSBot::Room $room,
 }
 
 our sub reminder(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Promise) {
+        PSBot::StateManager $state, PSBot::Connection $connection) {
     my Str ($time, $message) = $target.split(',').map({ .trim });
     return 'A time (e.g. 30s, 10m, 2h) and a message must be given.' unless $time && $message;
 
     my Int $seconds = 0;
     given $time {
-        when $_ ~~ / (\d+) [s | <.ws> seconds] / { $seconds += $0.Int                }
-        when $_ ~~ / (\d+) [m | <.ws> minutes] / { $seconds += $0.Int * 60           }
-        when $_ ~~ / (\d+) [h | <.ws> hours] /   { $seconds += $0.Int * 60 * 60      }
-        when $_ ~~ / (\d+) [d | <.ws> days] /    { $seconds += $0.Int * 60 * 60 * 24 }
-        default                                  { return 'Invalid time.'            }
+        when / ^ ( <[0..9]>+ ) [s | <.ws> seconds] $ / { $seconds += $0.Int                    }
+        when / ^ ( <[0..9]>+ ) [m | <.ws> minutes] $ / { $seconds += $0.Int * 60               }
+        when / ^ ( <[0..9]>+ ) [h | <.ws> hours]   $ / { $seconds += $0.Int * 60 * 60          }
+        when / ^ ( <[0..9]>+ ) [d | <.ws> days]    $ / { $seconds += $0.Int * 60 * 60 * 24     }
+        when / ^ ( <[0..9]>+ ) [w | <.ws> weeks]   $ / { $seconds += $0.Int * 60 * 60 * 24 * 7 }
+        default                                        { return 'Invalid time.'                }
     }
+    return 'Your timeout is too long. Please keep it under a year long.' if $seconds >= 60 * 60 * 24 * 365;
 
     if $room {
         $connection.send: "You set a reminder for $time from now.", :roomid($room.id);
