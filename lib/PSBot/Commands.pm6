@@ -59,3 +59,28 @@ our sub pick(Str $target, PSBot::User $user, PSBot::Room $room,
     return 'More than one choice must be given.' if @choices.elems == 1;
     @choices[floor rand * @choices.elems]
 }
+
+our sub reminder(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection --> Promise) {
+    my Str ($time, $message) = $target.split(',').map({ .trim });
+    return 'A time (e.g. 30s, 10m, 2h) and a message must be given.' unless $time && $message;
+
+    my Int $seconds = 0;
+    given $time {
+        when $_ ~~ / (\d+) [s | <.ws> seconds] / { $seconds += $0.Int                }
+        when $_ ~~ / (\d+) [m | <.ws> minutes] / { $seconds += $0.Int * 60           }
+        when $_ ~~ / (\d+) [h | <.ws> hours] /   { $seconds += $0.Int * 60 * 60      }
+        when $_ ~~ / (\d+) [d | <.ws> days] /    { $seconds += $0.Int * 60 * 60 * 24 }
+        default                                  { return 'Invalid time.'            }
+    }
+
+    if $room {
+        $connection.send: "You set a reminder for $time from now.", :roomid($room.id);
+    } else {
+        $connection.send: "You set a reminder for $time from now.", :userid($user.id);
+    }
+
+    Promise.in($seconds).then({
+        "{$user.name}, you set a reminder $time ago: $message"
+    });
+}

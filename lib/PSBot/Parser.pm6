@@ -102,7 +102,8 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
                     my Str $userid = to-id $username;
 
                     start {
-                        my Str $output = &command($target, $user, $room, $state, $connection);
+                        my $output = &command($target, $user, $room, $state, $connection);
+                        $output = await $output if $output ~~ Promise;
                         $connection.send: $output, :$roomid if $output;
                     }
                 }
@@ -128,7 +129,8 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
                     my PSBot::Room $room   = Nil;
 
                     start {
-                        my Str $output = &command($target, $user, $room, $state, $connection);
+                        my $output = &command($target, $user, $room, $state, $connection);
+                        $output = await $output if $output ~~ Promise;
                         $connection.send: $output, :$userid if $output;
                     }
                 }
