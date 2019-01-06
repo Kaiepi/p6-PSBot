@@ -19,6 +19,6 @@ method match(Str $target, PSBot::Room $room, PSBot::User $user,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     return if $!roomids ∌ $room.id;
     $target ~~ $!matcher;
-    &!on-match($/, $room, $user, $state, $connection) if $/;
+    return &!on-match($/, $room, $user, $state, $connection) if $/;
     Nil
 }
