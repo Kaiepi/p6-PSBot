@@ -36,7 +36,9 @@ method add-room(Str $roomid, Str $type, Str $title, Str @userlist) {
         for @userlist -> $userinfo {
             my Str $userid = to-id $userinfo.substr: 1;
             if %!users ∋ $userid {
+                my PSBot::User $user = %!users{$userid};
                 $room.join: $userinfo;
+                $user.on-join: $userinfo, $roomid;
             } else {
                 my PSBot::User $user .= new: $userinfo, $roomid;
                 %!users{$userid} = $user;
