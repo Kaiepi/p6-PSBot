@@ -103,9 +103,3 @@ method rename-user(Str $userinfo, Str $oldid, Str $roomid) {
         }
     })
 }
-
-method eval(Str $code --> Str) {
-    use MONKEY-SEE-NO-EVAL;
-    my $output = try EVAL $code;
-    ($output // $!).gist
-}
