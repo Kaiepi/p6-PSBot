@@ -72,9 +72,9 @@ our sub reminder(Str $target, PSBot::User $user, PSBot::Room $room,
     given $time {
         when / ^ ( <[0..9]>+ ) [s | <.ws> seconds] $ / { $seconds += $0.Int                    }
         when / ^ ( <[0..9]>+ ) [m | <.ws> minutes] $ / { $seconds += $0.Int * 60               }
-        when / ^ ( <[0..9]>+ ) [h | <.ws> hours]   $ / { $seconds += $0.Int * 60 * 60          }
-        when / ^ ( <[0..9]>+ ) [d | <.ws> days]    $ / { $seconds += $0.Int * 60 * 60 * 24     }
-        when / ^ ( <[0..9]>+ ) [w | <.ws> weeks]   $ / { $seconds += $0.Int * 60 * 60 * 24 * 7 }
+        when / ^ ( <[0..9]>+ ) [h | <.ws> hours  ] $ / { $seconds += $0.Int * 60 * 60          }
+        when / ^ ( <[0..9]>+ ) [d | <.ws> days   ] $ / { $seconds += $0.Int * 60 * 60 * 24     }
+        when / ^ ( <[0..9]>+ ) [w | <.ws> weeks  ] $ / { $seconds += $0.Int * 60 * 60 * 24 * 7 }
         default                                        { return 'Invalid time.'                }
     }
     return 'Your timeout is too long. Please keep it under a year long.' if $seconds >= 60 * 60 * 24 * 365;
@@ -106,6 +106,10 @@ our sub nick(Str $target, PSBot::User $user, PSBot::Room $room,
         $assertion = PSBot::LoginServer.get-assertion: $username, $state.challstr;
     }
 
-    $connection.send: "/trn $username,0,$assertion";
-    "Successfully nicked to $username!"
+    if $assertion.defined {
+        $connection.send: "/trn $username,0,$assertion";
+        "Successfully nicked to $username!"
+    } else {
+        "There was an error nicking to $username."
+    }
 }
