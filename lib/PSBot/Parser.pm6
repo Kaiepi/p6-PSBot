@@ -3,10 +3,26 @@ use PSBot::Commands;
 use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Room;
+use PSBot::Rule;
 use PSBot::StateManager;
 use PSBot::Tools;
 unit role PSBot::Parser;
 
+has PSBot::Rule @.rules;
+
+method new() {
+    my PSBot::Rule @rules = [
+        PSBot::Rule.new(
+            ['techcode'],
+            rx:s:i/how do i [host||set ?up] a server/,
+            -> $match, $room, $user, $state, $connection {
+                'Read the roomintro.'
+            }
+        )
+    ];
+
+    self.bless: :@rules;
+}
 method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $text) {
     my $matcher = / [ ^^ '>' <[a..z 0..9 -]>+ $$ ] | [ ^^ <[a..z 0..9 -]>* '|' <!before '|'> .+ $$ ] /;
     my @lines = $text.lines.grep($matcher);
@@ -60,8 +76,17 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
             }
             when 'c:' {
                 my (Str $timestamp, Str $userinfo) = @rest;
-                my Str $username = $userinfo.substr: 1;
-                my Str $message  = @rest[2..*].join: '|';
+                my Str         $username = $userinfo.substr: 1;
+                my Str         $userid   = to-id $username;
+                my Str         $message  = @rest[2..*].join: '|';
+                my PSBot::User $user     = $state.users{$userid};
+                my PSBot::Room $room     = $state.rooms{$roomid};
+
+                for @!rules -> $rule {
+                    my Str $result = $rule.match: $message, $room, $user, $state, $connection;
+                    $connection.send: $result, :$roomid if $result;
+                }
+
                 if $message.starts-with(COMMAND) && $username ne $state.username {
                     my Int $idx = $message.index: ' ';
                     $idx = $message.chars - 1 unless $idx;
@@ -73,10 +98,8 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
                     my &command = try &PSBot::Commands::($command);
                     return unless &command;
 
-                    my Str         $target = trim $message.substr: $idx + 1;
-                    my Str         $userid = to-id $username;
-                    my PSBot::User $user   = $state.users{$userid};
-                    my PSBot::Room $room   = $state.rooms{$roomid};
+                    my Str $target = trim $message.substr: $idx + 1;
+                    my Str $userid = to-id $username;
 
                     start {
                         my Str $output = &command($target, $user, $room, $state, $connection);
