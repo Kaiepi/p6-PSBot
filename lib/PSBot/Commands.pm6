@@ -11,8 +11,8 @@ our sub eval(Str $target, PSBot::User $user, PSBot::Room $room,
     return "{COMMAND}eval access is limited to admins" unless ADMINS ∋ $user.id;
 
     use MONKEY-SEE-NO-EVAL;
-    my Str $result = try EVAL $target;
-    $result // $!
+    my $result = try EVAL $target;
+    ($result // $!).gist
 }
 
 our sub primal(Str $target, PSBot::User $user, PSBot::Room $room,
