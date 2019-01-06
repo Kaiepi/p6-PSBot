@@ -67,19 +67,19 @@ multi method send(Str $data!, Str :$userid!) {
 multi method send-bulk(*@data) {
     my atomicint $i = 0;
     await lazy for @data -> $data {
-        Promise.in(++⚛$i * 0.6).then({ self.send: $data });
+        Promise.in($i⚛++ * 0.6).then({ self.send: $data });
     }
 }
 multi method send-bulk(*@data, Str :$roomid!) {
     my atomicint $i = 0;
     await lazy for @data -> $data {
-        Promise.in(++⚛$i * 0.6).then({ self.send: $data, :$roomid });
+        Promise.in($i⚛++ * 0.6).then({ self.send: $data, :$roomid });
     };
 }
 multi method send-bulk(*@data, Str :$userid!) {
     my atomicint $i = 0;
     await lazy for @data -> $data {
-        Promise.in(++⚛$i * 0.6).then({ self.send: $data, :$userid });
+        Promise.in($i⚛++ * 0.6).then({ self.send: $data, :$userid });
     };
 }
 

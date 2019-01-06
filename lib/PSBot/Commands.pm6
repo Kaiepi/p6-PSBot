@@ -2,12 +2,11 @@ use v6.d;
 use PSBot::Config;
 use PSBot::Connection;
 use PSBot::LoginServer;
+use PSBot::Plugins::Hangman;
 use PSBot::Room;
 use PSBot::StateManager;
 use PSBot::User;
 unit module PSBot::Commands;
-
-subset CommandValue where Int | Promise;
 
 our sub eval(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
@@ -111,5 +110,19 @@ our sub nick(Str $target, PSBot::User $user, PSBot::Room $room,
         "Successfully nicked to $username!"
     } else {
         "There was an error nicking to $username: {$assertion.exception.message}"
+    }
+}
+
+our sub hangman(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection) {
+    state $hangman = PSBot::Plugins::Hangman.new;
+
+    my (Str $subcommand, Str $guess) = $target.split: ' ';
+    given $subcommand {
+        when 'new'   { $hangman.start                                      }
+        when 'view'  { $hangman.print-progress                             }
+        when 'guess' { $hangman.guess: $guess                              }
+        when 'end'   { $hangman.end                                        }
+        default      { "Unknown {COMMAND}hangman subcommand: $subcommand." }
     }
 }

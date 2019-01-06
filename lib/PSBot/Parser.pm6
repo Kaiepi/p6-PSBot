@@ -12,13 +12,7 @@ has PSBot::Rule @.rules;
 
 method new() {
     my PSBot::Rule @rules = [
-        PSBot::Rule.new(
-            ['techcode'],
-            rx:s:i/how do i [host||set ?up] a server/,
-            -> $match, $room, $user, $state, $connection {
-                'Read the roomintro.'
-            }
-        )
+        # Add your own rules here.
     ];
 
     self.bless: :@rules;
@@ -26,6 +20,7 @@ method new() {
 method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $text) {
     my $matcher = / [ ^^ '>' <[a..z 0..9 -]>+ $$ ] | [ ^^ <[a..z 0..9 -]>* '|' <!before '|'> .+ $$ ] /;
     my @lines = $text.lines.grep($matcher);
+    return unless @lines.first;
 
     my Str $roomid;
     $roomid = @lines.shift.substr(1) if @lines.first.starts-with: '>';
@@ -104,7 +99,11 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
                     start {
                         my $output = &command($target, $user, $room, $state, $connection);
                         $output = await $output if $output ~~ Promise;
-                        $connection.send: $output, :$roomid if $output;
+                        if $output ~~ Iterable {
+                            $connection.send-bulk: |$output, :$roomid if $output.elems;
+                        } else {
+                            $connection.send: $output, :$roomid if $output;
+                        }
                     }
                 }
             }
@@ -131,7 +130,11 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
                     start {
                         my $output = &command($target, $user, $room, $state, $connection);
                         $output = await $output if $output ~~ Promise;
-                        $connection.send: $output, :$userid if $output;
+                        if $output ~~ Iterable {
+                            $connection.send-bulk: |$output, :$userid if $output.elems;
+                        } else {
+                            $connection.send: $output, :$userid if $output;
+                        }
                     }
                 }
             }
