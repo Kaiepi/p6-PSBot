@@ -6,7 +6,7 @@ use PSBot::Config;
 use PSBot::Tools;
 unit class PSBot::LoginServer;
 
-method get-assertion(Str $username!, Str $challstr! --> Str) {
+method get-assertion(Str $username!, Str $challstr!) {
     my Str                 $userid    = to-id $username;
     my Str                 $query     = "act=getassertion&userid=$userid&challstr=$challstr".subst('|', '%7C', :g);
     my Cro::HTTP::Response $response  = await Cro::HTTP::Client.get:
@@ -17,7 +17,7 @@ method get-assertion(Str $username!, Str $challstr! --> Str) {
     $assertion
 }
 
-method log-in(Str $username!, Str $password!, Str $challstr! --> Str) {
+method log-in(Str $username!, Str $password!, Str $challstr!) {
     my Cro::HTTP::Response $response = await Cro::HTTP::Client.post:
         "https://play.pokemonshowdown.com/~~{SERVERID}/action.php",
         content-type => 'application/x-www-form-urlencoded; charset=UTF-8',

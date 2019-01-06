@@ -10,7 +10,7 @@ unit module PSBot::Commands;
 subset CommandValue where Int | Promise;
 
 our sub eval(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> CommandValue) {
+        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     return "{COMMAND}eval access is limited to admins" unless ADMINS ∋ $user.id;
 
     use MONKEY-SEE-NO-EVAL;
@@ -19,19 +19,19 @@ our sub eval(Str $target, PSBot::User $user, PSBot::Room $room,
 }
 
 our sub primal(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> CommandValue) {
+        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     'C# sucks'
 }
 
 our sub say(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> CommandValue) {
+        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     return "{COMMAND}say access is limited to admins" unless ADMINS ∋ $user.id;
     return if $target ~~ / ^ <[!/]> <!before <[!/]> > /;
     $target
 }
 
 our sub eightball(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> CommandValue) {
+        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     given floor rand * 20 {
         when 0  { 'It is certain.'             }
         when 1  { 'It is decidedly so.'        }
@@ -57,14 +57,14 @@ our sub eightball(Str $target, PSBot::User $user, PSBot::Room $room,
 }
 
 our sub pick(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> CommandValue) {
+        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     my @choices = $target.split(',').map({ .trim });
     return 'More than one choice must be given.' if @choices.elems == 1;
     @choices[floor rand * @choices.elems]
 }
 
 our sub reminder(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> CommandValue) {
+        PSBot::StateManager $state, PSBot::Connection $connection --> Promise) {
     my Str ($time, $message) = $target.split(',').map({ .trim });
     return 'A time (e.g. 30s, 10m, 2h) and a message must be given.' unless $time && $message;
 
@@ -89,11 +89,11 @@ our sub reminder(Str $target, PSBot::User $user, PSBot::Room $room,
 }
 
 our sub nick(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> CommandValue) {
+        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     return "{COMMAND}nick access is limited to admins" unless ADMINS ∋ $user.id;
+    return 'A nick and optionally a password must be provided.' unless $target;
 
     my (Str $username, Str $password) = $target.split(',').map({ .trim });
-    return 'A nick and optionally a password must be provided.' unless $username;
     return 'Nick must be under 18 characters.' if $username.chars >= 18;
     return "Only use passwords with this command in PMs." if $room && $password;
 
