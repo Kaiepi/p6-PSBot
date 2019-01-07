@@ -37,30 +37,38 @@ method connect() {
 }
 
 multi method send(Str $data!) {
-    debug '[SEND]', "|$data";
-    if $data ~~ / ^ <[!/]> <!before <[!/]> > / {
-        fail "Command messages must be under 128KiB" if "|$data".codes >= 128 * 1024;
+    if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '~~~ ' ] / {
+        debug '[SEND]', "| $data";
+        $!connection.send: "| $data";
     } else {
-        fail "Chat messages must be under 300 characters long" if $data.codes >= 300;
+        debug '[SEND]', "|$data";
+        $!connection.send: "|$data";
     }
-    $!connection.send: "|$data"
 }
 multi method send(Str $data!, Str :$roomid!) {
-    debug '[SEND]', "$roomid|$data";
-    if $data ~~ / ^ <[!/]> <!before <[!/]> > / {
-        fail "Command messages must be under 128KiB" if "$roomid|$data".codes >= 128 * 1024;
+    if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '~~~ ' ] / {
+        debug '[SEND]', "$roomid| $data";
+        $!connection.send: "$roomid| $data";
     } else {
-        fail "Chat messages must be under 300 characters long" if $data.codes >= 300;
+        debug '[SEND]', "$roomid|$data";
+        $!connection.send: "$roomid|$data";
     }
-    $!connection.send: "$roomid|$data"
 }
 multi method send(Str $data!, Str :$userid!) {
     debug '[SEND]', "|/w $userid, $data";
-    if $data ~~ / ^ <[!/]> <!before <[!/]> > / {
-        fail "Command messages must be under 128KiB" if "|/w $userid, $data".codes >= 128 * 1024;
-    } else {
-        fail "Chat messages must be under 300 characters long" if $data.codes >= 300;
-    }
+    $!connection.send: "|/w $userid, $data"
+}
+
+multi method send-raw(Str $data!) {
+    debug '[SEND]', "|$data";
+    $!connection.send: "|$data"
+}
+multi method send-raw(Str $data!, Str :$roomid!) {
+    debug '[SEND]', "$roomid|$data";
+    $!connection.send: "$roomid|$data"
+}
+multi method send-raw(Str $data!, Str :$userid!) {
+    debug '[SEND]', "|/w $userid, $data";
     $!connection.send: "|/w $userid, $data"
 }
 

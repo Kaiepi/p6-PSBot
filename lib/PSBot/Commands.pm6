@@ -20,7 +20,6 @@ our sub eval(Str $target, PSBot::User $user, PSBot::Room $room,
 our sub say(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     return "{COMMAND}say access is limited to admins" unless ADMINS ∋ $user.id;
-    return if $target ~~ / ^ <[!/]> <!before <[!/]> > /;
     $target
 }
 
@@ -35,7 +34,7 @@ our sub nick(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my $assertion = $state.authenticate: $username, $password;
     if $assertion.defined {
-        $connection.send: "/trn $username,0,$assertion";
+        $connection.send-raw: "/trn $username,0,$assertion";
         "Successfully nicked to $username!"
     } else {
         "There was an error nicking to $username: {$assertion.exception.message}"
@@ -45,7 +44,7 @@ our sub nick(Str $target, PSBot::User $user, PSBot::Room $room,
 our sub suicide(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return "{COMMAND}suicide access is limited to admins" unless ADMINS ∋ $user.id;
-    $connection.send: '/logout';
+    $connection.send-raw: '/logout';
     exit 0;
 }
 
@@ -83,7 +82,7 @@ our sub eightball(Str $target, PSBot::User $user, PSBot::Room $room,
 our sub pick(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     my @choices = $target.split(',').map({ .trim });
-    return 'More than one choice must be given.' if @choices.elems == 1;
+    return 'More than one choice must be given.' if @choices.elems <= 1;
     @choices[floor rand * @choices.elems]
 }
 
@@ -116,8 +115,7 @@ our sub reminder(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our sub hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    state $hangman = PSBot::Plugins::Hangman.new;
-
+    state PSBot::Plugins::Hangman $hangman .= new;
     my (Str $subcommand, Str $guess) = $target.split: ' ';
     given $subcommand {
         when 'new'   { $hangman.start                                      }

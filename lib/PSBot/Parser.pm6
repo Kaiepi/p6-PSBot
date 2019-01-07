@@ -17,6 +17,7 @@ method new() {
 
     self.bless: :@rules;
 }
+
 method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $text) {
     my Str @lines = $text.lines;
     my Str $roomid;
@@ -41,15 +42,15 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
             when 'challstr' {
                 my Str $challstr = @rest.join: '|';
                 my Str $assertion = $state.authenticate: USERNAME, PASSWORD, $challstr;
-                $connection.send: "/trn {USERNAME},0,$assertion";
+                $connection.send-raw: "/trn {USERNAME},0,$assertion";
             }
             when 'updateuser' {
                 my (Str $username, Str $guest, Str $avatar) = @rest;
                 $state.update-user: $username, $guest, $avatar;
                 if $username eq USERNAME {
                     my Str @rooms = ROOMS.keys.elems > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
-                    $connection.send: "/autojoin {@rooms.join: ','}";
-                    $connection.send: "/avatar {AVATAR}";
+                    $connection.send-raw: "/autojoin {@rooms.join: ','}";
+                    $connection.send-raw: "/avatar {AVATAR}";
                 }
             }
             when 'deinit' {
@@ -78,7 +79,7 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
                 if $username ne $state.username {
                     for @!rules -> $rule {
                         my $result = $rule.match: $message, $room, $user, $state, $connection;
-                        $connection.send: $result, :$roomid if $result;
+                        $connection.send-raw: $result, :$roomid if $result;
                         last if $result;
                     }
                 }
