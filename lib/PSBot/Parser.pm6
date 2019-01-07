@@ -12,16 +12,13 @@ has PSBot::Rule @.rules;
 
 method new() {
     my PSBot::Rule @rules = [
-        # Add your own rules here.
+        # Add some rules here.
     ];
 
     self.bless: :@rules;
 }
 method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $text) {
-    my $matcher = / [ ^^ '>' <[a..z 0..9 -]>+ $$ ] | [ ^^ <[a..z 0..9 -]>* '|' <!before '|'> .+ $$ ] /;
-    my @lines = $text.lines.grep($matcher);
-    return unless @lines.first;
-
+    my Str @lines = $text.lines;
     my Str $roomid;
     $roomid = @lines.shift.substr(1) if @lines.first.starts-with: '>';
     $roomid //= 'lobby';
@@ -38,6 +35,7 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
     }
 
     for @lines -> $line {
+        next unless $line && $line.starts-with: '|';
         my (Str $type, Str @rest) = $line.substr(1).split('|');
         given $type {
             when 'challstr' {
@@ -77,9 +75,12 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
                 my PSBot::User $user     = $state.users{$userid};
                 my PSBot::Room $room     = $state.rooms{$roomid};
 
-                for @!rules -> $rule {
-                    my Str $result = $rule.match: $message, $room, $user, $state, $connection;
-                    $connection.send: $result, :$roomid if $result;
+                if $username ne $state.username {
+                    for @!rules -> $rule {
+                        my $result = $rule.match: $message, $room, $user, $state, $connection;
+                        $connection.send: $result, :$roomid if $result;
+                        last if $result;
+                    }
                 }
 
                 if $message.starts-with(COMMAND) && $username ne $state.username {

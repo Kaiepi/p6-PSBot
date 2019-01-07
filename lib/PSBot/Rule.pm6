@@ -16,9 +16,8 @@ method new(@roomids, Regex $matcher, &on-match) {
 }
 
 method match(Str $target, PSBot::Room $room, PSBot::User $user,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+        PSBot::StateManager $state, PSBot::Connection $connection) {
     return if $!roomids ∌ $room.id;
     $target ~~ $!matcher;
-    return &!on-match($/, $room, $user, $state, $connection) if $/;
-    Nil
+    &!on-match($/, $room, $user, $state, $connection) if $/;
 }
