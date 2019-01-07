@@ -98,13 +98,7 @@ our sub nick(Str $target, PSBot::User $user, PSBot::Room $room,
     return 'Nick must be under 18 characters.' if $username.chars >= 18;
     return "Only use passwords with this command in PMs." if $room && $password;
 
-    my $assertion;
-    if $password {
-        $assertion = PSBot::LoginServer.log-in: $username, $password, $state.challstr;
-    } else {
-        $assertion = PSBot::LoginServer.get-assertion: $username, $state.challstr;
-    }
-
+    my $assertion = $state.authenticate: $username, $password;
     if $assertion.defined {
         $connection.send: "/trn $username,0,$assertion";
         "Successfully nicked to $username!"
