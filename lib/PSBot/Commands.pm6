@@ -17,16 +17,41 @@ our sub eval(Str $target, PSBot::User $user, PSBot::Room $room,
     ($result // $!).gist
 }
 
-our sub primal(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    'C# sucks'
-}
-
 our sub say(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     return "{COMMAND}say access is limited to admins" unless ADMINS ∋ $user.id;
     return if $target ~~ / ^ <[!/]> <!before <[!/]> > /;
     $target
+}
+
+our sub nick(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+    return "{COMMAND}nick access is limited to admins" unless ADMINS ∋ $user.id;
+    return 'A nick and optionally a password must be provided.' unless $target;
+
+    my (Str $username, Str $password) = $target.split(',').map({ .trim });
+    return 'Nick must be under 18 characters.' if $username.chars >= 18;
+    return "Only use passwords with this command in PMs." if $room && $password;
+
+    my $assertion = $state.authenticate: $username, $password;
+    if $assertion.defined {
+        $connection.send: "/trn $username,0,$assertion";
+        "Successfully nicked to $username!"
+    } else {
+        "There was an error nicking to $username: {$assertion.exception.message}"
+    }
+}
+
+our sub suicide(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection) {
+    return "{COMMAND}suicide access is limited to admins" unless ADMINS ∋ $user.id;
+    $connection.send: '/logout';
+    exit 0;
+}
+
+our sub primal(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+    'C# sucks'
 }
 
 our sub eightball(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -87,24 +112,6 @@ our sub reminder(Str $target, PSBot::User $user, PSBot::Room $room,
     Promise.in($seconds).then({
         "{$user.name}, you set a reminder $time ago: $message"
     });
-}
-
-our sub nick(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    return "{COMMAND}nick access is limited to admins" unless ADMINS ∋ $user.id;
-    return 'A nick and optionally a password must be provided.' unless $target;
-
-    my (Str $username, Str $password) = $target.split(',').map({ .trim });
-    return 'Nick must be under 18 characters.' if $username.chars >= 18;
-    return "Only use passwords with this command in PMs." if $room && $password;
-
-    my $assertion = $state.authenticate: $username, $password;
-    if $assertion.defined {
-        $connection.send: "/trn $username,0,$assertion";
-        "Successfully nicked to $username!"
-    } else {
-        "There was an error nicking to $username: {$assertion.exception.message}"
-    }
 }
 
 our sub hangman(Str $target, PSBot::User $user, PSBot::Room $room,
