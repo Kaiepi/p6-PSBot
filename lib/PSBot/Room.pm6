@@ -1,13 +1,14 @@
 use v6.d;
+use PSBot::Game;
 use PSBot::Tools;
 unit class PSBot::Room;
 
-has Str     $.id;
-has Str     $.title;
-has Str     $.type;
-has Str     %.ranks;
-has SetHash $.userids;
-has         $.game;
+has Str         $.id;
+has Str         $.title;
+has Str         $.type;
+has Str         %.ranks;
+has SetHash     $.userids;
+has PSBot::Game $.game;
 
 method new(Str $id!, Str $title!, Str $type!, Str @userlist!) {
     my Str     %ranks    = @userlist.map({ to-id($_.substr(1)) => $_.substr(0, 1) });
@@ -39,7 +40,7 @@ method on-rename(Str $oldid, Str $userinfo) {
     $!userids{$userid}++;
 }
 
-method add-game($game) {
+method add-game(PSBot::Game $game) {
     $!game = $game;
 }
 

@@ -128,12 +128,12 @@ our sub hangman(Str $target, PSBot::User $user, PSBot::Room $room,
     given $subcommand {
         when 'new' {
             return "There is already a game of {$room.game.name} in progress!" if $room.game;
-            $room.add-game: PSBot::Games::Hangman.new: $room, $user;
+            $room.add-game: PSBot::Games::Hangman.new: $user;
             "A game of {$room.game.name} has been created."
         }
         when 'join' {
             return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
-            $room.game.join: $user 
+            $room.game.join: $user
         }
         when 'leave' {
             return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
@@ -149,11 +149,15 @@ our sub hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         }
         when 'guess' {
             return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
-            $room.game.guess: $user, $guess
+            my $res = $room.game.guess: $user, $guess;
+            $room.remove-game if $room.game.finished;
+            $res
         }
         when 'end' {
             return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
-            $room.game.end;
+            my Str $res = $room.game.end;
+            $room.remove-game;
+            $res;
         }
         default { "Unknown {COMMAND}hangman subcommand: $subcommand" }
     }

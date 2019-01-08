@@ -1,19 +1,16 @@
 use v6.d;
-use PSBot::Room;
 use PSBot::User;
 unit role PSBot::Game;
 
 has Str         $.name;
-has PSBot::Room $.room;
 has PSBot::User $.creator;
 has SetHash     $.players;
-has Bool        $.started          = False;
-has Bool        $.allow-late-joins = False;
+has Bool        $.started  = False;
+has Bool        $.finished = False;
+has Bool        $.allow-late-joins;
 
-method new(PSBot::Room $room, PSBot::User $creator, Bool :$allow-late-joins) {
-    my $self = self.bless: :$room, :$creator, :$allow-late-joins;
-    $room.add-game: $self;
-    $self
+method new(PSBot::User $creator, Bool :$allow-late-joins = False) {
+    self.bless: :$creator, :$allow-late-joins;
 }
 
 method start() {...}

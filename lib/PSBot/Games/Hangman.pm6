@@ -66,7 +66,7 @@ method guess(PSBot::User $player, Str $guess) {
 }
 
 method end() {
-    $!room.remove-game;
+    $!finished = True;
     my Str $ret = 'The game has ended.';
     $ret ~= " The word was $!word" if $!started;
     $ret
