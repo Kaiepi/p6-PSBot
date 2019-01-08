@@ -7,6 +7,7 @@ has Str     $.title;
 has Str     $.type;
 has Str     %.ranks;
 has SetHash $.userids;
+has         $.game;
 
 method new(Str $id!, Str $title!, Str $type!, Str @userlist!) {
     my Str     %ranks    = @userlist.map({ to-id($_.substr(1)) => $_.substr(0, 1) });
@@ -36,4 +37,12 @@ method on-rename(Str $oldid, Str $userinfo) {
     %!ranks{$userid} = $rank;
     $!userids{$oldid}:delete;
     $!userids{$userid}++;
+}
+
+method add-game($game) {
+    $!game = $game;
+}
+
+method remove-game() {
+    $!game = Nil;
 }

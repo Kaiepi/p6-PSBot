@@ -1,8 +1,8 @@
 use v6.d;
 use PSBot::Config;
 use PSBot::Connection;
+use PSBot::Games::Hangman;
 use PSBot::LoginServer;
-use PSBot::Plugins::Hangman;
 use PSBot::Room;
 use PSBot::StateManager;
 use PSBot::User;
@@ -122,13 +122,39 @@ our sub reminder(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our sub hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    state PSBot::Plugins::Hangman $hangman .= new;
+    return "{COMMAND}hangman can only be used in rooms." unless $room;
+
     my (Str $subcommand, Str $guess) = $target.split: ' ';
     given $subcommand {
-        when 'new'   { $hangman.start                                      }
-        when 'view'  { $hangman.print-progress                             }
-        when 'guess' { $hangman.guess: $guess                              }
-        when 'end'   { $hangman.end                                        }
-        default      { "Unknown {COMMAND}hangman subcommand: $subcommand." }
+        when 'new' {
+            return "There is already a game of {$room.game.name} in progress!" if $room.game;
+            $room.add-game: PSBot::Games::Hangman.new: $room, $user;
+            "A game of {$room.game.name} has been created."
+        }
+        when 'join' {
+            return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
+            $room.game.join: $user 
+        }
+        when 'leave' {
+            return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
+            $room.game.leave: $user
+        }
+        when 'players' {
+            return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
+            $room.game.players
+        }
+        when 'start' {
+            return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
+            $room.game.start
+        }
+        when 'guess' {
+            return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
+            $room.game.guess: $user, $guess
+        }
+        when 'end' {
+            return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
+            $room.game.end;
+        }
+        default { "Unknown {COMMAND}hangman subcommand: $subcommand" }
     }
 }

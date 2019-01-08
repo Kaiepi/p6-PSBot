@@ -12,7 +12,27 @@ has PSBot::Rule @.rules;
 
 method new() {
     my PSBot::Rule @rules = [
-        # Add some rules here.
+        PSBot::Rule.new(
+            ['showderp'],
+            / ^ <[iI]>\'?'ll show you' | 'THIS' $ /,
+            -> $match, $room, $user, $state, $connection {
+                '/me unzips'
+            }
+        ),
+        PSBot::Rule.new(
+            ['scholastic'],
+            rx:i/ ar\-?15 /,
+            -> $match, $room, $user, $state, $connection {
+                'The AR in AR-15 stands for assault rifle' unless floor rand * 10
+            }
+        ),
+        PSBot::Rule.new(
+            ['techcode'],
+            rx:i/'can i ask a question'/,
+            -> $match, $room, $user, $state, $connection {
+                "Don't ask if you can ask a question. Just ask it"
+            }
+        )
     ];
 
     self.bless: :@rules;
