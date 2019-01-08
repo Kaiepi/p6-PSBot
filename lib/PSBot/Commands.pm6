@@ -12,9 +12,16 @@ our sub eval(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     return "{COMMAND}eval access is limited to admins" unless ADMINS ∋ $user.id;
 
-    use MONKEY-SEE-NO-EVAL;
-    my $result = try EVAL $target;
-    ($result // $!).gist
+    my Str $res;
+    await Promise.anyof(
+        Promise.in(30).then({ $res = "Evaluating ``$target`` timed out after 30 seconds." }),
+        Promise.start({
+            use MONKEY-SEE-NO-EVAL;
+            my $result = try EVAL $target;
+            $res = ($result // $!).gist
+        })
+    );
+    $res
 }
 
 our sub say(Str $target, PSBot::User $user, PSBot::Room $room,
