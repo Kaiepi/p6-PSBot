@@ -1,0 +1,14 @@
+{
+	"username":               "",
+	"password":               "",
+	"avatar":                 "",
+	"host":                   "sim2.psim.us",
+	"port":                   443,
+	"ssl":                    true,
+	"serverid":               "showdown",
+	"command":                "$",
+	"rooms":                  [],
+	"admins":                 [],
+	"max_reconnect_attempts": 16,
+	"git":                    "https://github.com/Kaiepi/p6-PSBot"
+}
