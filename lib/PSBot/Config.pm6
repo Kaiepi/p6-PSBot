@@ -15,7 +15,8 @@ sub EXPORT(--> Hash) {
             COMMAND                => %config<command>,
             ROOMS                  => set(%config<rooms>.map: &to-roomid),
             ADMINS                 => set(%config<admins>.map: &to-id),
-            MAX_RECONNECT_ATTEMPTS => %config<max_reconnect_attempts>
+            MAX_RECONNECT_ATTEMPTS => %config<max_reconnect_attempts>,
+            GIT                    => %config<git>
         )
     }
 }

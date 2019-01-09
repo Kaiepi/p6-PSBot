@@ -36,13 +36,12 @@ our sub nick(Str $target, PSBot::User $user, PSBot::Room $room,
     return 'A nick and optionally a password must be provided.' unless $target;
 
     my (Str $username, Str $password) = $target.split(',').map({ .trim });
-    return 'Nick must be under 18 characters.' if $username.chars >= 18;
+    return 'Nick must be under 19 characters.' if $username.chars > 18;
     return "Only use passwords with this command in PMs." if $room && $password;
 
     my $assertion = $state.authenticate: $username, $password;
     if $assertion.defined {
         $connection.send-raw: "/trn $username,0,$assertion";
-        "Successfully nicked to $username!"
     } else {
         "There was an error nicking to $username: {$assertion.exception.message}"
     }
@@ -53,6 +52,11 @@ our sub suicide(Str $target, PSBot::User $user, PSBot::Room $room,
     return "{COMMAND}suicide access is limited to admins" unless ADMINS ∋ $user.id;
     $connection.send-raw: '/logout';
     exit 0;
+}
+
+our sub git(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+    "{$state.username}'s source code may be found at {GIT}"
 }
 
 our sub primal(Str $target, PSBot::User $user, PSBot::Room $room,

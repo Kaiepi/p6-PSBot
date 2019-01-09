@@ -53,50 +53,54 @@ of this, PSBot is not compatible with Windows.
 
 The following are the available config options:
 
-=item I<Str> B<username>
+=item Str I<username>
 
 The username the bot should use.
 
-=item I<Str> B<password>
+=item Str I<password>
 
 The password the bot should use. Set to null if no password is needed.
 
-=item I<Str> B<avatar>
+=item Str I<avatar>
 
 The avatar the bot should use.
 
-=item I<Str> B<host>
+=item Str I<host>
 
 The URL of the server you wish to connect to.
 
-=item I<Int> B<port>
+=item Int I<port>
 
 The port of the server you wish to connect to.
 
-=item I<Bool> B<ssl>
+=item Bool I<ssl>
 
 Whether or not to enable connecting using SSL. Set to true if the port is 443.
 
-=item I<Str> B<serverid>
+=item Str I<serverid>
 
 The ID of the server you wish to connect to.
 
-=item I<Str> B<command>
+=item Str I<command>
 
 The character that should precede all commands.
 
-=item I<Set> B<rooms>
+=item Set I<rooms>
 
 The list of rooms the bot should join.
 
-=item I<Set> B<admins>
+=item Set I<admins>
 
 The list of users who have admin access to the bot. Be wary of who you add to
 this list!
 
-=item I<Int> B<max_reconnect_attempts>
+=item Int I<max_reconnect_attempts>
 
 The maximum consecutive reconnect attempts allowed before the connection will
 throw.
+
+=item Str I<git>
+
+The link to the GitHub repo for the bot.
 
 =end pod
