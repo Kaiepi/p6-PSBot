@@ -69,8 +69,11 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
                 $state.update-user: $username, $guest, $avatar;
                 if $username eq USERNAME {
                     my Str @rooms = ROOMS.keys.elems > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
-                    $connection.send-raw: "/autojoin {@rooms.join: ','}";
-                    $connection.send-raw: "/avatar {AVATAR}";
+                    my Str @rest  = ROOMS.keys.elems > 11 ?? ROOMS.keys[11..*] !! [];
+                    $connection.send-raw:
+                        "/autojoin {@rooms.join: ','}",
+                        @rest.map({ "/join $_" }),
+                        "/avatar {AVATAR}";
                 }
             }
             when 'deinit' {
@@ -121,11 +124,7 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
                     start {
                         my $output = &command($target, $user, $room, $state, $connection);
                         $output = await $output if $output ~~ Promise;
-                        if $output ~~ Iterable {
-                            $connection.send-bulk: |$output, :$roomid if $output.elems;
-                        } else {
-                            $connection.send: $output, :$roomid if $output;
-                        }
+                        $connection.send: $output, :$roomid if $output;
                     }
                 }
             }
@@ -152,11 +151,7 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
                     start {
                         my $output = &command($target, $user, $room, $state, $connection);
                         $output = await $output if $output ~~ Promise;
-                        if $output ~~ Iterable {
-                            $connection.send-bulk: |$output, :$userid if $output.elems;
-                        } else {
-                            $connection.send: $output, :$userid if $output;
-                        }
+                        $connection.send: $output, :$userid if $output;
                     }
                 }
             }

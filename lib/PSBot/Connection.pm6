@@ -16,8 +16,10 @@ class X::PSBot::Connection::ReconnectFailure is Exception {
 
 has Cro::WebSocket::Client             $!client;
 has Cro::WebSocket::Client::Connection $.connection;
-has Supplier::Preserving               $.receiver .= new;
-has Int                                $.timeout   = 1;
+has Supplier::Preserving               $.receiver    .= new;
+has Supplier::Preserving               $.sender      .= new;
+has Tap                                $.tap;
+has Int                                $.timeout      = 1;
 
 submethod TWEAK(Cro::WebSocket::Client :$!client) { }
 
@@ -41,8 +43,8 @@ method connect() {
         debug '[DEBUG]', "Connection to {self.uri} failed: {$!.message}";
         await self.reconnect;
     } else {
-        debug '[DEBUG]', "Connected to {self.uri}!";
-        $!timeout = 1;
+        debug '[DEBUG]', "Connected to {self.uri}";
+
         $!connection.messages.tap(-> $data {
             my Str $text = await $data.body-text;
             if $text {
@@ -50,10 +52,18 @@ method connect() {
                 $!receiver.emit: $text;
             }
         }, done => {
+            $!tap.close;
             await self.reconnect;
         }, quit => {
+            $!tap.close;
             await self.reconnect;
         });
+
+        $!tap = $!sender.Supply.throttle(1, 0.6).tap(-> $data {
+            $!connection.send: $data;
+        });
+
+        $!timeout = 1;
     }
 }
 
@@ -69,59 +79,52 @@ method reconnect(--> Promise) {
     Promise.in($!timeout).then({ self.connect })
 }
 
-multi method send(Str $data!) {
-    if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '~~~ ' ] / {
-        debug '[SEND]', "| $data";
-        $!connection.send: "| $data";
-    } else {
+multi method send(*@data) {
+    for @data -> $data {
+        if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '~~~ ' ] / {
+            debug '[SEND]', "| $data";
+            $!sender.emit: "| $data";
+        } else {
+            debug '[SEND]', "|$data";
+            $!sender.emit: "|$data";
+        }
+    }
+}
+multi method send(*@data, Str :$roomid!) {
+    for @data -> $data {
+        if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '~~~ ' ] / {
+            debug '[SEND]', "$roomid| $data";
+            $!sender.emit: "$roomid| $data";
+        } else {
+            debug '[SEND]', "$roomid|$data";
+            $!sender.emit: "$roomid|$data";
+        }
+    }
+}
+multi method send(*@data, Str :$userid!) {
+    for @data -> $data {
+        debug '[SEND]', "|/w $userid, $data";
+        $!sender.emit: "|/w $userid, $data";
+    }
+}
+
+multi method send-raw(*@data) {
+    for @data -> $data {
         debug '[SEND]', "|$data";
-        $!connection.send: "|$data";
+        $!sender.emit: "|$data";
     }
 }
-multi method send(Str $data!, Str :$roomid!) {
-    if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '~~~ ' ] / {
-        debug '[SEND]', "$roomid| $data";
-        $!connection.send: "$roomid| $data";
-    } else {
+multi method send-raw(*@data, Str :$roomid!) {
+    for @data -> $data {
         debug '[SEND]', "$roomid|$data";
-        $!connection.send: "$roomid|$data";
+        $!sender.emit: "$roomid|$data";
     }
 }
-multi method send(Str $data!, Str :$userid!) {
-    debug '[SEND]', "|/w $userid, $data";
-    $!connection.send: "|/w $userid, $data"
-}
-
-multi method send-raw(Str $data!) {
-    debug '[SEND]', "|$data";
-    $!connection.send: "|$data"
-}
-multi method send-raw(Str $data!, Str :$roomid!) {
-    debug '[SEND]', "$roomid|$data";
-    $!connection.send: "$roomid|$data"
-}
-multi method send-raw(Str $data!, Str :$userid!) {
-    debug '[SEND]', "|/w $userid, $data";
-    $!connection.send: "|/w $userid, $data"
-}
-
-multi method send-bulk(*@data) {
-    my atomicint $i = 0;
-    await lazy for @data -> $data {
-        Promise.in($i⚛++ * 0.6).then({ self.send: $data });
+multi method send-raw(*@data, Str :$userid!) {
+    for @data -> $data {
+        debug '[SEND]', "|/w $userid, $data";
+        $!sender.emit: "|/w $userid, $data";
     }
-}
-multi method send-bulk(*@data, Str :$roomid!) {
-    my atomicint $i = 0;
-    await lazy for @data -> $data {
-        Promise.in($i⚛++ * 0.6).then({ self.send: $data, :$roomid });
-    };
-}
-multi method send-bulk(*@data, Str :$userid!) {
-    my atomicint $i = 0;
-    await lazy for @data -> $data {
-        Promise.in($i⚛++ * 0.6).then({ self.send: $data, :$userid });
-    };
 }
 
 method close(:$timeout = 1000 --> Promise) {
