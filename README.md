@@ -22,43 +22,47 @@ An example config file has been provided in psbot.json.example. This is to be co
 
 The following are the available config options:
 
-  * username
+  * *Str* **username**
 
 The username the bot should use.
 
-  * password
+  * *Str* **password**
 
-If any, the password the bot should use.
+The password the bot should use. Set to null if no password is needed.
 
-  * avatar
+  * *Str* **avatar**
 
 The avatar the bot should use.
 
-  * host
+  * *Str* **host**
 
 The URL of the server you wish to connect to.
 
-  * port
+  * *Int* **port**
 
 The port of the server you wish to connect to.
 
-  * ssl
+  * *Bool* **ssl**
 
 Whether or not to enable connecting using SSL. Set to true if the port is 443.
 
-  * serverid
+  * *Str* **serverid**
 
 The ID of the server you wish to connect to.
 
-  * command
+  * *Str* **command**
 
 The character that should precede all commands.
 
-  * rooms
+  * *Set* **rooms**
 
 The list of rooms the bot should join.
 
-  * admins
+  * *Set* **admins**
 
 The list of users who have admin access to the bot. Be wary of who you add to this list!
+
+  * *Int* **max_reconnect_attempts**
+
+The maximum consecutive reconnect attempts allowed before the connection will throw.
 
