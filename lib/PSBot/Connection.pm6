@@ -45,6 +45,11 @@ method connect() {
     } else {
         debug '[DEBUG]', "Connected to {self.uri}";
 
+        # Autojoin is sent as soon as the connection is opened.
+        my Str @autojoin = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
+        self.send-raw: "/autojoin {@autojoin.join: ','}";
+
+        # Pass any received messages back to PSBot to pass to the parser.
         $!connection.messages.tap(-> $data {
             my Str $text = await $data.body-text;
             if $text {
@@ -59,10 +64,9 @@ method connect() {
             await self.reconnect;
         });
 
-        my Str @autojoin = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
-        self.send-raw: "/autojoin {@autojoin.join: ','}";
-
+        # Throttle outgoing messages.
         $!tap = $!sender.Supply.throttle(1, 0.6).tap(-> $data {
+            debug '[SEND]', $data;
             $!connection.send: $data;
         });
 
@@ -85,10 +89,8 @@ method reconnect(--> Promise) {
 multi method send(*@data) {
     for @data -> $data {
         if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '~~~ ' ] / {
-            debug '[SEND]', "| $data";
             $!sender.emit: "| $data";
         } else {
-            debug '[SEND]', "|$data";
             $!sender.emit: "|$data";
         }
     }
@@ -96,36 +98,41 @@ multi method send(*@data) {
 multi method send(*@data, Str :$roomid!) {
     for @data -> $data {
         if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '~~~ ' ] / {
-            debug '[SEND]', "$roomid| $data";
             $!sender.emit: "$roomid| $data";
         } else {
-            debug '[SEND]', "$roomid|$data";
             $!sender.emit: "$roomid|$data";
         }
     }
 }
 multi method send(*@data, Str :$userid!) {
     for @data -> $data {
-        debug '[SEND]', "|/w $userid, $data";
         $!sender.emit: "|/w $userid, $data";
     }
 }
 
 multi method send-raw(*@data) {
     for @data -> $data {
-        debug '[SEND]', "|$data";
-        $!sender.emit: "|$data";
+        if $data.starts-with('/cmd userdetails') || $data.starts-with('>> ') {
+            # These commands are not throttled.
+            debug '[SEND]', "|$data";
+            $!connection.send: "|$data";
+        } else {
+            $!sender.emit: "|$data";
+        }
     }
 }
 multi method send-raw(*@data, Str :$roomid!) {
     for @data -> $data {
-        debug '[SEND]', "$roomid|$data";
-        $!sender.emit: "$roomid|$data";
+        if $data.starts-with: '>> ' {
+            # This command is not throttled.
+            $!connection.send: "|$data";
+        } else {
+            $!sender.emit: "$roomid|$data";
+        }
     }
 }
 multi method send-raw(*@data, Str :$userid!) {
     for @data -> $data {
-        debug '[SEND]', "|/w $userid, $data";
         $!sender.emit: "|/w $userid, $data";
     }
 }
