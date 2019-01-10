@@ -3,7 +3,7 @@ use PSBot::Config;
 use PSBot::Commands;
 use PSBot::Connection;
 use PSBot::Room;
-use PSBot::Rule;
+use PSBot::Rules;
 use PSBot::StateManager;
 use PSBot::Tools;
 use PSBot::User;
@@ -22,41 +22,20 @@ class X::PSBot::NameTaken is Exception {
 
 has PSBot::Connection   $.connection;
 has PSBot::StateManager $.state;
-has PSBot::Rule         @.rules;
+has PSBot::Rules        $.rules;
 has Supply              $.messages;
 
 method new() {
     my PSBot::Connection   $connection .= new: HOST, PORT, SSL;
-    my Supply              $messages    = $connection.receiver.Supply;
     my PSBot::StateManager $state      .= new;
-    my PSBot::Rule         @rules       = [
-        PSBot::Rule.new(
-            ['showderp'],
-            / ^ <[iI]>\'?'ll show you' | 'THIS' $ /,
-            -> $match, $room, $user, $state, $connection {
-                '/me unzips'
-            }
-        ),
-        PSBot::Rule.new(
-            ['scholastic'],
-            rx:i/ ar\-?15 /,
-            -> $match, $room, $user, $state, $connection {
-                'The AR in AR-15 stands for assault rifle' unless floor rand * 10
-            }
-        ),
-        PSBot::Rule.new(
-            ['techcode'],
-            rx:i/'can i ask a question'/,
-            -> $match, $room, $user, $state, $connection {
-                "Don't ask if you can ask a question. Just ask it"
-            }
-        )
-    ];
-    self.bless: :$connection, :$state, :@rules, :$messages;
+    my PSBot::Rules        $rules      .= new;
+    my Supply              $messages    = $connection.receiver.Supply;
+    self.bless: :$connection, :$state, :$rules, :$messages;
 }
 
 method start() {
     $!connection.connect;
+
     react {
         whenever $!messages -> $message {
             self.parse: $message;
@@ -79,6 +58,7 @@ method parse(Str $text) {
 
         # All that's left is logs, the infobox, and the roomintro, not relevant
         # to us at the moment.
+
         return;
     }
 
@@ -138,7 +118,7 @@ method parse(Str $text) {
                 my PSBot::Room $room     = $!state.rooms{$roomid};
 
                 if $username ne $!state.username {
-                    for @!rules -> $rule {
+                    for $!rules.chat -> $rule {
                         my $result = $rule.match: $message, $room, $user, $!state, $!connection;
                         $!connection.send-raw: $result, :$roomid if $result;
                         last if $result;
@@ -191,6 +171,36 @@ method parse(Str $text) {
                         $output = await $output if $output ~~ Promise;
                         $!connection.send: $output, :$userid if $output;
                     }
+                }
+            }
+            when 'html' {
+                my (Str $html) = @rest.join: '|';
+                my PSBot::Room $room = $!state.rooms{$roomid};
+                my PSBot::User $user = Nil;
+                for $!rules.html -> $rule {
+                    my $result = $rule.match: $html, $room, $user, $!state, $!connection;
+                    $!connection.send-raw: $result, :$roomid if $result;
+                    last if $result;
+                }
+            }
+            when 'popup' {
+                my (Str $message) = @rest.join: '|';
+                my PSBot::Room $room = Nil;
+                my PSBot::User $user = Nil;
+                for $!rules.popup -> $rule {
+                    my $result = $rule.match: $message, $room, $user, $!state, $!connection;
+                    $!connection.send-raw: $result, :$roomid if $result;
+                    last if $result;
+                }
+            }
+            when 'raw' {
+                my (Str $html) = @rest.join: '|';
+                my PSBot::Room $room = $!state.rooms{$roomid};
+                my PSBot::User $user = Nil;
+                for $!rules.raw -> $rule {
+                    my $result = $rule.match: $html, $room, $user, $!state, $!connection;
+                    $!connection.send-raw: $result, :$roomid if $result;
+                    last if $result;
                 }
             }
         }
