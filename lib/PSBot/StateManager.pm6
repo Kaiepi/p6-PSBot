@@ -12,7 +12,7 @@ has Bool $.guest;
 has Str  $.avatar;
 has Str  $.group;
 
-has Promise $.pending-rename is rw .= new;
+has Channel $.pending-rename.= new;
 
 has Lock::Async $.chat-mux .= new;
 has PSBot::User %.users;

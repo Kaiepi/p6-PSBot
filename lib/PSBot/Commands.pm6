@@ -43,8 +43,8 @@ our sub nick(Str $target, PSBot::User $user, PSBot::Room $room,
     if $assertion.defined {
         $state.pending-rename .= new;
         $connection.send-raw: "/trn $username,0,$assertion";
-        try await $state.pending-rename;
-        $! ?? $!.message !! "Successfully renamed to $username!"
+        my $res = await $state.pending-rename;
+        $res ~~ Exception ?? $res.message !! "Successfully renamed to $res!"
     } else {
         "Failed to rename to $username: {$assertion.exception.message}"
     }

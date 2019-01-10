@@ -70,17 +70,16 @@ method parse(Str $text) {
             when 'challstr' {
                 my Str $challstr = @rest.join: '|';
                 my Str $assertion = $!state.authenticate: USERNAME, PASSWORD, $challstr;
-                $!state.pending-rename .= new;
                 $!connection.send-raw: "/trn {USERNAME},0,$assertion";
                 start {
-                    try await $!state.pending-rename;
-                    $!.rethrow if $!;
+                    my $res = await $!state.pending-rename;
+                    $res.rethrow if $res ~~ Exception;
                 }
             }
             when 'updateuser' {
                 my (Str $username, Str $guest, Str $avatar) = @rest;
                 $!state.update-user: $username, $guest, $avatar;
-                $!state.pending-rename.keep;
+                $!state.pending-rename.send: $username;
                 if $username eq USERNAME {
                     my Str @autojoin = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
                     my Str @rooms    = +ROOMS > 11 ?? ROOMS.keys[11..*] !! [];
@@ -93,7 +92,7 @@ method parse(Str $text) {
             }
             when 'nametaken' {
                 my (Str $username, Str $reason) = @rest;
-                $!state.pending-rename.break:
+                $!state.pending-rename.send:
                     X::PSBot::NameTaken.new: :$username, :$reason
             }
             when 'queryresponse' {
