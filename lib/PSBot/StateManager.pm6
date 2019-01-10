@@ -29,6 +29,8 @@ method update-user(Str $username, Str $guest, Str $avatar) {
     $!avatar   = $avatar;
 }
 
+method set-avatar(Str $!avatar) {}
+
 method add-room(Str $roomid, Str $type, Str $title, Str @userlist) {
     $!chat-mux.protect({
         return if %!rooms ∋ $roomid;

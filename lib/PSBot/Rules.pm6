@@ -55,6 +55,16 @@ method new() {
     ];
     my Rule @html  = [];
     my Rule @popup = [];
-    my Rule @raw   = [];
+    my Rule @raw   = [
+        Rule.new(
+            [],
+            token { ^ '<img src="//play.pokemonshowdown.com/sprites/trainers/' $<avatar>=[<-[.]>+]  '.' <[a..z]>+ '" alt="" width="80" height="80" />' $ },
+            -> $match, $room, $user, $state, $connection {
+                my Str $avatar = ~$match<avatar>;
+                $avatar [R~]= '#' unless $avatar ~~ / ^ \d+ $ /;
+                $state.set-avatar: $avatar;
+            }
+        )
+    ];
     self.bless: :@chat, :@html, :@popup, :@raw;
 }
