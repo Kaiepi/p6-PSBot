@@ -239,8 +239,8 @@ synopsis. Note that C<PSBot.start> is blocking. Debug logging can be enabled by
 setting the C<DEBUG> environment variable to 1.
 
 An example config file has been provided in C<psbot.json.example>. This is to be
-copied over to C<~/.config/psbot.json> and edited to suit your needs. Because
-of this, PSBot is not compatible with Windows.
+copied over to C<~/.config/psbot.json> (C<%LOCALAPPDATA%\PSBot\psbot.json> on
+Windows) and edited to suit your needs.
 
 The following are the available config options:
 
