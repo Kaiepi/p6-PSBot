@@ -10,6 +10,7 @@ has Str  $.challstr;
 has Str  $.username;
 has Bool $.guest;
 has Str  $.avatar;
+has Str  $.group;
 
 has Promise $.pending-rename is rw .= new;
 
@@ -30,6 +31,7 @@ method update-user(Str $username, Str $guest, Str $avatar) {
 }
 
 method set-avatar(Str $!avatar) {}
+method set-group(Str $!group)   {}
 
 method add-room(Str $roomid, Str $type, Str $title, Str @userlist) {
     $!chat-mux.protect({

@@ -1,4 +1,5 @@
 use v6.d;
+use JSON::Fast;
 use PSBot::Config;
 use PSBot::Commands;
 use PSBot::Connection;
@@ -86,13 +87,21 @@ method parse(Str $text) {
                     $!connection.send-raw:
                         "/autojoin {@autojoin.join: ','}",
                         @rooms.map({ "/join $_" }),
-                        "/avatar {AVATAR}";
+                        "/avatar {AVATAR}",
+                        "/cmd userdetails {to-id $!state.username}";
                 }
             }
             when 'nametaken' {
                 my (Str $username, Str $reason) = @rest;
                 $!state.pending-rename.break:
                     X::PSBot::NameTaken.new: :$username, :$reason
+            }
+            when 'queryresponse' {
+                my (Str $type, Str $data) = @rest;
+                if $type eq 'userdetails' {
+                    my %data = from-json $data;
+                    $!state.set-group: %data<group> if %data<userid> eq to-id $!state.username;
+                }
             }
             when 'deinit' {
                 $!state.delete-room: $roomid;
@@ -108,6 +117,7 @@ method parse(Str $text) {
             when 'n' | 'N' {
                 my (Str $userinfo, Str $oldid) = @rest;
                 $!state.rename-user: $userinfo, $oldid, $roomid;
+                $!connection.send-raw: "/cmd userdetails {to-id $userinfo.substr: 1}" if $oldid eq to-id $!state.username;
             }
             when 'c:' {
                 my (Str $timestamp, Str $userinfo) = @rest;
@@ -226,9 +236,10 @@ PSBot is a Pokemon Showdown bot that will specialize in easily allowing the
 user to customize how the bot responds to messages.
 
 To run PSBot, simply run C<bin/psbot>, or in your own code, run the code in the
-synopsis. Note that C<PSBot.start> is blocking.
+synopsis. Note that C<PSBot.start> is blocking. Debug logging can be enabled by
+setting the C<DEBUG> environment variable to 1.
 
-An example config file has been provided in psbot.json.example. This is to be
+An example config file has been provided in C<psbot.json.example>. This is to be
 copied over to C<~/.config/psbot.json> and edited to suit your needs. Because
 of this, PSBot is not compatible with Windows.
 
