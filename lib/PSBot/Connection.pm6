@@ -59,6 +59,9 @@ method connect() {
             await self.reconnect;
         });
 
+        my Str @autojoin = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
+        self.send-raw: "/autojoin {@autojoin.join: ','}";
+
         $!tap = $!sender.Supply.throttle(1, 0.6).tap(-> $data {
             $!connection.send: $data;
         });

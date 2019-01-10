@@ -68,11 +68,9 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
                 my (Str $username, Str $guest, Str $avatar) = @rest;
                 $state.update-user: $username, $guest, $avatar;
                 if $username eq USERNAME {
-                    my Str @rooms = ROOMS.keys.elems > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
-                    my Str @rest  = ROOMS.keys.elems > 11 ?? ROOMS.keys[11..*] !! [];
+                    my Str @to-join = +ROOMS > 11 ?? ROOMS.keys[11..*] !! [];
                     $connection.send-raw:
-                        "/autojoin {@rooms.join: ','}",
-                        @rest.map({ "/join $_" }),
+                        @to-join.map({ "/join $_" }),
                         "/avatar {AVATAR}";
                 }
             }
