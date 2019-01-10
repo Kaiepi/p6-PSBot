@@ -4,6 +4,7 @@ unit class PSBot::User;
 
 has Str     $.id;
 has Str     $.name;
+has Str     $.group;
 has Str     %.ranks;
 has SetHash $.roomids;
 
@@ -15,6 +16,8 @@ method new(Str $userinfo!, Str $roomid!) {
     my SetHash $roomids .= new: ($roomid);
     self.bless: :$id, :$name, :%ranks, :$roomids;
 }
+
+method set-group(Str $!group) {}
 
 method on-join(Str $userinfo, Str $roomid) {
     my Str $rank = $userinfo.substr(0, 1);

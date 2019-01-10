@@ -57,6 +57,13 @@ method parse(Str $text) {
         my Str @userlist = @lines[2].substr(7).split(',')[1..*];
         $!state.add-room: $roomid, $type, $title, @userlist;
 
+        # FIXME: there *has* to be a better way of figuring out when to send these messages.
+        if $!state.rooms.keys.sort eqv ROOMS.keys.sort {
+            Promise.in(10).then({
+                $!connection.send-raw: $!state.users.keys.map(-> $userid { "/cmd userdetails $userid" })
+            });
+        }
+
         # All that's left is logs, the infobox, and the roomintro, not relevant
         # to us at the moment.
 
@@ -86,8 +93,7 @@ method parse(Str $text) {
                     $!connection.send-raw:
                         "/autojoin {@autojoin.join: ','}",
                         @rooms.map({ "/join $_" }),
-                        "/avatar {AVATAR}",
-                        "/cmd userdetails {to-id $!state.username}";
+                        "/avatar {AVATAR}";
                 }
             }
             when 'nametaken' {
@@ -99,7 +105,14 @@ method parse(Str $text) {
                 my (Str $type, Str $data) = @rest;
                 if $type eq 'userdetails' {
                     my %data = from-json $data;
-                    $!state.set-group: %data<group> if %data<userid> eq to-id $!state.username;
+                    my Str $userid = %data<userid>;
+                    $!state.set-group: %data<group> if $userid eq to-id $!state.username;
+
+                    my Str $group = %data<group>;
+                    if $!state.users ∋ $userid {
+                        my PSBot::User $user = $!state.users{$userid};
+                        $user.set-group: $group;
+                    }
                 }
             }
             when 'deinit' {
@@ -108,6 +121,10 @@ method parse(Str $text) {
             when 'j' | 'J' {
                 my (Str $userinfo) = @rest;
                 $!state.add-user: $userinfo, $roomid;
+
+                my Str         $userid = to-id $userinfo.substr: 1;
+                my PSBot::User $user   = $!state.users{$userid};
+                $!connection.send-raw: "/cmd userdetails $userid" unless defined $user.group;
             }
             when 'l' | 'L' {
                 my (Str $userinfo) = @rest;
@@ -116,7 +133,9 @@ method parse(Str $text) {
             when 'n' | 'N' {
                 my (Str $userinfo, Str $oldid) = @rest;
                 $!state.rename-user: $userinfo, $oldid, $roomid;
-                $!connection.send-raw: "/cmd userdetails {to-id $userinfo.substr: 1}" if $oldid eq to-id $!state.username;
+
+                my Str $userid = to-id $userinfo.substr: 1;
+                $!connection.send-raw: "/cmd userdetails $userid";
             }
             when 'c:' {
                 my (Str $timestamp, Str $userinfo) = @rest;
