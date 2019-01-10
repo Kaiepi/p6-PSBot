@@ -45,10 +45,6 @@ method connect() {
     } else {
         debug '[DEBUG]', "Connected to {self.uri}";
 
-        # Autojoin is sent as soon as the connection is opened.
-        my Str @autojoin = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
-        self.send-raw: "/autojoin {@autojoin.join: ','}";
-
         # Pass any received messages back to PSBot to pass to the parser.
         $!connection.messages.tap(-> $data {
             my Str $text = await $data.body-text;
