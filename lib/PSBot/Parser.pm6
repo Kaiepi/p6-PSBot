@@ -6,7 +6,18 @@ use PSBot::Room;
 use PSBot::Rule;
 use PSBot::StateManager;
 use PSBot::Tools;
-unit role PSBot::Parser;
+unit class PSBot::Parser;
+
+class X::PSBot::Parser::NameTaken is Exception {
+    has Str $.username;
+    has Str $.reason;
+    method message(--> Str) {
+        my Str $res = 'Failed to rename';
+        $res ~= " to $!username" if $!username;
+        $res ~= ": $!reason";
+        $res
+    }
+}
 
 has PSBot::Rule @.rules;
 
@@ -62,17 +73,28 @@ method parse(PSBot::Connection $connection, PSBot::StateManager $state, Str $tex
             when 'challstr' {
                 my Str $challstr = @rest.join: '|';
                 my Str $assertion = $state.authenticate: USERNAME, PASSWORD, $challstr;
+                $state.pending-rename .= new;
                 $connection.send-raw: "/trn {USERNAME},0,$assertion";
+                start {
+                    try await $state.pending-rename;
+                    $!.rethrow if $!;
+                }
             }
             when 'updateuser' {
                 my (Str $username, Str $guest, Str $avatar) = @rest;
                 $state.update-user: $username, $guest, $avatar;
+                $state.pending-rename.keep;
                 if $username eq USERNAME {
                     my Str @to-join = +ROOMS > 11 ?? ROOMS.keys[11..*] !! [];
                     $connection.send-raw:
                         @to-join.map({ "/join $_" }),
                         "/avatar {AVATAR}";
                 }
+            }
+            when 'nametaken' {
+                my (Str $username, Str $reason) = @rest;
+                $state.pending-rename.break:
+                    X::PSBot::Parser::NameTaken.new: :$username, :$reason
             }
             when 'deinit' {
                 $state.delete-room: $roomid;

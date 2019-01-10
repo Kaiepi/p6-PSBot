@@ -11,6 +11,8 @@ has Str  $.username;
 has Bool $.guest;
 has Str  $.avatar;
 
+has Promise $.pending-rename is rw .= new;
+
 has Lock::Async $.chat-mux .= new;
 has PSBot::User %.users;
 has PSBot::Room %.rooms;
