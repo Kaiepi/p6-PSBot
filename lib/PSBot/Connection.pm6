@@ -20,6 +20,7 @@ has Supplier::Preserving               $.receiver    .= new;
 has Supplier::Preserving               $.sender      .= new;
 has Tap                                $.tap;
 has Int                                $.timeout      = 1;
+has Promise                            $.inited;
 
 submethod TWEAK(Cro::WebSocket::Client :$!client) { }
 
@@ -67,6 +68,7 @@ method connect() {
         });
 
         $!timeout = 1;
+        $!inited .= new;
     }
 }
 

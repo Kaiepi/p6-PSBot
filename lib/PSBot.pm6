@@ -57,9 +57,9 @@ method parse(Str $text) {
         my Str @userlist = @lines[2].substr(7).split(',')[1..*];
         $!state.add-room: $roomid, $type, $title, @userlist;
 
-        # FIXME: there *has* to be a better way of figuring out when to send these messages.
-        if $!state.rooms.keys.sort eqv ROOMS.keys.sort {
-            Promise.in(2).then({
+        if $!state.rooms.keys.sort eqv ROOMS.keys.sort && $!connection.inited.status ~~ Planned {
+            $!connection.inited.keep;
+            Promise.in(1).then({
                 $!connection.send-raw: $!state.users.keys.map(-> $userid { "/cmd userdetails $userid" })
             });
         }
@@ -105,7 +105,7 @@ method parse(Str $text) {
                     my     %data   = from-json $data;
                     my Str $userid = %data<userid>;
                     my Str $group  = %data<group>;
-                    $!state.set-group: $group if $userid eq to-id($!state.username) && (not defined($!state.group) || $!state.group ne $group);
+                    $!state.set-group: $group if $userid eq to-id($!state.username) && (!defined($!state.group) || $!state.group ne $group);
 
                     if $!state.users ∋ $userid {
                         my PSBot::User $user = $!state.users{$userid};
@@ -122,7 +122,10 @@ method parse(Str $text) {
 
                 my Str         $userid = to-id $userinfo.substr: 1;
                 my PSBot::User $user   = $!state.users{$userid};
-                $!connection.send-raw: "/cmd userdetails $userid" unless defined $user.group;
+                start {
+                    await $!connection.inited;
+                    $!connection.send-raw: "/cmd userdetails $userid" unless defined $user.group;
+                }
             }
             when 'l' | 'L' {
                 my (Str $userinfo) = @rest;
@@ -133,7 +136,10 @@ method parse(Str $text) {
                 $!state.rename-user: $userinfo, $oldid, $roomid;
 
                 my Str $userid = to-id $userinfo.substr: 1;
-                $!connection.send-raw: "/cmd userdetails $userid";
+                start {
+                    await $!connection.inited;
+                    $!connection.send-raw: "/cmd userdetails $userid";
+                }
             }
             when 'c:' {
                 my (Str $timestamp, Str $userinfo) = @rest;
