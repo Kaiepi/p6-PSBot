@@ -186,7 +186,7 @@ method parse(Str $text) {
                 my Str $userid   = to-id $username;
                 if $!state.users ∋ $userid {
                     my PSBot::User $user = $!state.users{$userid};
-                    $user.set-group: $group if $user.group ne $group;
+                    $user.set-group: $group unless defined($user.group) && $user.group eq $group;
                 }
                 if $message.starts-with(COMMAND) && $username ne $!state.username {
                     my Int $idx = $message.index: ' ';
