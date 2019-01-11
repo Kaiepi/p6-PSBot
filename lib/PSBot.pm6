@@ -105,11 +105,11 @@ method parse(Str $text) {
                     my     %data   = from-json $data;
                     my Str $userid = %data<userid>;
                     my Str $group  = %data<group>;
-                    $!state.set-group: $group if $userid eq to-id($!state.username) && $!state.group ne $group;
+                    $!state.set-group: $group if $userid eq to-id($!state.username) && (not defined($!state.group) || $!state.group ne $group);
 
                     if $!state.users ∋ $userid {
                         my PSBot::User $user = $!state.users{$userid};
-                        $user.set-group: $group if $user.group ne $group;
+                        $user.set-group: $group unless defined($user.group) && $user.group eq $group;
                     }
                 }
             }
@@ -194,8 +194,14 @@ method parse(Str $text) {
                     return unless &command;
 
                     my Str         $target = trim $message.substr: $idx + 1;
-                    my PSBot::User $user   = $!state.users{$userid};
+                    my PSBot::User $user;
                     my PSBot::Room $room   = Nil;
+                    if $!state.users ∋ $userid {
+                        $user = $!state.users{$userid};
+                    } else {
+                        $user .= new: $from;
+                        $user.set-group: $group;
+                    }
 
                     start {
                         my $output = &command($target, $user, $room, $!state, $!connection);

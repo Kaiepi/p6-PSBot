@@ -8,11 +8,17 @@ has Str     $.group;
 has Str     %.ranks;
 has SetHash $.roomids;
 
-method new(Str $userinfo!, Str $roomid!) {
-    my Str     $rank     = $userinfo.substr(0, 1);
-    my Str     $name     = $userinfo.substr(1);
+multi method new(Str $userinfo) {
+    my Str     $name     = $userinfo.substr: 1;
     my Str     $id       = to-id $name;
-    my Str     %ranks    = ($id => $rank);
+    my SetHash $roomids .= new;
+    self.bless: :$id, :$name, :$roomids;
+}
+multi method new(Str $userinfo, Str $roomid) {
+    my Str     $group    = $userinfo.substr: 0, 1;
+    my Str     $name     = $userinfo.substr: 1;
+    my Str     $id       = to-id $name;
+    my         %ranks    = ($roomid => $group);
     my SetHash $roomids .= new: ($roomid);
     self.bless: :$id, :$name, :%ranks, :$roomids;
 }
