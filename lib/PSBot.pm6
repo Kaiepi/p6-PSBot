@@ -172,9 +172,9 @@ method parse(Str $text) {
                     my Str $userid = to-id $username;
 
                     start {
-                        my $output = &command($target, $user, $room, $!state, $!connection);
-                        $output = await $output if $output ~~ Promise;
-                        $!connection.send: $output, :$roomid if $output;
+                        my \output = &command($target, $user, $room, $!state, $!connection);
+                        output = await output if output ~~ Promise;
+                        $!connection.send: output, :$roomid if output;
                     }
                 }
             }
@@ -210,9 +210,9 @@ method parse(Str $text) {
                     }
 
                     start {
-                        my $output = &command($target, $user, $room, $!state, $!connection);
-                        $output = await $output if $output ~~ Promise;
-                        $!connection.send: $output, :$userid if $output;
+                        my \output = &command($target, $user, $room, $!state, $!connection);
+                        output = await output if output ~~ Promise;
+                        $!connection.send: output, :$userid if output;
                     }
                 }
             }

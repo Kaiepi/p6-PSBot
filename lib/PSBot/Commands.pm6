@@ -156,15 +156,15 @@ our sub hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         }
         when 'guess' {
             return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
-            my $res = $room.game.guess: $user, $guess;
+            my \res = $room.game.guess: $user, $guess;
             $room.remove-game if $room.game.finished;
-            $res
+            res
         }
         when 'end' {
             return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
-            my Str $res = $room.game.end;
+            my Str \res = $room.game.end;
             $room.remove-game;
-            $res;
+            res
         }
         default { "Unknown {COMMAND}hangman subcommand: $subcommand" }
     }
