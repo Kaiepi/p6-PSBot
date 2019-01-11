@@ -1,6 +1,7 @@
 use v6.d;
 use JSON::Fast;
 use PSBot::Config;
+use PSBot::CommandContext;
 use PSBot::Commands;
 use PSBot::Connection;
 use PSBot::Room;
@@ -178,7 +179,7 @@ method parse(Str $text) {
                     my Str $userid = to-id $username;
 
                     start {
-                        my \output = &command($target, $user, $room, $!state, $!connection);
+                        my \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
                         output = await output if output ~~ Promise;
                         $!connection.send: output, :$roomid if output;
                     }
@@ -216,7 +217,7 @@ method parse(Str $text) {
                     }
 
                     start {
-                        my \output = &command($target, $user, $room, $!state, $!connection);
+                        my \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
                         output = await output if output ~~ Promise;
                         $!connection.send: output, :$userid if output;
                     }
