@@ -108,7 +108,10 @@ method parse(Str $text) {
                     my     %data   = from-json $data;
                     my Str $userid = %data<userid>;
                     my Str $group  = %data<group>;
-                    $!state.set-group: $group if $userid eq to-id($!state.username) && (!defined($!state.group) || $!state.group ne $group);
+                    if $userid eq to-id($!state.username) && (!defined($!state.group) || $!state.group ne $group) {
+                        $!state.set-group: $group;
+                        $!connection.lower-throttle if $group ne ' ';
+                    }
 
                     if $!state.users ∋ $userid {
                         my PSBot::User $user = $!state.users{$userid};

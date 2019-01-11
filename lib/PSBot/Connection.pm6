@@ -87,6 +87,14 @@ method reconnect(--> Promise) {
     Promise.in($!timeout).then({ self.connect })
 }
 
+method lower-throttle() {
+    $!tap.close;
+    $!tap = $!sender.Supply.throttle(1, 0.3).tap(-> $data {
+        debug '[SEND]', $data;
+        $!connection.send: $data;
+    });
+}
+
 multi method send(*@data) {
     for @data -> $data {
         if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '~~~ ' ] / {
