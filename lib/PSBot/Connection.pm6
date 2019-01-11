@@ -115,7 +115,13 @@ multi method send(*@data, Str :$roomid!) {
 }
 multi method send(*@data, Str :$userid!) {
     for @data -> $data {
-        $!sender.emit: "|/w $userid, $data";
+        given $data {
+            when / ^ '/' <!before '/'> / { $!sender.emit: "|/w $userid, /$data" }
+            when / ^ '!' <!before '!'> / { $!sender.emit: "|/w $userid, !$data" }
+            when .starts-with: '~~ '     { $!sender.emit: "|/w $userid,  $data" }
+            when .starts-with: '~~~ '    { $!sender.emit: "|/w $userid,  $data" }
+            default                      { $!sender.emit: "|/w $userid, $data"  }
+        }
     }
 }
 
