@@ -88,10 +88,8 @@ method parse(Str $text) {
                 $!state.update-user: $username, $guest, $avatar;
                 $!state.pending-rename.send: $username;
                 if $username eq USERNAME {
-                    my Str @autojoin = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
-                    my Str @rooms    = +ROOMS > 11 ?? ROOMS.keys[11..*] !! [];
+                    my Str @rooms = ROOMS.keys;
                     $!connection.send-raw:
-                        "/autojoin {@autojoin.join: ','}",
                         @rooms.map({ "/join $_" }),
                         "/avatar {AVATAR}";
                 }
