@@ -97,15 +97,6 @@ our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
     }
 }
 
-our method pick(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    return "Permission denied." unless !$room || self.can: '+', $user.ranks{$room.id};
-
-    my @choices = $target.split(',').map({ .trim });
-    return 'More than one choice must be given.' if @choices.elems <= 1;
-    @choices[floor rand * @choices.elems]
-}
-
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     my Str ($time, $message) = $target.split(',').map({ .trim });
