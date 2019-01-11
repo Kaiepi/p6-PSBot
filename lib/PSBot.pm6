@@ -104,14 +104,14 @@ method parse(Str $text) {
             when 'queryresponse' {
                 my (Str $type, Str $data) = @rest;
                 if $type eq 'userdetails' {
-                    my %data = from-json $data;
+                    my     %data   = from-json $data;
                     my Str $userid = %data<userid>;
-                    $!state.set-group: %data<group> if $userid eq to-id $!state.username;
+                    my Str $group  = %data<group>;
+                    $!state.set-group: $group if $userid eq to-id($!state.username) && $!state.group ne $group;
 
-                    my Str $group = %data<group>;
                     if $!state.users ∋ $userid {
                         my PSBot::User $user = $!state.users{$userid};
-                        $user.set-group: $group;
+                        $user.set-group: $group if $user.group ne $group;
                     }
                 }
             }
@@ -177,8 +177,13 @@ method parse(Str $text) {
             when 'pm' {
                 my (Str $from, Str $to) = @rest;
                 my Str $message  = @rest[2..*].join: '|';
+                my Str $group    = $from.substr: 0, 1;
                 my Str $username = $from.substr: 1;
                 my Str $userid   = to-id $username;
+                if $!state.users ∋ $userid {
+                    my PSBot::User $user = $!state.users{$userid};
+                    $user.set-group: $group if $user.group ne $group;
+                }
                 if $message.starts-with(COMMAND) && $username ne $!state.username {
                     my Int $idx = $message.index: ' ';
                     $idx = $message.chars - 1 unless $idx;
