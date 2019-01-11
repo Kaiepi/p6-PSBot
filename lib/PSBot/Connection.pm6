@@ -16,11 +16,12 @@ class X::PSBot::Connection::ReconnectFailure is Exception {
 
 has Cro::WebSocket::Client             $!client;
 has Cro::WebSocket::Client::Connection $.connection;
+has Promise                            $.inited;
 has Supplier::Preserving               $.receiver    .= new;
 has Supplier::Preserving               $.sender      .= new;
+has Channel                            $.disconnects .= new;
 has Tap                                $.tap;
 has Int                                $.timeout      = 1;
-has Promise                            $.inited;
 
 submethod TWEAK(Cro::WebSocket::Client :$!client) { }
 
@@ -55,9 +56,11 @@ method connect() {
             }
         }, done => {
             $!tap.close;
+            $!disconnects.send: True;
             await self.reconnect;
         }, quit => {
             $!tap.close;
+            $!disconnects.send: True;
             await self.reconnect;
         });
 

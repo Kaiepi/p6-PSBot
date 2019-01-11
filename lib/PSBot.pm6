@@ -42,6 +42,9 @@ method start() {
             self.parse: $message;
             QUIT { $_.rethrow }
         }
+        whenever $!connection.disconnects {
+            $!state .= new;
+        }
     }
 }
 
