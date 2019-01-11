@@ -59,7 +59,7 @@ method parse(Str $text) {
 
         # FIXME: there *has* to be a better way of figuring out when to send these messages.
         if $!state.rooms.keys.sort eqv ROOMS.keys.sort {
-            Promise.in(10).then({
+            Promise.in(2).then({
                 $!connection.send-raw: $!state.users.keys.map(-> $userid { "/cmd userdetails $userid" })
             });
         }
