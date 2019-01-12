@@ -147,7 +147,7 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
     }
 
     my Int $id = $state.database.get-reminders.tail<id>.Int;
-    Promise.in($seconds).then({
+    sink $*SCHEDULER.cue({
         if $room {
             $connection.send: "{$user.name}, you set a reminder $time ago: $message", roomid => $room.id;
         } else {
@@ -155,7 +155,7 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
         }
 
         sink $state.database.remove-reminder: $id;
-    });
+    }, at => now + $seconds);
 }
 
 our method mail(Str $target, PSBot::User $user, PSBot::Room $room,

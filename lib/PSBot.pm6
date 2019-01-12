@@ -35,16 +35,15 @@ method new() {
     my Supply              $messages    = $connection.receiver.Supply;
 
     for $state.database.get-reminders -> %row {
-        my Num $seconds = %row<time> - now;
-        if $seconds > 0 {
-            Promise.in($seconds).then({
+        if %row<time> - now > 0 {
+            $*SCHEDULER.cue({
                 if %row<roomid> {
                     $connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
                 } else {
                     $connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
                 }
                 $state.database.remove-reminder: %row<id>.Int;
-            });
+            }, at => %row<time>);
         } else {
             $state.database.remove-reminder: %row<id>.Int;
         }
