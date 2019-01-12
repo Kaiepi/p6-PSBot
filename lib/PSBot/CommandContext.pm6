@@ -7,3 +7,7 @@ method can(Str $required, Str $target --> Bool) {
     my Map $ranks = Rank.enums;
     $ranks{$target} >= $ranks{$required}
 }
+
+method is-rank(Str $rank --> Bool) {
+    Rank.enums ∋ $rank
+}

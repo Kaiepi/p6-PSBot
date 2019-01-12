@@ -53,6 +53,15 @@ method new() {
         );
         STATEMENT
 
+    $dbh.do: q:to/STATEMENT/;
+        CREATE TABLE IF NOT EXISTS settings (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            roomid  TEXT NOT NULL,
+            command TEXT NOT NULL,
+            rank    TEXT NOT NULL
+        );
+        STATEMENT
+
     self.bless: :$dbh;
 }
 
@@ -154,6 +163,40 @@ method add-seen(Str $userid, Instant $time) {
             VALUES (?, ?);
             STATEMENT
         $sth.execute: $userid, $time;
+        $sth.finish;
+    }
+}
+
+method get-command(Str $roomid, Str $command) {
+    my $sth = $!dbh.prepare: q:to/STATEMENT/;
+        SELECT * FROM settings
+        WHERE roomid = ? AND command = ?;
+        STATEMENT
+    $sth.execute: $roomid, $command;
+    my %row = $sth.fetchrow-hash;
+    $sth.finish;
+
+    fail "No row was found for $command." unless %row;
+    %row<rank>
+}
+
+method set-command(Str $roomid, Str $command, Str $rank) {
+    my $res = self.get-command: $roomid, $command;
+    my $sth;
+    if $res.defined {
+        $sth = $!dbh.prepare: q:to/STATEMENT/;
+            UPDATE settings
+            SET rank = ?
+            WHERE roomid = ? AND command = ?;
+            STATEMENT
+        $sth.execute: $rank, $roomid, $command;
+        $sth.finish;
+    } else {
+        $sth = $!dbh.prepare: q:to/STATEMENT/;
+            INSERT INTO settings (roomid, command, rank)
+            VALUES (?, ?, ?);
+            STATEMENT
+        $sth.execute: $roomid, $command, $rank;
         $sth.finish;
     }
 }
