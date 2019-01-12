@@ -4,8 +4,8 @@
 /.panda-work
 /resources/*.so
 /resources/*.dylib
+/resources/database.sqlite3
 .precomp/
-/Net-Telnet-*
 
 *.swp
 *.swo
