@@ -43,7 +43,11 @@ method new() {
             ['scholastic'],
             token { :i ar\-?15 },
             -> $match, $room, $user, $state, $connection {
-                'The AR in AR-15 stands for assault rifle' unless floor rand * 10
+                state $timeout = now - 600;
+                if now - $timeout >= 600 {
+                    $timeout = now;
+                    'The AR in AR-15 stands for assault rifle'
+                }
             }
         ),
         Rule.new(
