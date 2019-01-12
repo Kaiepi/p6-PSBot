@@ -26,6 +26,7 @@ has PSBot::Connection   $.connection;
 has PSBot::StateManager $.state;
 has PSBot::Rules        $.rules;
 has Supply              $.messages;
+has atomicint           $.rooms-joined = 0;
 
 method new() {
     my PSBot::Connection   $connection .= new: HOST, PORT, SSL;
@@ -35,7 +36,6 @@ method new() {
 
     for $state.database.get-reminders -> %row {
         my Num $seconds = %row<time> - now;
-
         if $seconds > 0 {
             Promise.in($seconds).then({
                 if %row<roomid> {
@@ -63,6 +63,7 @@ method start() {
         }
         whenever $!connection.disconnects {
             $!state .= new;
+            $!rooms-joined = 0;
         }
     }
 }
@@ -79,9 +80,9 @@ method parse(Str $text) {
         my Str @userlist = @lines[2].substr(7).split(',')[1..*];
         $!state.add-room: $roomid, $type, $title, @userlist;
 
-        if $!state.rooms.keys.sort eqv ROOMS.keys.sort && $!connection.inited.status ~~ Planned {
+        if ++⚛$!rooms-joined == +ROOMS {
             $!connection.inited.keep;
-            Promise.in(1).then({
+            $*SCHEDULER.cue({
                 $!connection.send-raw: $!state.users.keys.map(-> $userid { "/cmd userdetails $userid" })
             });
         }
