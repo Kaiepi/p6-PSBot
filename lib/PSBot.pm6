@@ -213,6 +213,24 @@ method parse(Str $text) {
                     my PSBot::User $user = $!state.users{$userid};
                     $user.set-group: $group unless defined($user.group) && $user.group eq $group;
                 }
+
+                my PSBot::User $user;
+                my PSBot::Room $room = Nil;
+                if $!state.users ∋ $userid {
+                    $user = $!state.users{$userid};
+                } else {
+                    $user .= new: $from;
+                    $user.set-group: $group;
+                }
+
+                if $username ne $!state.username {
+                    for $!rules.pm -> $rule {
+                        my $result = $rule.match: $message, $room, $user, $!state, $!connection;
+                        $!connection.send-raw: $result, :$roomid if $result;
+                        last if $result;
+                    }
+                }
+
                 if $message.starts-with(COMMAND) && $username ne $!state.username {
                     my Int $idx = $message.index: ' ';
                     $idx = $message.chars - 1 unless $idx;
@@ -224,17 +242,8 @@ method parse(Str $text) {
                     my &command = try &PSBot::Commands::($command);
                     return unless &command;
 
-                    my Str         $target = trim $message.substr: $idx + 1;
-                    my PSBot::User $user;
-                    my PSBot::Room $room   = Nil;
-                    if $!state.users ∋ $userid {
-                        $user = $!state.users{$userid};
-                    } else {
-                        $user .= new: $from;
-                        $user.set-group: $group;
-                    }
-
                     start {
+                        my Str $target = trim $message.substr: $idx + 1;
                         my \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
                         output = await output if output ~~ Promise;
                         $!connection.send: output, :$userid if output;

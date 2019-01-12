@@ -25,6 +25,7 @@ my class Rule {
 }
 
 has Rule @.chat;
+has Rule @.pm;
 has Rule @.html;
 has Rule @.popup;
 has Rule @.raw;
@@ -53,6 +54,16 @@ method new() {
             }
         )
     ];
+    my Rule @pm    = [
+        Rule.new(
+            [],
+            token { ^ '/invite ' $<roomid>=[<[a..z]>+] $ },
+            -> $match, $room, $user, $state, $connection {
+                my Str $roomid = ~$match<roomid>;
+                $connection.send-raw: "/join $roomid" if $user.group !~~ ' ' | '+';
+            }
+        )
+    ];
     my Rule @html  = [];
     my Rule @popup = [];
     my Rule @raw   = [
@@ -66,5 +77,5 @@ method new() {
             }
         )
     ];
-    self.bless: :@chat, :@html, :@popup, :@raw;
+    self.bless: :@chat, :@pm, :@html, :@popup, :@raw;
 }
