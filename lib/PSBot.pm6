@@ -220,7 +220,7 @@ method parse(Str $text) {
                 if $message.starts-with(COMMAND) && $username ne $!state.username {
                     return unless $message ~~ / ^ $(COMMAND) $<command>=[<[a..z 0..9]>*] [ <.ws> $<target>=[.+] ]? $ /;
                     my Str $command = ~$<command>;
-                    my Str $target  = ~$<target>;
+                    my Str $target  = ~$<target> if defined $<target>;
                     my Str $userid  = to-id $username;
                     return unless $command;
 
