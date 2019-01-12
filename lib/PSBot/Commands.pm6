@@ -204,8 +204,8 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     return 'Permission denied.' unless $room && self.can: '@', $user.ranks{$room.id};
     
-    my (Str $command, Str $rank) = $target.split(',').map({ .trim });
-    $rank = ' ' unless defined $rank;
+    my (Str $command, $rank) = $target.split(',').map({ .trim });
+    $rank = ' ' unless $rank;
     return "'$rank' is not a rank." unless self.is-rank: $rank;
 
     my &command = try &::("OUR::$command");
