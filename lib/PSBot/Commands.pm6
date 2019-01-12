@@ -1,6 +1,7 @@
 use v6.d;
 use Cro::HTTP::Client;
 use Cro::HTTP::Response;
+use Hastebin;
 use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Games::Hangman;
@@ -162,7 +163,7 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
 }
 
 our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection) {
+        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     my Int $idx = $target.index: ',';
     return 'A username and a message must be included.' unless $idx;
 
@@ -259,4 +260,32 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         }
         default { "Unknown {COMMAND}hangman subcommand: $subcommand" }
     }
+}
+
+our method help(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+    my Str $help = q:to/END/;
+        - eval <expression>:            Evaluates an expression. Requires admin access to the bot.
+        - say <message>:                Says a message in the room or PMs the command was sent in. Requires admin access to the bot.
+        - nick <username>, <password>?: Logs the bot into the account given. Password is optional. Requires admin access to the bot.
+        - suicide:                      Kills the bot. Requires admin access to the bot.
+        - git:                          Returns the GitHub repo for the bot. Requires at least rank + by default.
+        - primal:                       Returns 'C# sucks'.
+        - eightball <question>:         Returns an 8ball message in response to the given question. Requires at least rank + by default.
+        - urban <term>:                 Returns the link to the Urban Dictionary definition for the given term. Requires at least rank + by default.
+        - reminder <time>, <message>  : Sets a reminder with the given message to be sent in the given time.
+        - mail <username>, <message>:   Mails the given message to the given user once they log on.
+        - seen <username>:              Returns the last time the given user was seen. Requires at least rank + by default.
+        - set <command>, <rank>:        Sets the rank required to use the given command to the given rank. Requires at least rank # by default.
+        - hangman:                      Requires at least rank + by default.
+            - hangman new: Starts a new hangman game.
+            - hangman join: Joins the hangman game. This can only be used before the game has been started.
+            - hangman start: Starts the hangman game.
+            - hangman guess <letter>: Guesses the given letter.
+            - hangman guess <word>: Guesses the given word.
+            - hangman end: Ends the hangman game.
+            - hangman players: Returns a list of the players in the hangman game. 
+        END
+    my Str $url = Hastebin.post: $help;
+    "{$state.username} help may be found at: $url"
 }
