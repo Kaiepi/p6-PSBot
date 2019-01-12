@@ -218,18 +218,14 @@ method parse(Str $text) {
                 }
 
                 if $message.starts-with(COMMAND) && $username ne $!state.username {
-                    my Int $idx = $message.index: ' ';
-                    $idx = $message.chars - 1 unless $idx;
-                    return if $idx == 1;
-
-                    my Str $command = to-id $message.substr: 1, $idx;
+                    return unless $message ~~ / ^ $(COMMAND) $<command>=[<[a..z 0..9]>*] [ <.ws> $<target>=[.+] ]? $ /;
+                    my Str $command = ~$<command>;
+                    my Str $target  = ~$<target>;
+                    my Str $userid  = to-id $username;
                     return unless $command;
 
                     my &command = try &PSBot::Commands::($command);
                     return $!connection.send: "{COMMAND}$command is not a valid command.", :$roomid  unless &command;
-
-                    my Str $target = trim $message.substr: $idx + 1;
-                    my Str $userid = to-id $username;
 
                     start {
                         my \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
@@ -267,18 +263,16 @@ method parse(Str $text) {
                 }
 
                 if $message.starts-with(COMMAND) && $username ne $!state.username {
-                    my Int $idx = $message.index: ' ';
-                    $idx = $message.chars - 1 unless $idx;
-                    return if $idx == 1;
-
-                    my Str $command = to-id $message.substr: 1, $idx;
+                    return unless $message ~~ / ^ $(COMMAND) $<command>=[<[a..z 0..9]>*] [ <.ws> $<target>=[.+] ]? $ /;
+                    my Str $command = ~$<command>;
+                    my Str $target  = ~$<target>;
+                    my Str $userid  = to-id $username;
                     return unless $command;
 
                     my &command = try &PSBot::Commands::($command);
                     return $!connection.send: "{COMMAND}$command is not a valid command.", :$userid unless &command;
 
                     start {
-                        my Str $target = trim $message.substr: $idx + 1;
                         my \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
                         output = await output if output ~~ Promise;
                         $!connection.send: output, :$userid if output;
@@ -377,7 +371,7 @@ The ID of the server you wish to connect to.
 
 =item Str I<command>
 
-The character that should precede all commands.
+The command string that should precede all commands.
 
 =item Set I<rooms>
 

@@ -52,7 +52,7 @@ The ID of the server you wish to connect to.
 
   * Str *command*
 
-The character that should precede all commands.
+The command string that should precede all commands.
 
   * Set *rooms*
 
