@@ -226,7 +226,7 @@ method parse(Str $text) {
                     return unless $command;
 
                     my &command = try &PSBot::Commands::($command);
-                    return unless &command;
+                    return $!connection.send: "{COMMAND}$command is not a valid command.", :$roomid  unless &command;
 
                     my Str $target = trim $message.substr: $idx + 1;
                     my Str $userid = to-id $username;
@@ -275,7 +275,7 @@ method parse(Str $text) {
                     return unless $command;
 
                     my &command = try &PSBot::Commands::($command);
-                    return unless &command;
+                    return $!connection.send: "{COMMAND}$command is not a valid command.", :$userid unless &command;
 
                     start {
                         my Str $target = trim $message.substr: $idx + 1;
