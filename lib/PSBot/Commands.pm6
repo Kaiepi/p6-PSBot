@@ -205,15 +205,15 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
     my $rank = $state.database.get-command($room.id, 'set') || '#';
     return 'Permission denied.' unless $room && self.can: $rank, $user.ranks{$room.id};
 
-    my (Str $command, $rank) = $target.split(',').map({ .trim });
-    $rank = ' ' unless $rank;
-    return "'$rank' is not a rank." unless self.is-rank: $rank;
+    my (Str $command, $target-rank) = $target.split(',').map({ .trim });
+    $target-rank = ' ' unless $target-rank;
+    return "'$target-rank' is not a rank." unless self.is-rank: $target-rank;
 
     my &command = try &::("OUR::$command");
     return "{COMMAND}$command doe not exist." unless defined &command;
 
-    $state.database.set-command: $room.id, $command, $rank;
-    "{COMMAND}$command was set to '$rank'.";
+    $state.database.set-command: $room.id, $command, $target-rank;
+    "{COMMAND}$command was set to '$target-rank'.";
 }
 
 our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
