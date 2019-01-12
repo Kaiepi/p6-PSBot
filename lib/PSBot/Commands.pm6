@@ -281,25 +281,38 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
     return "{$state.username} help may be found at: $url" if defined($url) && now - $timeout <= 60 * 60 * 24 * 30;
 
     my Str $help = q:to/END/;
-        - eval <expression>:            Evaluates an expression. Requires admin access to the bot.
+        - eval <expression>:            Evaluates an expression.
+                                        Requires admin access to the bot.
+
         - say <message>:                Says a message in the room or PMs the command was sent in.
                                         Requires admin access to the bot.
+
         - nick <username>, <password>?: Logs the bot into the account given. Password is optional.
                                         Requires admin access to the bot.
+
         - suicide:                      Kills the bot. Requires admin access to the bot.
+
         - git:                          Returns the GitHub repo for the bot.
                                         Requires at least rank + by default.
+
         - primal:                       Returns 'C# sucks'.
+
         - eightball <question>:         Returns an 8ball message in response to the given question.
                                         Requires at least rank + by default.
+
         - urban <term>:                 Returns the link to the Urban Dictionary definition for the given term.
                                         Requires at least rank + by default.
+
         - reminder <time>, <message>  : Sets a reminder with the given message to be sent in the given time.
+
         - mail <username>, <message>:   Mails the given message to the given user once they log on.
+
         - seen <username>:              Returns the last time the given user was seen.
                                         Requires at least rank + by default.
+
         - set <command>, <rank>:        Sets the rank required to use the given command to the given rank.
                                         Requires at least rank # by default.
+
         - hangman:
             - hangman new:              Starts a new hangman game.
                                         Requires at least rank + by default.
