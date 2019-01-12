@@ -190,7 +190,7 @@ our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my $time = $state.database.get-seen: $userid;
     if $time.defined {
-        "$target was last seen on {$time.yyyy-mm-dd} at {$time.hh-mm-ss}."
+        "$target was last seen on {$time.yyyy-mm-dd} at {$time.hh-mm-ss} UTC."
     } else {
         "$target has never been seen before."
     }
