@@ -36,12 +36,21 @@ method new() {
         );
         STATEMENT
 
+    $dbh.do: q:to/STATEMENT/;
+        CREATE TABLE IF NOT EXISTS mailbox (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            target  TEXT NOT NULL,
+            source  TEXT NOT NULL,
+            message TEXT NOT NULL
+        );
+        STATEMENT
+
     self.bless: :$dbh;
 }
 
 
 method get-reminders(--> Array) {
-    my $sth = $!dbh.prepare: qq:to/STATEMENT/;
+    my $sth = $!dbh.prepare: q:to/STATEMENT/;
         SELECT * FROM reminders;
         STATEMENT
     $sth.execute;
@@ -52,7 +61,7 @@ method get-reminders(--> Array) {
 }
 
 multi method add-reminder(Str $name, Str $time-ago, Instant $time, Str $reminder, Str :$userid!) {
-    my $sth = $!dbh.prepare: qq:to/STATEMENT/;
+    my $sth = $!dbh.prepare: q:to/STATEMENT/;
         INSERT INTO reminders (name, time_ago, userid,  roomid, time, reminder)
         VALUES (?, ?, ?, NULL, ?, ?);
         STATEMENT
@@ -60,7 +69,7 @@ multi method add-reminder(Str $name, Str $time-ago, Instant $time, Str $reminder
     $sth.finish;
 }
 multi method add-reminder(Str $name, Str $time-ago, Instant $time, Str $reminder, Str :$roomid!) {
-    my $sth = $!dbh.prepare: qq:to/STATEMENT/;
+    my $sth = $!dbh.prepare: q:to/STATEMENT/;
         INSERT INTO reminders (name, time_ago, userid, roomid, time, reminder)
         VALUES (?, ?, NULL, ?, ?, ?);
         STATEMENT
@@ -69,10 +78,40 @@ multi method add-reminder(Str $name, Str $time-ago, Instant $time, Str $reminder
 }
 
 method remove-reminder(Int $id) {
-    my $sth = $!dbh.prepare: qq:to/STATEMENT/;
+    my $sth = $!dbh.prepare: q:to/STATEMENT/;
         DELETE FROM reminders
         WHERE id = ?;
         STATEMENT
     $sth.execute: $id;
+    $sth.finish;
+}
+
+method get-mail(Str $to --> Array) {
+    my $sth = $!dbh.prepare: q:to/STATEMENT/;
+        SELECT * FROM mailbox
+        WHERE target = ?;
+        STATEMENT
+    $sth.execute: $to;
+    my @rows = [$sth.fetchall-AoH];
+    @rows = @rows.flat if @rows.first ~~ List;
+    $sth.finish;
+    @rows;
+}
+
+method add-mail(Str $to, Str $from, Str $message) {
+    my $sth = $!dbh.prepare: q:to/STATEMENT/;
+        INSERT INTO mailbox (target, source, message)
+        VALUES (?, ?, ?);
+        STATEMENT
+    $sth.execute: $to, $from, $message;
+    $sth.finish;
+}
+
+method remove-mail(Str $to) {
+    my $sth = $!dbh.prepare: q:to/STATEMENT/;
+        DELETE FROM mailbox
+        WHERE target = ?;
+        STATEMENT
+    $sth.execute: $to;
     $sth.finish;
 }

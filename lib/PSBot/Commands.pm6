@@ -5,6 +5,7 @@ use PSBot::Games::Hangman;
 use PSBot::LoginServer;
 use PSBot::Room;
 use PSBot::StateManager;
+use PSBot::Tools;
 use PSBot::User;
 unit module PSBot::Commands;
 
@@ -99,7 +100,7 @@ our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str ($time, $message) = $target.split(',').map({ .trim });
+    my (Str $time, Str $message) = $target.split(',').map({ .trim });
     return 'A time (e.g. 30s, 10m, 2h) and a message must be given.' unless $time && $message;
 
     my Int $seconds = 0;
@@ -132,13 +133,36 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
     });
 }
 
+our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection) {
+    my Int $idx = $target.index: ',';
+    return 'A username and a message must be included.' unless $idx;
+
+    my Str   $username = $target.substr: 0, $idx;
+    my Str   $userid   = to-id $username;
+    my Str   $message  = $target.substr: $idx + 1;
+    return 'No username was given.' unless $userid;
+    return 'No message was given.'  unless $message;
+
+    my @mail = $state.database.get-mail: $userid;
+    return $username ~ "'s mailbox is full." if +@mail == 5;
+
+    if $state.users ∋ $userid {
+        $connection.send: ["You received 1 mail:", "[{$user.id}] $message"], :$userid;
+    } else {
+        $state.database.add-mail: $userid, $user.id, $message;
+    }
+
+    "Your mail has been delivered to $username."
+}
+
 our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return "Permission denied." unless !$room || self.can: '+', $user.ranks{$room.id};
     return "{COMMAND}hangman can only be used in rooms." unless $room;
 
-    my (Str $methodcommand, Str $guess) = $target.split: ' ';
-    given $methodcommand {
+    my (Str $subcommand, Str $guess) = $target.split: ' ';
+    given $subcommand {
         when 'new' {
             return "There is already a game of {$room.game.name} in progress!" if $room.game;
             $room.add-game: PSBot::Games::Hangman.new: $user;
@@ -172,6 +196,6 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
             $room.remove-game;
             res
         }
-        default { "Unknown {COMMAND}hangman methodcommand: $methodcommand" }
+        default { "Unknown {COMMAND}hangman subcommand: $subcommand" }
     }
 }

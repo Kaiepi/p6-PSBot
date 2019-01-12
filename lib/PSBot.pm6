@@ -82,9 +82,21 @@ method parse(Str $text) {
 
         if ++⚛$!rooms-joined == +ROOMS {
             $!connection.inited.keep;
+
             $*SCHEDULER.cue({
                 $!connection.send-raw: $!state.users.keys.map(-> $userid { "/cmd userdetails $userid" })
             });
+
+            for $!state.users.keys -> $userid {
+                my @mail = $!state.database.get-mail: $userid;
+                if +@mail {
+                    $!connection.send:
+                        "You received {+@mail} mail:",
+                        @mail.map(-> %data { "[%data<source>] %data<message>" }),
+                        :$userid;
+                    $!state.database.remove-mail: $userid;
+                }
+            }
         }
 
         # All that's left is logs, the infobox, and the roomintro, not relevant
@@ -146,9 +158,18 @@ method parse(Str $text) {
                 my (Str $userinfo) = @rest;
                 $!state.add-user: $userinfo, $roomid;
 
-                my Str         $userid = to-id $userinfo.substr: 1;
-                my PSBot::User $user   = $!state.users{$userid};
+                my Str $userid = to-id $userinfo.substr: 1;
+                my     @mail   = $!state.database.get-mail: $userid;
+                if +@mail {
+                    $!connection.send:
+                        "You receieved {+@mail} mail:",
+                        @mail.map(-> %row { "[%row<source>] %row<message>" }),
+                        :$userid;
+                    $!state.database.remove-mail: $userid;
+                }
+
                 start {
+                    my PSBot::User $user = $!state.users{$userid};
                     await $!connection.inited;
                     $!connection.send-raw: "/cmd userdetails $userid" unless defined $user.group;
                 }
@@ -162,6 +183,15 @@ method parse(Str $text) {
                 $!state.rename-user: $userinfo, $oldid, $roomid;
 
                 my Str $userid = to-id $userinfo.substr: 1;
+                my     @mail   = $!state.database.get-mail: $userid;
+                if +@mail {
+                    $!connection.send:
+                        "You receieved {+@mail} mail:",
+                        @mail.map(-> %row { "[%row<source>] %row<message>" }),
+                        :$userid;
+                    $!state.database.remove-mail: $userid;
+                }
+
                 start {
                     await $!connection.inited;
                     $!connection.send-raw: "/cmd userdetails $userid";
