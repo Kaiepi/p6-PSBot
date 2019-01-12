@@ -3,7 +3,7 @@
     "Ben Davies"
   ],
   "build-depends" : [ ],
-  "depends" : [ "Cro::WebSocket::Client" ],
+  "depends" : [ "Cro::WebSocket", "DBIish" ],
   "description" : "Pokémon Showdown chat bot",
   "license" : "Artistic-2.0",
   "name" : "PSBot",
@@ -11,7 +11,7 @@
   "provides" : {
     "PSBot" : "lib/PSBot.pm6"
   },
-  "resources" : [ "dictionary" ],
+  "resources" : [ "dictionary", "database.sqlite3" ],
   "source-url" : "https://github.com/Kaiepi/p6-PSBot.git",
   "tags" : [ ],
   "test-depends" : [ "Test" ],

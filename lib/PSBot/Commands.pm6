@@ -111,16 +111,24 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
         when / ^ ( <[0..9]>+ ) [w | <.ws> weeks  ] $ / { $seconds += $0.Int * 60 * 60 * 24 * 7 }
         default                                        { return 'Invalid time.'                }
     }
-    return 'Your timeout is too long. Please keep it under a year long.' if $seconds >= 60 * 60 * 24 * 365;
 
     if $room {
-        $connection.send: "You set a reminder for $time from now.", :roomid($room.id);
+        $connection.send: "You set a reminder for $time from now.", roomid => $room.id;
+        $state.database.add-reminder: $user.name, $time, now + $seconds, $message, roomid => $room.id;
     } else {
-        $connection.send: "You set a reminder for $time from now.", :userid($user.id);
+        $connection.send: "You set a reminder for $time from now.", userid => $user.id;
+        $state.database.add-reminder: $user.name, $time, now + $seconds, $message, userid => $user.id;
     }
 
+    my Int $id = $state.database.get-reminders.tail<id>.Int;
     Promise.in($seconds).then({
-        "{$user.name}, you set a reminder $time ago: $message"
+        if $room {
+            $connection.send: "{$user.name}, you set a reminder $time ago: $message", roomid => $room.id;
+        } else {
+            $connection.send: "{$user.naem}, you set a reminder $time ago: $message", userid => $user.id;
+        }
+
+        sink $state.database.remove-reminder: $id;
     });
 }
 

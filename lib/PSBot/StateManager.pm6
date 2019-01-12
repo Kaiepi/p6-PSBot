@@ -1,5 +1,6 @@
 use v6.d;
 use PSBot::Config;
+use PSBot::Database;
 use PSBot::LoginServer;
 use PSBot::Room;
 use PSBot::Tools;
@@ -17,6 +18,8 @@ has Channel $.pending-rename.= new;
 has Lock::Async $.chat-mux .= new;
 has PSBot::User %.users;
 has PSBot::Room %.rooms;
+
+has PSBot::Database $.database .= new;
 
 method authenticate(Str $username!, Str $password?, Str $challstr? --> Str) {
     $!challstr = $challstr if defined $challstr;

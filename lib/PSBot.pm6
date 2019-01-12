@@ -32,6 +32,24 @@ method new() {
     my PSBot::StateManager $state      .= new;
     my PSBot::Rules        $rules      .= new;
     my Supply              $messages    = $connection.receiver.Supply;
+
+    for $state.database.get-reminders -> %row {
+        my Num $seconds = %row<time> - now;
+
+        if $seconds > 0 {
+            Promise.in($seconds).then({
+                if %row<roomid> {
+                    $connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
+                } else {
+                    $connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
+                }
+                $state.database.remove-reminder: %row<id>.Int;
+            });
+        } else {
+            $state.database.remove-reminder: %row<id>.Int;
+        }
+    }
+
     self.bless: :$connection, :$state, :$rules, :$messages;
 }
 
