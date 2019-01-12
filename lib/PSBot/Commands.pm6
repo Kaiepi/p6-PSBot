@@ -1,4 +1,6 @@
 use v6.d;
+use Cro::HTTP::Client;
+use Cro::HTTP::Response;
 use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Games::Hangman;
@@ -102,6 +104,23 @@ our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
         when 18 { 'Outlook not so good.'       }
         when 19 { 'Very doubtful.'             }
     }
+}
+
+our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection) {
+    return 'Permission denied.' unless !$room || self.can: '+', $user.ranks{$room.id};
+    return 'No term was given.' unless $target;
+
+    my Str                 $term = $target.subst: ' ', '%20';
+    my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
+        "http://api.urbandictionary.com/v0/define?term=$term",
+        content-type     => 'application/json',
+        body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
+    my                     %body = await $resp.body;
+    return "No Urban Dictionary definition for $target was found." unless +%body<list>;
+
+    my %info = %body<list>.head;
+    "Urban Dictionary definition for $target: %info<permalink>"
 }
 
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
