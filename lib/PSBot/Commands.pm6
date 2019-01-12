@@ -68,8 +68,8 @@ our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method git(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    my $rank = $state.database.get-command: $room.id, 'git';
-    return "Permission denied." unless !$room || ($rank.defined ?? self.can($rank, $user.ranks{$room.id}) !! '+');
+    my $rank = $state.database.get-command($room.id, 'git') || '+';
+    return "Permission denied." unless !$room || self.can: $rank, $user.ranks{$room.id};
 
     "{$state.username}'s source code may be found at {GIT}"
 }
@@ -81,8 +81,8 @@ our method primal(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    my $rank = $state.database.get-command: $room.id, 'eightball';
-    return "Permission denied." unless !$room || ($rank.defined ?? self.can($rank, $user.ranks{$room.id}) !! '+');
+    my $rank = $state.database.get-command($room.id, 'eightball') || '+';
+    return "Permission denied." unless !$room || self.can: $rank, $user.ranks{$room.id};
 
     given floor rand * 20 {
         when 0  { 'It is certain.'             }
@@ -110,8 +110,8 @@ our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    my $rank = $state.database.get-command:  $room.id, 'urban';
-    return 'Permission denied.' unless !$room || ($rank.defined ?? self.can($rank, $user.ranks{$room.id}) !! '+');
+    my $rank = $state.database.get-command( $room.id, 'urban') || '+';
+    return 'Permission denied.' unless !$room || self.can: $rank, $user.ranks{$room.id};
     return 'No term was given.' unless $target;
 
     my Str                 $term = $target.subst: ' ', '%20';
@@ -186,8 +186,8 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    my $rank = $state.database.get-command: $room.id, 'seen';
-    return 'Permission denied.' unless !$room || ($rank.defined ?? self.can($rank, $user.ranks{$room.id}) !! '+');
+    my $rank = $state.database.get-command($room.id, 'seen') || '+';
+    return 'Permission denied.' unless !$room || self.can: $rank, $user.ranks{$room.id};
 
     my Str $userid = to-id $target;
     return 'No username was given.' unless $userid;
@@ -217,8 +217,8 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = $state.database.get-command: $room.id, 'hangman';
-    return "Permission denied." unless !$room || ($rank.defined ?? self.can($rank, $user.ranks{$room.id}) !! '+');
+    my $rank = $state.database.get-command($room.id, 'hangman') || '+';
+    return "Permission denied." unless !$room || self.can: $rank, $user.ranks{$room.id};
     return "{COMMAND}hangman can only be used in rooms." unless $room;
 
     my (Str $subcommand, Str $guess) = $target.split: ' ';
