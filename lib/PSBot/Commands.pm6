@@ -235,7 +235,7 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         when 'new' {
             return "There is already a game of {$room.game.name} in progress!" if $room.game;
             return $connection.sned: "Permission denied.", userid => $user.id unless !$room || self.can: $rank, $user.ranks{$room.id};
-            $room.add-game: PSBot::Games::Hangman.new: $user;
+            $room.add-game: PSBot::Games::Hangman.new: $user, :allow-late-joins;
             "A game of {$room.game.name} has been created."
         }
         when 'join' {
