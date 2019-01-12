@@ -146,12 +146,14 @@ method add-seen(Str $userid, Instant $time) {
             SET time = ?
             WHERE userid = ?;
             STATEMENT
+        $sth.execute: $time, $userid;
+        $sth.finish;
     } else {
         $sth = $!dbh.prepare: q:to/STATEMENT/;
             INSERT INTO seen (userid, time)
             VALUES (?, ?);
             STATEMENT
+        $sth.execute: $userid, $time;
+        $sth.finish;
     }
-    $sth.execute: $userid, $time;
-    $sth.finish;
 }
