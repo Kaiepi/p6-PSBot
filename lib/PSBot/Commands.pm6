@@ -181,6 +181,21 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
     "Your mail has been delivered to $username."
 }
 
+our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection) {
+    return 'Permission denied.' unless !$room || self.can: '+', $user.ranks{$room.id};
+
+    my Str $userid = to-id $target;
+    return 'No username was given.' unless $userid;
+
+    my $time = $state.database.get-seen: $userid;
+    if $time.defined {
+        "$target was last seen on {$time.yyyy-mm-dd} at {$time.hh-mm-ss}."
+    } else {
+        "$target has never been seen before."
+    }
+}
+
 our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return "Permission denied." unless !$room || self.can: '+', $user.ranks{$room.id};

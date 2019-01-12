@@ -159,7 +159,9 @@ method parse(Str $text) {
                 $!state.add-user: $userinfo, $roomid;
 
                 my Str $userid = to-id $userinfo.substr: 1;
-                my     @mail   = $!state.database.get-mail: $userid;
+                $!state.database.add-seen: $userid, now;
+
+                my @mail = $!state.database.get-mail: $userid;
                 if +@mail {
                     $!connection.send:
                         "You receieved {+@mail} mail:",
@@ -183,7 +185,9 @@ method parse(Str $text) {
                 $!state.rename-user: $userinfo, $oldid, $roomid;
 
                 my Str $userid = to-id $userinfo.substr: 1;
-                my     @mail   = $!state.database.get-mail: $userid;
+                $!state.database.add-seen: $userid, now;
+
+                my @mail = $!state.database.get-mail: $userid;
                 if +@mail {
                     $!connection.send:
                         "You receieved {+@mail} mail:",
@@ -204,6 +208,7 @@ method parse(Str $text) {
                 my Str         $message  = @rest[2..*].join: '|';
                 my PSBot::User $user     = $!state.users{$userid};
                 my PSBot::Room $room     = $!state.rooms{$roomid};
+                $!state.database.add-seen: $userid, now;
 
                 if $username ne $!state.username {
                     for $!rules.chat -> $rule {

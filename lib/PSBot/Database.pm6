@@ -45,6 +45,14 @@ method new() {
         );
         STATEMENT
 
+    $dbh.do: q:to/STATEMENT/;
+        CREATE TABLE IF NOT EXISTS seen (
+            id     INTEGER PRIMARY KEY AUTOINCREMENT,
+            userid TEXT NOT NULL,
+            time   REAL NOT NULL
+        );
+        STATEMENT
+
     self.bless: :$dbh;
 }
 
@@ -113,5 +121,37 @@ method remove-mail(Str $to) {
         WHERE target = ?;
         STATEMENT
     $sth.execute: $to;
+    $sth.finish;
+}
+
+method get-seen(Str $userid --> DateTime) {
+    my $sth = $!dbh.prepare: q:to/STATEMENT/;
+        SELECT * FROM seen
+        WHERE userid = ?
+        STATEMENT
+    $sth.execute: $userid;
+    my %row = $sth.fetchrow-hash;
+    $sth.finish;
+
+    fail "No row was found for $userid." unless %row;
+    DateTime.new(%row<time>.Num)
+}
+
+method add-seen(Str $userid, Instant $time) {
+    my $seen = self.get-seen: $userid;
+    my $sth;
+    if $seen.defined {
+        $sth = $!dbh.prepare: q:to/STATEMENT/;
+            UPDATE seen
+            SET time = ?
+            WHERE userid = ?;
+            STATEMENT
+    } else {
+        $sth = $!dbh.prepare: q:to/STATEMENT/;
+            INSERT INTO seen (userid, time)
+            VALUES (?, ?);
+            STATEMENT
+    }
+    $sth.execute: $userid, $time;
     $sth.finish;
 }
