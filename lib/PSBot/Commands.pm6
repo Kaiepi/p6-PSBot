@@ -69,10 +69,11 @@ our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method git(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    my $rank = $state.database.get-command($room.id, 'git') || '+';
-    return "Permission denied." unless !$room || self.can: $rank, $user.ranks{$room.id};
+    my     $rank = $state.database.get-command($room.id, 'git') || '+';
+    my Str $res  = "{$state.username}'s source code may be found at {GIT}";
+    return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};;
 
-    "{$state.username}'s source code may be found at {GIT}"
+    $res
 }
 
 our method primal(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -82,10 +83,7 @@ our method primal(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    my $rank = $state.database.get-command($room.id, 'eightball') || '+';
-    return "Permission denied." unless !$room || self.can: $rank, $user.ranks{$room.id};
-
-    given floor rand * 20 {
+    my Str $res  = do given floor rand * 20 {
         when 0  { 'It is certain.'             }
         when 1  { 'It is decidedly so.'        }
         when 2  { 'Without a doubt.'           }
@@ -107,12 +105,15 @@ our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
         when 18 { 'Outlook not so good.'       }
         when 19 { 'Very doubtful.'             }
     }
+
+    my $rank = $state.database.get-command($room.id, 'eightball') || '+';
+    return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+
+    $res
 }
 
 our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    my $rank = $state.database.get-command( $room.id, 'urban') || '+';
-    return 'Permission denied.' unless !$room || self.can: $rank, $user.ranks{$room.id};
     return 'No term was given.' unless $target;
 
     my Str                 $term = $target.subst: ' ', '%20';
@@ -123,8 +124,12 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
     my                     %body = await $resp.body;
     return "No Urban Dictionary definition for $target was found." unless +%body<list>;
 
-    my %info = %body<list>.head;
-    "Urban Dictionary definition for $target: %info<permalink>"
+    my     $rank = $state.database.get-command( $room.id, 'urban') || '+';
+    my     %info = %body<list>.head;
+    my Str $res  = "Urban Dictionary definition for $target: %info<permalink>";
+    return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+
+    $res
 }
 
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -187,24 +192,27 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    my $rank = $state.database.get-command($room.id, 'seen') || '+';
-    return 'Permission denied.' unless !$room || self.can: $rank, $user.ranks{$room.id};
-
     my Str $userid = to-id $target;
     return 'No username was given.' unless $userid;
 
-    my $time = $state.database.get-seen: $userid;
+    my     $time = $state.database.get-seen: $userid;
+    my Str $res;
     if $time.defined {
-        "$target was last seen on {$time.yyyy-mm-dd} at {$time.hh-mm-ss} UTC."
+        $res = "$target was last seen on {$time.yyyy-mm-dd} at {$time.hh-mm-ss} UTC."
     } else {
-        "$target has never been seen before."
+        $res = "$target has never been seen before."
     }
+
+    my $rank = $state.database.get-command($room.id, 'seen') || '+';
+    return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+
+    $res
 }
 
 our method set(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     my $rank = $state.database.get-command($room.id, 'set') || '#';
-    return 'Permission denied.' unless $room && self.can: $rank, $user.ranks{$room.id};
+    return $connection.send: 'Permission denied.', userid => $user.id unless $room && self.can: $rank, $user.ranks{$room.id};
 
     my (Str $command, $target-rank) = $target.split(',').map({ .trim });
     $target-rank = ' ' unless $target-rank;
@@ -220,7 +228,7 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
 our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     my $rank = $state.database.get-command($room.id, 'hangman') || '+';
-    return "Permission denied." unless !$room || self.can: $rank, $user.ranks{$room.id};
+    return $connection.sned: "Permission denied.", userid => $user.id unless !$room || self.can: $rank, $user.ranks{$room.id};
     return "{COMMAND}hangman can only be used in rooms." unless $room;
 
     my (Str $subcommand, Str $guess) = $target.split: ' ';
