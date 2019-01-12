@@ -40,6 +40,12 @@ our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
     return 'Nick must be under 19 characters.' if $username.chars > 18;
     return "Only use passwords with this command in PMs." if $room && $password;
 
+    my Str $userid = to-id $username;
+    if $userid eq to-id $state.username {
+        $connection.send-raw: "/trn $username";
+        return "Successfully renamed to $username!";
+    }
+
     my $assertion = $state.authenticate: $username, $password;
     if $assertion.defined {
         $state.pending-rename .= new;
