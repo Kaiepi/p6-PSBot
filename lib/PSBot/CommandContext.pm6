@@ -9,5 +9,5 @@ method can(Str $required, Str $target --> Bool) {
 }
 
 method is-rank(Str $rank --> Bool) {
-    Rank.enums ∋ $rank
+    Rank.enums{$rank}:exists
 }
