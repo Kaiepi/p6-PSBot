@@ -228,13 +228,13 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
 our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     my $rank = $state.database.get-command($room.id, 'hangman') || '+';
-    return $connection.sned: "Permission denied.", userid => $user.id unless !$room || self.can: $rank, $user.ranks{$room.id};
     return "{COMMAND}hangman can only be used in rooms." unless $room;
 
     my (Str $subcommand, Str $guess) = $target.split: ' ';
     given $subcommand {
         when 'new' {
             return "There is already a game of {$room.game.name} in progress!" if $room.game;
+            return $connection.sned: "Permission denied.", userid => $user.id unless !$room || self.can: $rank, $user.ranks{$room.id};
             $room.add-game: PSBot::Games::Hangman.new: $user;
             "A game of {$room.game.name} has been created."
         }
@@ -248,7 +248,11 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         }
         when 'players' {
             return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
-            $room.game.players
+
+            my Str $res = $room.game.players;
+            return $connection.send: $res, userid => $user.id unless !$room || self.can: $rank, $user.ranks{$room.id};
+
+            $res
         }
         when 'start' {
             return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
@@ -296,8 +300,9 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
                                         Requires at least rank + by default.
         - set <command>, <rank>:        Sets the rank required to use the given command to the given rank.
                                         Requires at least rank # by default.
-        - hangman:                      Requires at least rank + by default.
+        - hangman:
             - hangman new:              Starts a new hangman game.
+                                        Requires at least rank + by default.
             - hangman join:             Joins the hangman game. This can only be used before the game has been started.
             - hangman start:            Starts the hangman game.
             - hangman guess <letter>:   Guesses the given letter.
