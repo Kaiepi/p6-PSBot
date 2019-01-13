@@ -13,7 +13,7 @@ unit module PSBot::Commands;
 
 our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return 'Permission denied.' unless ADMINS ∋ $user.id;
+    return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
 
     my Str @res;
     await Promise.anyof(
@@ -33,7 +33,7 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return 'Permission denied.' unless ADMINS ∋ $user.id;
+    return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
 
     my Str @parts = $target.split(',');
     return 'No command, target, user, and room were given.' unless +@parts >= 4;
@@ -74,13 +74,13 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method say(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return 'Permission denied.' unless ADMINS ∋ $user.id;
+    return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
     $target
 }
 
 our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    return 'Permission denied.' unless ADMINS ∋ $user.id;
+    return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
     return 'A nick and optionally a password must be provided.' unless $target;
 
     my (Str $username, Str $password) = $target.split(',').map({ .trim });
@@ -106,7 +106,7 @@ our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return 'Permission denied.' unless ADMINS ∋ $user.id;
+    return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
     $state.login-server.log-out: $state.username;
     $connection.send-raw: '/logout';
     exit 0;
@@ -153,13 +153,17 @@ our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my $rank = $state.database.get-command($room.id, 'eightball') || '+';
     return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
-
     $res
 }
 
 our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return 'No term was given.' unless $target;
+    my $rank = $state.database.get-command($room.id, 'urban') || '+';
+    unless $target {
+        my Str $res = 'No term was given.';
+        return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+        return $connection.send: $res, roomid => $room.id;
+    }
 
     my Str                 $term = $target.subst: ' ', '%20';
     my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
@@ -167,13 +171,15 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
         content-type     => 'application/json',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
     my                     %body = await $resp.body;
-    return "No Urban Dictionary definition for $target was found." unless +%body<list>;
+    unless +%body<list> {
+        my Str $res = "Urban Dictionary definition for $target was not found.";
+        return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+        return $connection.send: $res, roomid => $room.id;
+    }
 
-    my     $rank = $state.database.get-command($room.id, 'urban') || '+';
     my     %info = %body<list>.head;
     my Str $res  = "Urban Dictionary definition for $target: %info<permalink>";
     return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
-
     $res
 }
 
@@ -181,13 +187,26 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     state %urls;
     state %definitions;
-    return "{$state.username} has no configured dictionary API ID."  unless DICTIONARY_API_ID;
-    return "{$state.username} has no configured dictionary API key." unless DICTIONARY_API_KEY;
-
-    my Str $word = to-id $target;
-    return "No word was given." unless $word;
 
     my Str $rank   = $state.database.get-command($room.id, 'dictionary') || '+';
+    unless DICTIONARY_API_ID {
+        my Str $res = "{$state.username} has no configured dictionary API ID.";
+        return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+        return $res;
+    }
+    unless DICTIONARY_API_KEY {
+        my Str $res = "{$state.username} has no configured dictionary API key.";
+        return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+        return $res;
+    }
+
+    my Str $word = to-id $target;
+    unless $word {
+        my Str $res = "No word was given.";
+        return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+        return $res;
+    }
+
     my Str $userid = to-id $state.username;
     if %definitions ∋ $word {
         return $connection.send-raw: %definitions{$word}, userid => $user.id unless $state.group ne '*' || self.can: $rank, $user.ranks{$room.id};
@@ -203,7 +222,11 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
         "https://od-api.oxforddictionaries.com:443/api/v1/entries/en/$word",
         headers          => [app_id => DICTIONARY_API_ID, app_key => DICTIONARY_API_KEY],
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
-    return "Definition for $word not found." unless $resp;
+    unless $resp {
+        my Str $res = "Definition for $word not found.";
+        return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+        return $res;
+    }
 
     my %body        = await $resp.body;
     my @definitions = %body<results>.flat.map({
@@ -227,20 +250,23 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my Str $res = "Oxford Dictionary definition for $word: $url";
     return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
-
     $res
 }
 
 our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return "No page was given." unless $target;
+    my Str $rank = $state.database.get-command($room.id, 'wikimon') || '+';
+    unless $target {
+        my Str $res = "No query was given.";
+        return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+        return $res;
+    }
 
     my Str                 $page = $target.subst: ' ', '%20', :g;
     my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
         "https://en.wikipedia.org/w/api.php?action=query&prop=info&titles=$page&inprop=url&format=json",
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
     my                     %body = await $resp.body;
-    my Str                 $rank = $state.database.get-command($room.id, 'wikimon') || '+';
     if %body<query><pages> ∋ '-1' {
         my Str $res = "No Wikipedia page for $target was found.";
         return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
@@ -254,14 +280,18 @@ our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return "No page was given." unless $target;
+    my Str $rank = $state.database.get-command($room.id, 'wikimon') || '+';
+    unless $target {
+        my Str $res = "No query was given.";
+        return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+        return $res;
+    }
 
     my Str                 $page = $target.subst: ' ', '%20', :g;
     my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
         "https://wikimon.net/api.php?action=query&prop=info&titles=$page&inprop=url&format=json",
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
     my                     %body = await $resp.body;
-    my Str                 $rank = $state.database.get-command($room.id, 'wikimon') || '+';
     if %body<query><pages> ∋ '-1' {
         my Str $res = "No Wikimon page for $target was found.";
         return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
@@ -334,7 +364,12 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
 our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     my Str $userid = to-id $target;
-    return 'No username was given.' unless $userid;
+    my Str $rank   = $state.database.get-command($room.id, 'seen') || '+';
+    unless $userid {
+        my Str $res = "No user was given.";
+        return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+        return $res;
+    }
 
     my     $time = $state.database.get-seen: $userid;
     my Str $res;
@@ -344,9 +379,7 @@ our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
         $res = "$target has never been seen before."
     }
 
-    my $rank = $state.database.get-command($room.id, 'seen') || '+';
     return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
-
     $res
 }
 
