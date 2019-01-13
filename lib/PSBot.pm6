@@ -231,8 +231,8 @@ method parse(Str $text) {
 
                     start {
                         my \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
-                        output = await output if output ~~ Promise;
-                        $!connection.send: output, :$roomid if output && output ~~ Str | Iterable;
+                        output = await output if output ~~ Awaitable:D;
+                        $!connection.send: output, :$roomid if output && output ~~ Str:D | Iterable:D;
                     }
                 }
             }
