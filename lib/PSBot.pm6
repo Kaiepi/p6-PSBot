@@ -232,7 +232,7 @@ method parse(Str $text) {
                     start {
                         my \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
                         output = await output if output ~~ Promise;
-                        $!connection.send: output, :$roomid if output;
+                        $!connection.send: output, :$roomid if output && output ~~ Str | Iterable;
                     }
                 }
             }
@@ -277,7 +277,7 @@ method parse(Str $text) {
                     start {
                         my \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
                         output = await output if output ~~ Promise;
-                        $!connection.send: output, :$userid if output;
+                        $!connection.send: output, :$userid if output && output ~~ Str | Iterable;
                     }
                 }
             }
