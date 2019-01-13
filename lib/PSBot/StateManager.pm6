@@ -8,8 +8,9 @@ use PSBot::User;
 unit class PSBot::StateManager;
 
 has Str  $.challstr;
+has Str  $.guest-username;
 has Str  $.username;
-has Bool $.guest;
+has Bool $.is-guest;
 has Str  $.avatar;
 has Str  $.group;
 
@@ -29,10 +30,11 @@ method authenticate(Str $username!, Str $password?, Str $challstr? --> Str) {
     $!login-server.log-in: $username, $password, $!challstr
 }
 
-method update-user(Str $username, Str $guest, Str $avatar) {
-    $!username = $username;
-    $!guest    = $guest eq '0';
-    $!avatar   = $avatar;
+method update-user(Str $username, Str $named, Str $avatar) {
+    $!username       = $username;
+    $!guest-username = $username if $username.starts-with: 'Guest ';
+    $!is-guest       = $named eq '0';
+    $!avatar         = $avatar;
 }
 
 method set-avatar(Str $!avatar) {}

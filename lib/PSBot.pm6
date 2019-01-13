@@ -113,25 +113,27 @@ method parse(Str $text) {
         next unless $line && $line.starts-with: '|';
         my (Str $type, Str @rest) = $line.substr(1).split('|');
         given $type {
-            when 'challstr' {
-                my Str $challstr = @rest.join: '|';
-                my Str $assertion = $!state.authenticate: USERNAME, PASSWORD, $challstr;
-                $*SCHEDULER.cue({
-                    $!connection.send-raw: "/trn {USERNAME},0,$assertion";
-                    my $res = await $!state.pending-rename;
-                    $res.rethrow if $res ~~ Exception;
-                });
-            }
             when 'updateuser' {
                 my (Str $username, Str $guest, Str $avatar) = @rest;
                 $!state.update-user: $username, $guest, $avatar;
                 $!state.pending-rename.send: $username;
-                if $username eq USERNAME {
+                if USERNAME && $username eq USERNAME {
                     my Str @rooms = ROOMS.keys;
-                    $!connection.send-raw:
-                        @rooms.map({ "/join $_" }),
-                        "/avatar {AVATAR}";
+                    $!connection.send-raw: @rooms.map({ "/join $_" });
+                    $!connection.send-raw: "/avatar {AVATAR}" if AVATAR;
                 }
+            }
+            when 'challstr' {
+                return unless USERNAME;
+
+                $*SCHEDULER.cue({
+                    my Str $challstr  = @rest.join: '|';
+                    my Str $assertion = $!state.authenticate: USERNAME, PASSWORD, $challstr;
+                    $!connection.send-raw: "/trn {USERNAME},0,$assertion";
+
+                    my $res = await $!state.pending-rename;
+                    $res.rethrow if $res ~~ Exception;
+                });
             }
             when 'nametaken' {
                 my (Str $username, Str $reason) = @rest;
@@ -164,22 +166,22 @@ method parse(Str $text) {
                 my (Str $userinfo) = @rest;
                 $!state.add-user: $userinfo, $roomid;
 
-                my Str $userid = to-id $userinfo.substr: 1;
-                $!state.database.add-seen: $userid, now;
-
-                my @mail = $!state.database.get-mail: $userid;
-                if +@mail {
-                    $!connection.send:
-                        "You receieved {+@mail} mail:",
-                        @mail.map(-> %row { "[%row<source>] %row<message>" }),
-                        :$userid;
-                    $!state.database.remove-mail: $userid;
-                }
-
                 $*SCHEDULER.cue({
+                    my Str $userid = to-id $userinfo.substr: 1;
+                    $!state.database.add-seen: $userid, now;
+
+                    my @mail = $!state.database.get-mail: $userid;
+                    if +@mail {
+                        $!connection.send:
+                            "You receieved {+@mail} mail:",
+                            @mail.map(-> %row { "[%row<source>] %row<message>" }),
+                            :$userid;
+                        $!state.database.remove-mail: $userid;
+                    }
+
                     my PSBot::User $user = $!state.users{$userid};
                     await $!connection.inited;
-                    $!connection.send-raw: "/cmd userdetails $userid" unless defined $user.group;
+                    $!connection.send-raw: "/cmd userdetails $userid";
                 });
             }
             when 'l' | 'L' {
@@ -190,19 +192,19 @@ method parse(Str $text) {
                 my (Str $userinfo, Str $oldid) = @rest;
                 $!state.rename-user: $userinfo, $oldid, $roomid;
 
-                my Str $userid = to-id $userinfo.substr: 1;
-                $!state.database.add-seen: $userid, now;
-
-                my @mail = $!state.database.get-mail: $userid;
-                if +@mail {
-                    $!connection.send:
-                        "You receieved {+@mail} mail:",
-                        @mail.map(-> %row { "[%row<source>] %row<message>" }),
-                        :$userid;
-                    $!state.database.remove-mail: $userid;
-                }
-
                 $*SCHEDULER.cue({
+                    my Str $userid = to-id $userinfo.substr: 1;
+                    $!state.database.add-seen: $userid, now;
+
+                    my @mail = $!state.database.get-mail: $userid;
+                    if +@mail {
+                        $!connection.send:
+                            "You receieved {+@mail} mail:",
+                            @mail.map(-> %row { "[%row<source>] %row<message>" }),
+                            :$userid;
+                        $!state.database.remove-mail: $userid;
+                    }
+
                     await $!connection.inited;
                     $!connection.send-raw: "/cmd userdetails $userid";
                 });
@@ -227,7 +229,7 @@ method parse(Str $text) {
                 if $message.starts-with(COMMAND) && $username ne $!state.username {
                     return unless $message ~~ / ^ $(COMMAND) $<command>=[<[a..z 0..9]>*] [ <.ws> $<target>=[.+] ]? $ /;
                     my Str $command = ~$<command>;
-                    my Str $target  = ~$<target> if defined $<target>;
+                    my Str $target  = defined($<target>) ?? ~$<target> !! '';
                     my Str $userid  = to-id $username;
                     return unless $command;
 
@@ -272,7 +274,7 @@ method parse(Str $text) {
                 if $message.starts-with(COMMAND) && $username ne $!state.username {
                     return unless $message ~~ / ^ $(COMMAND) $<command>=[<[a..z 0..9]>*] [ <.ws> $<target>=[.+] ]? $ /;
                     my Str $command = ~$<command>;
-                    my Str $target  = ~$<target>;
+                    my Str $target  = defined($<target>) ?? ~$<target> !! '';
                     my Str $userid  = to-id $username;
                     return unless $command;
 
@@ -350,7 +352,7 @@ The following are the available config options:
 
 =item Str I<username>
 
-The username the bot should use.
+The username the bot should use. Set to null if the bot should use a guest username.
 
 =item Str I<password>
 
@@ -358,7 +360,7 @@ The password the bot should use. Set to null if no password is needed.
 
 =item Str I<avatar>
 
-The avatar the bot should use.
+The avatar the bot should use. Set to null if a random avatar should be used.
 
 =item Str I<host>
 

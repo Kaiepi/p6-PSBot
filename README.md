@@ -24,7 +24,7 @@ The following are the available config options:
 
   * Str *username*
 
-The username the bot should use.
+The username the bot should use. Set to null if the bot should use a guest username.
 
   * Str *password*
 
@@ -32,7 +32,7 @@ The password the bot should use. Set to null if no password is needed.
 
   * Str *avatar*
 
-The avatar the bot should use.
+The avatar the bot should use. Set to null if a random avatar should be used.
 
   * Str *host*
 

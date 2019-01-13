@@ -1,14 +1,16 @@
 {
-	"username":               "",
-	"password":               "",
-	"avatar":                 "",
-	"host":                   "sim2.psim.us",
-	"port":                   443,
-	"ssl":                    true,
-	"serverid":               "showdown",
-	"command":                "$",
-	"rooms":                  [],
-	"admins":                 [],
-	"max_reconnect_attempts": 16,
-	"git":                    "https://github.com/Kaiepi/p6-PSBot"
+    "username":               null,
+    "password":               null,
+    "avatar":                 null,
+    "host":                   "sim2.psim.us",
+    "port":                   443,
+    "ssl":                    true,
+    "serverid":               "showdown",
+    "command":                "$",
+    "rooms":                  ["lobby"],
+    "admins":                 [],
+    "max_reconnect_attempts": 16,
+    "git":                    "https://github.com/Kaiepi/p6-PSBot",
+    "dictionary_api_id":      null,
+    "dictionary_api_key":     null
 }
