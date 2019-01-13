@@ -88,7 +88,7 @@ method parse(Str $text) {
             $!connection.inited.keep;
 
             $*SCHEDULER.cue({
-                $!connection.send-raw: $!state.users.keys.map(-> $userid { "/cmd userdetails $userid" })
+                $!connection.send-raw: $!state.users.keys.map(-> $userid { "/cmd userdetails $userid" });
 
                 for $!state.users.keys -> $userid {
                     my @mail = $!state.database.get-mail: $userid;
@@ -116,11 +116,11 @@ method parse(Str $text) {
             when 'challstr' {
                 my Str $challstr = @rest.join: '|';
                 my Str $assertion = $!state.authenticate: USERNAME, PASSWORD, $challstr;
-                $!connection.send-raw: "/trn {USERNAME},0,$assertion";
-                start {
+                $*SCHEDULER.cue({
+                    $!connection.send-raw: "/trn {USERNAME},0,$assertion";
                     my $res = await $!state.pending-rename;
                     $res.rethrow if $res ~~ Exception;
-                }
+                });
             }
             when 'updateuser' {
                 my (Str $username, Str $guest, Str $avatar) = @rest;
@@ -176,11 +176,11 @@ method parse(Str $text) {
                     $!state.database.remove-mail: $userid;
                 }
 
-                start {
+                $*SCHEDULER.cue({
                     my PSBot::User $user = $!state.users{$userid};
                     await $!connection.inited;
                     $!connection.send-raw: "/cmd userdetails $userid" unless defined $user.group;
-                }
+                });
             }
             when 'l' | 'L' {
                 my (Str $userinfo) = @rest;
@@ -202,10 +202,10 @@ method parse(Str $text) {
                     $!state.database.remove-mail: $userid;
                 }
 
-                start {
+                $*SCHEDULER.cue({
                     await $!connection.inited;
                     $!connection.send-raw: "/cmd userdetails $userid";
-                }
+                });
             }
             when 'c:' {
                 my (Str $timestamp, Str $userinfo) = @rest;
@@ -234,11 +234,11 @@ method parse(Str $text) {
                     my &command = try &PSBot::Commands::($command);
                     return $!connection.send: "{COMMAND}$command is not a valid command.", :$roomid  unless &command;
 
-                    start {
+                    $*SCHEDULER.cue({
                         my \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
                         output = await output if output ~~ Awaitable:D;
                         $!connection.send: output, :$roomid if output && output ~~ Str:D | Iterable:D;
-                    }
+                    });
                 }
             }
             when 'pm' {
@@ -279,11 +279,11 @@ method parse(Str $text) {
                     my &command = try &PSBot::Commands::($command);
                     return $!connection.send: "{COMMAND}$command is not a valid command.", :$userid unless &command;
 
-                    start {
+                    $*SCHEDULER.cue({
                         my \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
-                        output = await output if output ~~ Promise;
-                        $!connection.send: output, :$userid if output && output ~~ Str | Iterable;
-                    }
+                        output = await output if output ~~ Awaitable:D;
+                        $!connection.send: output, :$userid if output && output ~~ Str:D | Iterable:D;
+                    });
                 }
             }
             when 'html' {
