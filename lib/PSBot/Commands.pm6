@@ -344,7 +344,8 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
         - nick <username>, <password>?: Logs the bot into the account given. Password is optional.
                                         Requires admin access to the bot.
 
-        - suicide:                      Kills the bot. Requires admin access to the bot.
+        - suicide:                      Kills the bot.
+                                        Requires admin access to the bot.
 
         - git:                          Returns the GitHub repo for the bot.
                                         Requires at least rank + by default.
@@ -373,7 +374,7 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
         - hangman:
             - hangman new:              Starts a new hangman game.
                                         Requires at least rank + by default.
-            - hangman join:             Joins the hangman game. This can only be used before the game has been started.
+            - hangman join:             Joins the hangman game.
             - hangman start:            Starts the hangman game.
             - hangman guess <letter>:   Guesses the given letter.
             - hangman guess <word>:     Guesses the given word.
