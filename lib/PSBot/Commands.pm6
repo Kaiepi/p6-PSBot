@@ -123,7 +123,7 @@ our method primal(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str $rank = $room ?? ($state.database.get-command($room.id, 'eightball') || '+') !! Nil;
+    my     $rank = $room ?? ($state.database.get-command($room.id, 'eightball') || '+') !! Nil;
     my Str $res  = do given floor rand * 20 {
         when 0  { 'It is certain.'             }
         when 1  { 'It is decidedly so.'        }
@@ -157,7 +157,7 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
         'No term was given.',
         $rank, $user, $room, $connection unless $target;
 
-    my Str                 $term = $target.subst: ' ', '%20';
+    my Str                 $term = $target.trim.subst: ' ', '%20', :g;
     my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
         "http://api.urbandictionary.com/v0/define?term=$term",
         content-type     => 'application/json',
@@ -170,7 +170,7 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
     my %info = %body<list>.head;
     self.send:
         "Urban Dictionary definition for $target: %info<permalink>",
-        $rank, $user, $room, $connection unless +%body<list>;
+        $rank, $user, $room, $connection;
 }
 
 our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -178,7 +178,7 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     state %urls;
     state %definitions;
 
-    my Str $rank = $room ?? ($state.database.get-command($room.id, 'dictionary') || '+') !! Nil;
+    my $rank = $room ?? ($state.database.get-command($room.id, 'dictionary') || '+') !! Nil;
     return self.send:
         "{$state.username} has no configured dictionary API ID.",
         $rank, $user, $room, $connection unless DICTIONARY_API_ID;
@@ -235,7 +235,7 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str $rank = $room ?? ($state.database.get-command($room.id, 'wikimon') || '+') !! Nil;
+    my $rank = $room ?? ($state.database.get-command($room.id, 'wikimon') || '+') !! Nil;
     return self.send:
         'No query was given,',
         $rank, $user, $room, $connection unless $target;
@@ -256,7 +256,7 @@ our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str $rank = $room ?? ($state.database.get-command($room.id, 'wikimon') || '+') !! Nil;
+    my $rank = $room ?? ($state.database.get-command($room.id, 'wikimon') || '+') !! Nil;
     return self.send:
         'No query was given,',
         $rank, $user, $room, $connection unless $target;
@@ -335,7 +335,7 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
 our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     my Str $userid = to-id $target;
-    my Str $rank   = $room ?? ($state.database.get-command($room.id, 'seen') || '+') !! Nil;
+    my     $rank   = $room ?? ($state.database.get-command($room.id, 'seen') || '+') !! Nil;
     return self.send:
         'No user was given.',
         $rank, $user, $room, $connection unless $userid;

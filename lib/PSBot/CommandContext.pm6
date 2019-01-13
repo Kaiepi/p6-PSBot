@@ -11,11 +11,11 @@ method can(Str $required, Str $target --> Bool) {
     $ranks{$target} >= $ranks{$required}
 }
 
-method is-rank(Str $rank --> Bool) {
+method is-rank($rank --> Bool) {
     Rank.enums{$rank}:exists
 }
 
-method send(Str $message, Str $rank, PSBot::User $user,
+method send(Str $message, $rank, PSBot::User $user,
     PSBot::Room $room, PSBot::Connection $connection, Bool :$raw = False) {
     if $raw {
         return $connection.send-raw: $message, userid => $user.id unless $room && self.can: $rank, $user.ranks{$room.id};
