@@ -166,19 +166,19 @@ method parse(Str $text) {
                 my (Str $userinfo) = @rest;
                 $!state.add-user: $userinfo, $roomid;
 
+                my Str $userid = to-id $userinfo.substr: 1;
+                $!state.database.add-seen: $userid, now;
+
+                my @mail = $!state.database.get-mail: $userid;
+                if +@mail {
+                    $!connection.send:
+                        "You receieved {+@mail} mail:",
+                        @mail.map(-> %row { "[%row<source>] %row<message>" }),
+                        :$userid;
+                    $!state.database.remove-mail: $userid;
+                }
+
                 $*SCHEDULER.cue({
-                    my Str $userid = to-id $userinfo.substr: 1;
-                    $!state.database.add-seen: $userid, now;
-
-                    my @mail = $!state.database.get-mail: $userid;
-                    if +@mail {
-                        $!connection.send:
-                            "You receieved {+@mail} mail:",
-                            @mail.map(-> %row { "[%row<source>] %row<message>" }),
-                            :$userid;
-                        $!state.database.remove-mail: $userid;
-                    }
-
                     my PSBot::User $user = $!state.users{$userid};
                     await $!connection.inited;
                     $!connection.send-raw: "/cmd userdetails $userid";
@@ -211,13 +211,16 @@ method parse(Str $text) {
             }
             when 'c:' {
                 my (Str $timestamp, Str $userinfo) = @rest;
-                my Str         $username = $userinfo.substr: 1;
-                my Str         $userid   = to-id $username;
-                my Str         $message  = @rest[2..*].join: '|';
-                my PSBot::User $user     = $!state.users{$userid};
-                my PSBot::Room $room     = $!state.rooms{$roomid};
+                my Str $username = $userinfo.substr: 1;
+                my Str $userid   = to-id $username;
+                my Str $message  = @rest[2..*].join: '|';
+                # Messages end with a newline for whatever reason, so we remove it.
+                $message .= substr: 0, *-1 if $message.ends-with: "\n";
+
                 $!state.database.add-seen: $userid, now;
 
+                my PSBot::User $user     = $!state.users{$userid};
+                my PSBot::Room $room     = $!state.rooms{$roomid};
                 if $username ne $!state.username {
                     for $!rules.chat -> $rule {
                         my $result = $rule.match: $message, $room, $user, $!state, $!connection;
