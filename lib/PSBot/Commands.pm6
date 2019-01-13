@@ -135,13 +135,19 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
 our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     state %urls;
+    state %definitions;
     return "{$state.username} has no configured dictionary API ID."  unless DICTIONARY_API_ID;
     return "{$state.username} has no configured dictionary API key." unless DICTIONARY_API_KEY;
 
     my Str $word = to-id $target;
     return "No word was given." unless $word;
 
-    my Str $rank = $state.database.get-command($room.id, 'dictionary') || '+';
+    my Str $rank   = $state.database.get-command($room.id, 'dictionary') || '+';
+    my Str $userid = to-id $state.username;
+    if %definitions ∋ $word {
+        return $connection.send-raw: %definitions{$word}, userid => $user.id unless $state.group ne '*' || self.can: $rank, $user.ranks{$room.id};
+        return $connection.send-raw: %definitions{$word}, roomid => $room.id if $state.users{$userid}.ranks{$room.id} eq '*';
+    }
     if %urls ∋ $word && now - %urls{$word}<time> <= 60 * 60 * 24 * 30 {
         my Str $res = "Oxford Dictionary definition for $word: %urls{$word}<url>";
         return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
@@ -154,23 +160,24 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
     return "Definition for $word not found." unless $resp;
 
-    my     %body        = await $resp.body;
-    my Int $i           = 0;
-    my     @definitions = %body<results>.flat.map({
+    my %body        = await $resp.body;
+    my @definitions = %body<results>.flat.map({
         $_<lexicalEntries>.map({
             $_<entries>.map({
                 $_.map({
                     $_<senses>.map({
-                        $_<definitions>.map(-> $definition {
-                            "{++$i}. $definition" if defined $definition
-                        })
+                        $_<definitions>
                     })
                 })
             })
         })
     }).flat.grep({ .defined });
+    %definitions{$word} = "/addhtmlbox <ol>{@definitions.map({ "<li>{$_.head}</li>" })}</ol>";
+    return $connection.send-raw: %definitions{$word}, userid => $user.id unless $state.group ne '*' || self.can: $rank, $user.ranks{$room.id};
+    return $connection.send-raw: %definitions{$word}, roomid => $room.id if $state.users{$userid}.ranks{$room.id} eq '*';
 
-    my Str $url = Hastebin.post: @definitions.join: "\n";
+    my Int $i   = 0;
+    my Str $url = Hastebin.post: @definitions.map({ "{++$i}. {$_.head}" }).join: "\n";
     %urls{$word} = {url => $url, time => now};
 
     my Str $res = "Oxford Dictionary definition for $word: $url";
