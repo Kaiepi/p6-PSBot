@@ -18,7 +18,7 @@ PSBot is a Pokemon Showdown bot that will specialize in easily allowing the user
 
 To run PSBot, simply run `bin/psbot`, or in your own code, run the code in the synopsis. Note that `PSBot.start` is blocking. Debug logging can be enabled by setting the `DEBUG` environment variable to 1.
 
-An example config file has been provided in `psbot.json.example`. This is to be copied over to `~/.config/psbot.json` (`%LOCALAPPDATA%\PSBot\psbot.json` on Windows) and edited to suit your needs.
+An example config file has been provided in `config.json.example`. This is to be copied over to `~/.config/PSBot/config.json` (`%LOCALAPPDATA%\PSBot\config.json` on Window-s) and edited to suit your needs.
 
 The following are the available config options:
 

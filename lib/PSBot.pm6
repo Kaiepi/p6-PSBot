@@ -358,9 +358,9 @@ To run PSBot, simply run C<bin/psbot>, or in your own code, run the code in the
 synopsis. Note that C<PSBot.start> is blocking. Debug logging can be enabled by
 setting the C<DEBUG> environment variable to 1.
 
-An example config file has been provided in C<psbot.json.example>. This is to be
-copied over to C<~/.config/psbot.json> (C<%LOCALAPPDATA%\PSBot\psbot.json> on
-Windows) and edited to suit your needs.
+An example config file has been provided in C<config.json.example>. This is to be
+copied over to C<~/.config/PSBot/config.json>
+(C<%LOCALAPPDATA%\PSBot\config.json> on Window-s) and edited to suit your needs.
 
 The following are the available config options:
 

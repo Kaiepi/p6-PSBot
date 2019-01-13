@@ -4,7 +4,7 @@ use PSBot::Tools;
 
 sub EXPORT(--> Hash) {
     INIT {
-        my Str $path = $*DISTRO.is-win ?? "%*ENV<LOCALAPPDATA>\\PSBot\\psbot.json" !! "$*HOME/.config/psbot.json";
+        my Str $path = $*DISTRO.is-win ?? "%*ENV<LOCALAPPDATA>\\PSBot\\config.json" !! "$*HOME/.config/PSBot/config.json";
 
         unless $path.IO.e {
             note "PSBot config at $path does not exist!";
