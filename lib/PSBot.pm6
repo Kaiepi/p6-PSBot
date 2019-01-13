@@ -118,8 +118,7 @@ method parse(Str $text) {
                 $!state.update-user: $username, $guest, $avatar;
                 $!state.pending-rename.send: $username;
                 if USERNAME && $username eq USERNAME {
-                    my Str @rooms = ROOMS.keys;
-                    $!connection.send-raw: @rooms.map({ "/join $_" });
+                    $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
                     $!connection.send-raw: "/avatar {AVATAR}" if AVATAR;
                 }
             }
@@ -129,7 +128,9 @@ method parse(Str $text) {
                 $*SCHEDULER.cue({
                     my Str $challstr  = @rest.join: '|';
                     my Str $assertion = $!state.authenticate: USERNAME, PASSWORD, $challstr;
+                    my     @autojoin  = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
                     $!connection.send-raw:
+                        "/autojoin {@autojoin.join: ','}",
                         '/cmd rooms',
                         "/trn {USERNAME},0,$assertion";
 
