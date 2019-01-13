@@ -6,27 +6,24 @@ unit class PSBot::Room;
 has Str         $.id;
 has Str         $.title;
 has Str         $.type;
+has Bool        $.is-private;
 has Str         %.ranks;
-has SetHash     $.userids;
 has PSBot::Game $.game;
 
-method new(Str $id!, Str $title!, Str $type!, Str @userlist!) {
-    my Str     %ranks    = @userlist.map({ to-id($_.substr(1)) => $_.substr(0, 1) });
-    my SetHash $userids .= new: %ranks.keys;
-    self.bless: :$id, :$title, :$type, :%ranks, :$userids;
+method new(Str $id, Str $title, Str $type, Str @userlist, Bool $is-private) {
+    my Str %ranks = @userlist.map({ to-id($_.substr(1)) => $_.substr(0, 1) });
+    self.bless: :$id, :$title, :$type, :$is-private, :%ranks;
 }
 
 method join(Str $userinfo) {
-    my Str $rank = $userinfo.substr(0, 1);
+    my Str $rank   = $userinfo.substr(0, 1);
     my Str $userid = to-id $userinfo.substr(1);
     %!ranks{$userid} = $rank;
-    $!userids{$userid}++;
 }
 
 method leave(Str $userinfo) {
     my Str $userid = to-id $userinfo.substr(1);
     %!ranks{$userid}:delete;
-    $!userids{$userid}:delete;
 }
 
 method on-rename(Str $oldid, Str $userinfo) {
@@ -36,8 +33,6 @@ method on-rename(Str $oldid, Str $userinfo) {
 
     %!ranks{$oldid}:delete;
     %!ranks{$userid} = $rank;
-    $!userids{$oldid}:delete;
-    $!userids{$userid}++;
 }
 
 method add-game(PSBot::Game $game) {

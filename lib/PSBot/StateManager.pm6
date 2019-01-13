@@ -13,6 +13,7 @@ has Str  $.username;
 has Bool $.is-guest;
 has Str  $.avatar;
 has Str  $.group;
+has Set  $.public-rooms;
 
 has Channel $.pending-rename.= new;
 
@@ -39,13 +40,18 @@ method update-user(Str $username, Str $named, Str $avatar) {
 
 method set-avatar(Str $!avatar) {}
 method set-group(Str $!group)   {}
+method set-public-rooms(@rooms) {
+    $!public-rooms = set(@rooms);
+}
 
 method add-room(Str $roomid, Str $type, Str $title, Str @userlist) {
     $!chat-mux.protect({
         return if %!rooms ∋ $roomid;
 
-        my PSBot::Room $room .= new: $roomid, $title, $type, @userlist;
+        my Bool        $is-private  = $!public-rooms ∌ $roomid;
+        my PSBot::Room $room       .= new: $roomid, $title, $type, @userlist, $is-private;
         %!rooms{$roomid} = $room;
+
         for @userlist -> $userinfo {
             my Str $userid = to-id $userinfo.substr: 1;
             if %!users ∋ $userid {
@@ -96,7 +102,7 @@ method delete-user(Str $userinfo, Str $roomid) {
 
         my Bool $found = False;
         for %!rooms.kv -> $roomid, $room {
-            last if $found = $room.userids ∋ $userid;
+            last if $found = $room.ranks ∋ $userid;
         }
         %!users{$userid}:delete unless $found;
     })

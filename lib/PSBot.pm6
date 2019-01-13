@@ -129,7 +129,9 @@ method parse(Str $text) {
                 $*SCHEDULER.cue({
                     my Str $challstr  = @rest.join: '|';
                     my Str $assertion = $!state.authenticate: USERNAME, PASSWORD, $challstr;
-                    $!connection.send-raw: "/trn {USERNAME},0,$assertion";
+                    $!connection.send-raw:
+                        '/cmd rooms',
+                        "/trn {USERNAME},0,$assertion";
 
                     my $res = await $!state.pending-rename;
                     $res.rethrow if $res ~~ Exception;
@@ -142,20 +144,28 @@ method parse(Str $text) {
             }
             when 'queryresponse' {
                 my (Str $type, Str $data) = @rest;
-                if $type eq 'userdetails' {
-                    my     %data   = from-json $data;
-                    my Str $userid = %data<userid>;
-                    my Str $group  = %data<group> || Nil;
-                    return if not defined $group;
 
-                    if $userid eq to-id($!state.username) && (!defined($!state.group) || $!state.group ne $group) {
-                        $!state.set-group: $group;
-                        $!connection.lower-throttle if $group ne ' ';
+                given $type {
+                    when 'userdetails' {
+                        my     %data   = from-json $data;
+                        my Str $userid = %data<userid>;
+                        my Str $group  = %data<group> || Nil;
+                        return if not defined $group;
+
+                        if $userid eq to-id($!state.username) && (!defined($!state.group) || $!state.group ne $group) {
+                            $!state.set-group: $group;
+                            $!connection.lower-throttle if $group ne ' ';
+                        }
+
+                        if $!state.users ∋ $userid {
+                            my PSBot::User $user = $!state.users{$userid};
+                            $user.set-group: $group unless defined($user.group) && $user.group eq $group;
+                        }
                     }
-
-                    if $!state.users ∋ $userid {
-                        my PSBot::User $user = $!state.users{$userid};
-                        $user.set-group: $group unless defined($user.group) && $user.group eq $group;
+                    when 'rooms' {
+                        my     %data  = from-json $data;
+                        my Str @rooms = flat %data.values.grep(* ~~ Array).map({ .map({ to-id $_<title> }) });
+                        $!state.set-public-rooms: @rooms;
                     }
                 }
             }
