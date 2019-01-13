@@ -12,23 +12,69 @@ use PSBot::User;
 unit module PSBot::Commands;
 
 our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+        PSBot::StateManager $state, PSBot::Connection $connection) {
     return 'Permission denied.' unless ADMINS ∋ $user.id;
 
-    my Str $res;
-    await Promise.anyof(
-        Promise.in(30).then({ $res = "Evaluating ``$target`` timed out after 30 seconds." }),
+    my Promise $p .= new;
+    Promise.anyof(
+        Promise.in(30).then({
+            $p.keep: "Evaluating ``$target`` timed out after 30 seconds."
+        }),
         Promise.start({
             use MONKEY-SEE-NO-EVAL;
+
             my $result = try EVAL $target;
-            $res = ($result // $!).gist
+            $p.keep: ($result // $!).gist
         })
     );
-    $res
+
+    $p
+}
+
+our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection) {
+    return 'Permission denied.' unless ADMINS ∋ $user.id;
+
+    my Str @parts = $target.split: ',';
+    return 'No target, user, room, and command were given.' unless +@parts >= 4;
+
+    my Str $command-target = @parts[0..*-4].join(',').trim;
+    return 'No target was given.' unless $command-target;
+
+    my Str $userid = to-id @parts[*-3];
+    return 'No user was given.'unless $userid;
+    return "$userid is not a known user." unless $state.users ∋ $userid;
+
+    my Str $roomid = to-id @parts[*-2];
+    return 'No room was given.' unless $roomid;
+    return "$roomid is not a known room." unless $state.users ∋ $roomid;
+
+    my Str $command = to-id @parts[*-1];
+    return 'No command was given.' unless $command;
+
+    my &command = &::("OUR::$command");
+    return "{COMMAND}$command is not a valid command." unless &::("OUR::$command");
+
+    my Promise $p .= new;
+    Promise.anyof(
+        Promise.in(30).then({
+            $p.keep: "Evaluating ``{$command}$command $command-target`` in room $roomid with user $userid timed out after 30 seconds."
+        }),
+        Promise.start({
+            use MONKEY-SEE-NO-EVAL;
+
+            my $output = EVAL &command($command-target, $state.users{$userid}, $state.rooms{$roomid}, $state, $connection);
+            $output = await $output if $output ~~ Promise;
+            $p.keep: $output if $output ~~ Iterable;
+            $p.keep: ($output // $!).gist
+        })
+    );
+
+    $p
 }
 
 our method say(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+        PSBot::StateManager $state, PSBot::Connection $connection) {
     return 'Permission denied.' unless ADMINS ∋ $user.id;
     $target
 }
@@ -227,7 +273,7 @@ our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
     return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
     $res
 }
-    
+
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     my (Str $time, Str $message) = $target.split(',').map({ .trim });

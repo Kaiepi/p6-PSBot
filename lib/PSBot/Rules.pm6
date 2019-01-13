@@ -7,18 +7,20 @@ use PSBot::User;
 unit class PSBot::Rules;
 
 my class Rule {
-    has Set   $.roomids;
+    has Set   $.includes;
+    has Set   $.excludes;
     has Regex $.matcher;
     has       &.on-match;
 
-    method new(@roomids, Regex $matcher, &on-match) {
-        my Set $roomids = set(@roomids);
-        self.bless: :$roomids, :$matcher, :&on-match;
+    method new(@includes, @excludes, Regex $matcher, &on-match) {
+        my Set $includes = set(@includes);
+        my Set $excludes = set(@excludes);
+        self.bless: :$includes, :$excludes, :$matcher, :&on-match;
     }
 
     method match(Str $target, PSBot::Room $room, PSBot::User $user,
             PSBot::StateManager $state, PSBot::Connection $connection) {
-        return if +$!roomids && $!roomids ∌ $room.id;
+        return if $room && ((+$!includes && $!includes ∌ $room.id) || $!excludes ∋ $room.id);
         $target ~~ $!matcher;
         &!on-match($/, $room, $user, $state, $connection) if $/;
     }
@@ -34,6 +36,7 @@ method new() {
     my Rule @chat = [
         Rule.new(
             ['showderp'],
+            [],
             token { ^ <[iI]>\'?'ll show you' | 'THIS' $ },
             -> $match, $room, $user, $state, $connection {
                 '/me unzips'
@@ -41,9 +44,10 @@ method new() {
         ),
         Rule.new(
             ['scholastic'],
+            [],
             token { :i ar\-?15 },
             -> $match, $room, $user, $state, $connection {
-                state $timeout = now - 600;
+                state Instant $timeout = now - 600;
                 if now - $timeout >= 600 {
                     $timeout = now;
                     'The AR in AR-15 stands for assault rifle'
@@ -52,6 +56,7 @@ method new() {
         ),
         Rule.new(
             ['techcode'],
+            [],
             token { :i 'can i ask a question' },
             -> $match, $room, $user, $state, $connection {
                 "Don't ask if you can ask a question. Just ask it"
@@ -60,6 +65,7 @@ method new() {
     ];
     my Rule @pm    = [
         Rule.new(
+            [],
             [],
             token { ^ '/invite ' $<roomid>=[<[a..z]>+] $ },
             -> $match, $room, $user, $state, $connection {
@@ -72,6 +78,7 @@ method new() {
     my Rule @popup = [];
     my Rule @raw   = [
         Rule.new(
+            [],
             [],
             token { ^ '<img src="//play.pokemonshowdown.com/sprites/trainers/' $<avatar>=[<-[.]>+]  '.' <[a..z]>+ '" alt="" width="80" height="80" />' $ },
             -> $match, $room, $user, $state, $connection {
