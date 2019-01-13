@@ -138,7 +138,7 @@ method parse(Str $text) {
                 if $type eq 'userdetails' {
                     my     %data   = from-json $data;
                     my Str $userid = %data<userid>;
-                    my Str $group  = %data<group>;
+                    my Str $group  = %data<group> || Nil;
                     return if not defined $group;
 
                     if $userid eq to-id($!state.username) && (!defined($!state.group) || $!state.group ne $group) {
