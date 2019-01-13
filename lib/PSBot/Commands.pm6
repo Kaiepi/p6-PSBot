@@ -15,62 +15,61 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return 'Permission denied.' unless ADMINS ∋ $user.id;
 
-    my Promise $p .= new;
-    Promise.anyof(
+    my Str @res;
+    await Promise.anyof(
         Promise.in(30).then({
-            $p.keep: "Evaluating ``$target`` timed out after 30 seconds."
+            @res = "Evaluating ``$target`` timed out after 30 seconds."
         }),
         Promise.start({
             use MONKEY-SEE-NO-EVAL;
 
-            my $result = try EVAL $target;
-            $p.keep: ($result // $!).gist
+            my \output = try EVAL $target;
+            @res = output ?? output.perl !! $!.gist.split: "\n";
         })
     );
 
-    $p
+    @res
 }
 
 our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return 'Permission denied.' unless ADMINS ∋ $user.id;
 
-    my Str @parts = $target.split: ',';
-    return 'No target, user, room, and command were given.' unless +@parts >= 4;
+    my Str @parts = $target.split(',');
+    return 'No command, target, user, and room were given.' unless +@parts >= 4;
 
-    my Str $command-target = @parts[0..*-4].join(',').trim;
+    my Str $command = to-id @parts.head;
+    return 'No command was given.' unless $command;
+
+    my &command = try &::("OUR::$command");
+    return "{COMMAND}$command is not a valid command." unless &command;
+
+    my Str $command-target = @parts[1..*-3].join: ',';
     return 'No target was given.' unless $command-target;
 
-    my Str $userid = to-id @parts[*-3];
+    my Str $userid = to-id @parts[*-2];
     return 'No user was given.'unless $userid;
     return "$userid is not a known user." unless $state.users ∋ $userid;
 
-    my Str $roomid = to-id @parts[*-2];
+    my Str $roomid = to-id @parts[*-1];
     return 'No room was given.' unless $roomid;
-    return "$roomid is not a known room." unless $state.users ∋ $roomid;
+    return "$roomid is not a known room." unless $state.rooms ∋ $roomid;
 
-    my Str $command = to-id @parts[*-1];
-    return 'No command was given.' unless $command;
-
-    my &command = &::("OUR::$command");
-    return "{COMMAND}$command is not a valid command." unless &::("OUR::$command");
-
-    my Promise $p .= new;
-    Promise.anyof(
+    my Str @res;
+    await Promise.anyof(
         Promise.in(30).then({
-            $p.keep: "Evaluating ``{$command}$command $command-target`` in room $roomid with user $userid timed out after 30 seconds."
+            @res = "Evaluating ``{COMMAND}$command $command-target`` in room $roomid with user $userid timed out after 30 seconds."
         }),
         Promise.start({
             use MONKEY-SEE-NO-EVAL;
 
-            my $output = EVAL &command($command-target, $state.users{$userid}, $state.rooms{$roomid}, $state, $connection);
-            $output = await $output if $output ~~ Promise;
-            $p.keep: $output if $output ~~ Iterable;
-            $p.keep: ($output // $!).gist
+            my \output = try EVAL &command(self, $command-target, $state.users{$userid}, $state.rooms{$roomid}, $state, $connection);
+            output = await output if output ~~ Promise;
+            @res = output ?? output.perl !! $!.gist.split: "\n";
         })
     );
 
-    $p
+    @res
 }
 
 our method say(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -423,57 +422,77 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
     return "{$state.username} help may be found at: $url" if defined($url) && now - $timeout <= 60 * 60 * 24 * 30;
 
     my Str $help = q:to/END/;
-        - eval <expression>:            Evaluates an expression.
-                                        Requires admin access to the bot.
+        - eval <expression>:
+          Evaluates an expression.
+          Requires admin access to the bot.
 
-        - say <message>:                Says a message in the room or PMs the command was sent in.
-                                        Requires admin access to the bot.
+        - evalcommand <command>, <target>, <user>, <room>
+          Evaluates a command with the given target, user, and room. Useful for detecting errors in commands.
+          Requires admin access to the bot.
 
-        - nick <username>, <password>?: Logs the bot into the account given. Password is optional.
-                                        Requires admin access to the bot.
+        - say <message>:
+          Says a message in the room or PMs the command was sent in.
+          Requires admin access to the bot.
 
-        - suicide:                      Kills the bot.
-                                        Requires admin access to the bot.
+        - nick <username>, <password>:
+          Logs the bot into the account given. Password is optional.
+          Requires admin access to the bot.
 
-        - git:                          Returns the GitHub repo for the bot.
-                                        Requires at least rank + by default.
+        - suicide:
+          Kills the bot.
+          Requires admin access to the bot.
 
-        - primal:                       Returns 'C# sucks'.
+        - git:
+          Returns the GitHub repo for the bot.
+          Requires at least rank + by default.
 
-        - eightball <question>:         Returns an 8ball message in response to the given question.
-                                        Requires at least rank + by default.
+        - primal:
+          Returns 'C# sucks'.
 
-        - urban <term>:                 Returns the link to the Urban Dictionary definition for the given term.
-                                        Requires at least rank + by default.
+        - eightball <question>:
+          Returns an 8ball message in response to the given question.
+          Requires at least rank + by default.
 
-        - dictionary <word>:            Returns the Oxford Dictionary definitions for the given word.
-                                        Requires at least rank + by default.
+        - urban <term>:
+          Returns the link to the Urban Dictionary definition for the given term.
+          Requires at least rank + by default.
 
-        - wikipedia <query>             Returns the Wikipedia page for the given query.
-                                        Requires at least rank + by default.
+        - dictionary <word>:
+          Returns the Oxford Dictionary definitions for the given word.
+          Requires at least rank + by default.
 
-        - wikimon <query>               Returns the Wikimon page for the given query.
-                                        Requires at least rank + by default.
+        - wikipedia <query>:
+          Returns the Wikipedia page for the given query.
+          Requires at least rank + by default.
 
-        - reminder <time>, <message>  : Sets a reminder with the given message to be sent in the given time.
+        - wikimon <query>:
+          Returns the Wikimon page for the given query.
+          Requires at least rank + by default.
 
-        - mail <username>, <message>:   Mails the given message to the given user once they log on.
+        - reminder <time>, <message>:
+          Sets a reminder with the given message to be sent in the given time.
 
-        - seen <username>:              Returns the last time the given user was seen.
-                                        Requires at least rank + by default.
+        - mail <username>, <message>:
+          Mails the given message to the given user once they log on.
 
-        - set <command>, <rank>:        Sets the rank required to use the given command to the given rank.
-                                        Requires at least rank # by default.
+        - seen <username>:
+          Returns the last time the given user was seen.
+          Requires at least rank + by default.
+
+        - set <command>, <rank>:
+          Sets the rank required to use the given command to the given rank.
+          Requires at least rank # by default.
 
         - hangman:
-            - hangman new:              Starts a new hangman game.
-                                        Requires at least rank + by default.
-            - hangman join:             Joins the hangman game.
-            - hangman start:            Starts the hangman game.
-            - hangman guess <letter>:   Guesses the given letter.
-            - hangman guess <word>:     Guesses the given word.
-            - hangman end:              Ends the hangman game.
-            - hangman players:          Returns a list of the players in the hangman game.
+            - hangman new:            Starts a new hangman game.
+                                      Requires at least rank + by default.
+            - hangman join:           Joins the hangman game.
+            - hangman start:          Starts the hangman game.
+            - hangman guess <letter>: Guesses the given letter.
+            - hangman guess <word>:   Guesses the given word.
+            - hangman end:            Ends the hangman game.
+            - hangman players:        Returns a list of the players in the hangman game.
+                                      Requires at least rank + by default.
         END
 
     $url     = Hastebin.post: $help;
