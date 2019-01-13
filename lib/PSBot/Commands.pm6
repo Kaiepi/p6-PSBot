@@ -134,11 +134,19 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
+    state %urls;
     return "{$state.username} has no configured dictionary API ID."  unless DICTIONARY_API_ID;
     return "{$state.username} has no configured dictionary API key." unless DICTIONARY_API_KEY;
 
     my Str $word = to-id $target;
     return "No word was given." unless $word;
+
+    my Str $rank = $state.database.get-command($room.id, 'dictionary') || '+';
+    if %urls ∋ $word && now - %urls{$word}<time> <= 60 * 60 * 24 * 30 {
+        my Str $res = "Oxford Dictionary definition for $word: %urls{$word}<url>";
+        return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+        return $res;
+    }
 
     my Cro::HTTP::Response $resp = try await Cro::HTTP::Client.get:
         "https://od-api.oxforddictionaries.com:443/api/v1/entries/en/$word",
@@ -147,7 +155,6 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     return "Definition for $word not found." unless $resp;
 
     my     %body        = await $resp.body;
-    my Str $rank        = $state.database.get-command($room.id, 'dictionary') || '+';
     my Int $i           = 0;
     my     @definitions = %body<results>.flat.map({
         $_<lexicalEntries>.map({
@@ -162,9 +169,14 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
             })
         })
     }).flat.grep({ .defined });
-    return $connection.send: @definitions, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
 
-    @definitions
+    my Str $url = Hastebin.post: @definitions.join: "\n";
+    %urls{$word} = {url => $url, time => now};
+
+    my Str $res = "Oxford Dictionary definition for $word: $url";
+    return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+
+    $res
 }
 
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
