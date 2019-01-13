@@ -18,8 +18,10 @@ method new() {
 
     my $dbh = DBIish.connect: "SQLite", database => %?RESOURCES<database.sqlite3>;
     signal(SIGINT).tap({
-        $dbh.dispose;
-        exit 0;
+        Supply.interval(1).tap({
+            try $dbh.dispose;
+            exit 0 unless $!;
+        });
     });
 
     $dbh.do: q:to/STATEMENT/;
