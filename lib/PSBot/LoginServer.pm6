@@ -6,7 +6,8 @@ use PSBot::Config;
 use PSBot::Tools;
 unit class PSBot::LoginServer;
 
-has Cro::HTTP::Client $!client .= new: :cookie-jar;
+has Cro::HTTP::Client $.client    .= new: :cookie-jar;
+has Bool              $.logged-in  = False;
 
 method get-assertion(Str $username!, Str $challstr!) {
     my Str                 $userid    = to-id $username;
@@ -16,6 +17,9 @@ method get-assertion(Str $username!, Str $challstr!) {
     my Str                 $assertion = await $response.body-text;
     fail 'this username is registered' if $assertion eq ';';
     fail $assertion.substr: 2 if $assertion.starts-with: ';;';
+
+    $!logged-in = True;
+
     $assertion
 }
 
@@ -32,6 +36,8 @@ method log-in(Str $username!, Str $password!, Str $challstr!) {
     fail "invalid username, password, or challstr" unless %data<curuser><loggedin>;
     fail %data<assertion>.substr: 2 if %data<assertion>.starts-with: ';;';
 
+    $!logged-in = True;
+
     %data<assertion>
 }
 
@@ -40,8 +46,22 @@ method log-out(Str $username --> Bool) {
     my Cro::HTTP::Response $response = await $!client.post:
         "https://play.pokemonshowdown.com/~~{SERVERID}/action.php",
         content-type => 'application/x-www-form-urlencoded; charset=UTF-8',
-        body => $(act => 'logout', userid => $userid);
+        body         => $(act => 'logout', userid => $userid);
     my Str                 $body     = await $response.body-text;
     my                     %data     = from-json $body.substr: 1;
+
+    $!logged-in = False;
+
     %data<actionsuccess>
+}
+
+method upkeep(Str $challstr --> Str) {
+    my Cro::HTTP::Response $response = await $!client.post:
+        "https://play.pokemonshowdown.com/~~{SERVERID}/action.php",
+        content-type => 'application/x-www-form-urlencoded; charset=UTF-8',
+        body         => %(act => 'upkeep', challstr => $challstr);
+    my Str                 $body     = await $response.body-text;
+    my                     %data     = from-json $body.substr: 1;
+
+    %data<assertion>
 }

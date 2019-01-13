@@ -13,7 +13,7 @@ unit module PSBot::Commands;
 
 our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    return "Permission denied." unless ADMINS ∋ $user.id;
+    return 'Permission denied.' unless ADMINS ∋ $user.id;
 
     my Str $res;
     await Promise.anyof(
@@ -29,13 +29,13 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method say(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    return "Permission denied." unless ADMINS ∋ $user.id;
+    return 'Permission denied.' unless ADMINS ∋ $user.id;
     $target
 }
 
 our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    return "Permission denied." unless ADMINS ∋ $user.id;
+    return 'Permission denied.' unless ADMINS ∋ $user.id;
     return 'A nick and optionally a password must be provided.' unless $target;
 
     my (Str $username, Str $password) = $target.split(',').map({ .trim });
@@ -61,7 +61,7 @@ our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return "Permission denied." unless ADMINS ∋ $user.id;
+    return 'Permission denied.' unless ADMINS ∋ $user.id;
     $state.login-server.log-out: $state.username;
     $connection.send-raw: '/logout';
     exit 0;
@@ -288,7 +288,7 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
     given $subcommand {
         when 'new' {
             return "There is already a game of {$room.game.name} in progress!" if $room.game;
-            return $connection.sned: "Permission denied.", userid => $user.id unless !$room || self.can: $rank, $user.ranks{$room.id};
+            return $connection.send: 'Permission denied.', userid => $user.id unless !$room || self.can: $rank, $user.ranks{$room.id};
             $room.add-game: PSBot::Games::Hangman.new: $user, :allow-late-joins;
             "A game of {$room.game.name} has been created."
         }

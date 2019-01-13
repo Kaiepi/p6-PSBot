@@ -11,7 +11,7 @@
   "provides" : {
     "PSBot" : "lib/PSBot.pm6"
   },
-  "resources" : [ "dictionary", "database.sqlite3" ],
+  "resources" : [ "database.sqlite3", "dictionary" ],
   "source-url" : "https://github.com/Kaiepi/p6-PSBot.git",
   "tags" : [ ],
   "test-depends" : [ "Test" ],

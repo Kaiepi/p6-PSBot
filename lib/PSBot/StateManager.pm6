@@ -24,8 +24,9 @@ has PSBot::LoginServer $.login-server .= new;
 
 method authenticate(Str $username!, Str $password?, Str $challstr? --> Str) {
     $!challstr = $challstr if defined $challstr;
-    return $!login-server.get-assertion($username, $!challstr) unless defined $password;
-    return $!login-server.log-in($username, $password, $!challstr);
+    return $!login-server.get-assertion: $username, $!challstr unless defined $password;
+    return $!login-server.upkeep: $!challstr if $!login-server.logged-in;
+    $!login-server.log-in: $username, $password, $!challstr
 }
 
 method update-user(Str $username, Str $guest, Str $avatar) {
