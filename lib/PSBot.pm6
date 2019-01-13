@@ -391,4 +391,12 @@ throw.
 
 The link to the GitHub repo for the bot.
 
+=item Str C<dictionary_api_id>
+
+The API ID for Oxford Dictionary. Set to null if you don't want to use the dictionary command.
+
+=item Str C<dictionary_api_key>
+
+The API key for Oxford Dictionary. Set to null if you don't want to use the dictionary command.
+
 =end pod

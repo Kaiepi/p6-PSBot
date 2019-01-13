@@ -25,7 +25,9 @@ sub EXPORT(--> Hash) {
                 ROOMS                  => set(%config<rooms>.map: &to-roomid),
                 ADMINS                 => set(%config<admins>.map: &to-id),
                 MAX_RECONNECT_ATTEMPTS => %config<max_reconnect_attempts>,
-                GIT                    => %config<git>
+                GIT                    => %config<git>,
+                DICTIONARY_API_ID      => %config<dictionary_api_id>,
+                DICTIONARY_API_KEY     => %config<dictionary_api_key>
             )
         }
     }

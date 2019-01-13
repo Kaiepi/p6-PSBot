@@ -68,7 +68,7 @@ our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
 }
 
 our method git(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+        PSBot::StateManager $state, PSBot::Connection $connection) {
     my     $rank = $state.database.get-command($room.id, 'git') || '+';
     my Str $res  = "{$state.username}'s source code may be found at {GIT}";
     return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};;
@@ -82,7 +82,7 @@ our method primal(Str $target, PSBot::User $user, PSBot::Room $room,
 }
 
 our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+        PSBot::StateManager $state, PSBot::Connection $connection) {
     my Str $res  = do given floor rand * 20 {
         when 0  { 'It is certain.'             }
         when 1  { 'It is decidedly so.'        }
@@ -113,7 +113,7 @@ our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
 }
 
 our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+        PSBot::StateManager $state, PSBot::Connection $connection) {
     return 'No term was given.' unless $target;
 
     my Str                 $term = $target.subst: ' ', '%20';
@@ -124,12 +124,47 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
     my                     %body = await $resp.body;
     return "No Urban Dictionary definition for $target was found." unless +%body<list>;
 
-    my     $rank = $state.database.get-command( $room.id, 'urban') || '+';
+    my     $rank = $state.database.get-command($room.id, 'urban') || '+';
     my     %info = %body<list>.head;
     my Str $res  = "Urban Dictionary definition for $target: %info<permalink>";
     return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
 
     $res
+}
+
+our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection) {
+    return "{$state.username} has no configured dictionary API ID."  unless DICTIONARY_API_ID;
+    return "{$state.username} has no configured dictionary API key." unless DICTIONARY_API_KEY;
+
+    my Str $word = to-id $target;
+    return "No word was given." unless $word;
+
+    my Cro::HTTP::Response $resp = try await Cro::HTTP::Client.get:
+        "https://od-api.oxforddictionaries.com:443/api/v1/entries/en/$word",
+        headers          => [app_id => DICTIONARY_API_ID, app_key => DICTIONARY_API_KEY],
+        body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
+    return "Definition for $word not found." unless $resp;
+
+    my     %body        = await $resp.body;
+    my Str $rank        = $state.database.get-command($room.id, 'dictionary') || '+';
+    my Int $i           = 0;
+    my     @definitions = %body<results>.flat.map({
+        $_<lexicalEntries>.map({
+            $_<entries>.map({
+                $_.map({
+                    $_<senses>.map({
+                        $_<definitions>.map(-> $definition {
+                            "{++$i}. $definition" if defined $definition
+                        })
+                    })
+                })
+            })
+        })
+    }).flat.grep({ .defined });
+    return $connection.send: @definitions, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+
+    @definitions
 }
 
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -191,7 +226,7 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
 }
 
 our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+        PSBot::StateManager $state, PSBot::Connection $connection) {
     my Str $userid = to-id $target;
     return 'No username was given.' unless $userid;
 
@@ -210,7 +245,7 @@ our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
 }
 
 our method set(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+        PSBot::StateManager $state, PSBot::Connection $connection) {
     my $rank = $state.database.get-command($room.id, 'set') || '#';
     return $connection.send: 'Permission denied.', userid => $user.id unless $room && self.can: $rank, $user.ranks{$room.id};
 
@@ -301,6 +336,9 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
                                         Requires at least rank + by default.
 
         - urban <term>:                 Returns the link to the Urban Dictionary definition for the given term.
+                                        Requires at least rank + by default.
+
+        - dictionary <word>:            Returns the Oxford Dictionary definitions for the given word.
                                         Requires at least rank + by default.
 
         - reminder <time>, <message>  : Sets a reminder with the given message to be sent in the given time.
