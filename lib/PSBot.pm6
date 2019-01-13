@@ -89,18 +89,18 @@ method parse(Str $text) {
 
             $*SCHEDULER.cue({
                 $!connection.send-raw: $!state.users.keys.map(-> $userid { "/cmd userdetails $userid" })
-            });
 
-            for $!state.users.keys -> $userid {
-                my @mail = $!state.database.get-mail: $userid;
-                if +@mail {
-                    $!connection.send:
-                        "You received {+@mail} mail:",
-                        @mail.map(-> %data { "[%data<source>] %data<message>" }),
-                        :$userid;
-                    $!state.database.remove-mail: $userid;
+                for $!state.users.keys -> $userid {
+                    my @mail = $!state.database.get-mail: $userid;
+                    if +@mail {
+                        $!connection.send:
+                            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
+                            @mail.map(-> %data { "[%data<source>] %data<message>" }),
+                            :$userid;
+                        $!state.database.remove-mail: $userid;
+                    }
                 }
-            }
+            });
         }
 
         # All that's left is logs, the infobox, and the roomintro, not relevant

@@ -328,7 +328,7 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
     return $username ~ "'s mailbox is full." if +@mail == 5;
 
     if $state.users ∋ $userid {
-        $connection.send: ["You received 1 mail:", "[{$user.id}] $message"], :$userid;
+        $connection.send: ["You received 1 message:", "[{$user.id}] $message"], :$userid;
     } else {
         $state.database.add-mail: $userid, $user.id, $message;
     }
