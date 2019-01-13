@@ -5,7 +5,6 @@ use Hastebin;
 use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Games::Hangman;
-use PSBot::LoginServer;
 use PSBot::Room;
 use PSBot::StateManager;
 use PSBot::Tools;
@@ -63,6 +62,7 @@ our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
 our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return "Permission denied." unless ADMINS ∋ $user.id;
+    $state.login-server.log-out: $state.username;
     $connection.send-raw: '/logout';
     exit 0;
 }
