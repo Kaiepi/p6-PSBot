@@ -2,9 +2,7 @@ use v6.d;
 use DBIish;
 unit class PSBot::Database;
 
-has $!dbh;
-
-submethod TWEAK(:$!dbh) {}
+has $.dbh;
 
 method new() {
     given DBIish.install-driver('SQLite') {
