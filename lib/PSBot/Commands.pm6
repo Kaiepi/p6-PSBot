@@ -186,6 +186,27 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     $res
 }
 
+our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection) {
+    return "No page was given." unless $target;
+
+    my Str                 $page = $target.subst: ' ', '%20', :g;
+    my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
+        "https://en.wikipedia.org/w/api.php?action=query&prop=info&titles=$page&inprop=url&format=json",
+        body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
+    my                     %body = await $resp.body;
+    my Str                 $rank = $state.database.get-command($room.id, 'wikimon') || '+';
+    if %body<query><pages> ∋ '-1' {
+        my Str $res = "No Wikipedia page for $target was found.";
+        return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+        return $res;
+    }
+
+    my Str $res = "The Wikipedia page for $target is {%body<query><pages>.head.value<fullurl>}";
+    return $connection.send: $res, userid => $user.id unless self.can: $rank, $user.ranks{$room.id};
+    $res
+}
+
 our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return "No page was given." unless $target;
@@ -380,6 +401,9 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
                                         Requires at least rank + by default.
 
         - dictionary <word>:            Returns the Oxford Dictionary definitions for the given word.
+                                        Requires at least rank + by default.
+
+        - wikipedia <query>             Returns the Wikipedia page for the given query.
                                         Requires at least rank + by default.
 
         - wikimon <query>               Returns the Wikimon page for the given query.
