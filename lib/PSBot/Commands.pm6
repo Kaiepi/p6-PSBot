@@ -24,7 +24,7 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
             use MONKEY-SEE-NO-EVAL;
 
             my \output = try EVAL $target;
-            @res = output ?? output.perl !! $!.gist.split: "\n";
+            @res = (output // $!).gist.split: "\n";
         })
     );
 
@@ -62,7 +62,7 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
 
             my \output = try EVAL &command(self, $command-target, $state.users{$userid}, $state.rooms{$roomid}, $state, $connection);
             output = await output if output ~~ Awaitable:D;
-            @res = output ?? output.perl !! $!.gist.split: "\n";
+            @res = (output // $!).gist.split: "\n";
         })
     );
 
