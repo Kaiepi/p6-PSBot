@@ -277,35 +277,39 @@ our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my (Str $time, Str $message) = $target.split(',').map({ .trim });
-    return 'A time (e.g. 30s, 10m, 2h) and a message must be given.' unless $time && $message;
+    my (Str $time-ago, Str $message) = $target.split(',').map({ .trim });
+    return 'A time (e.g. 30s, 10m, 2h) and a message must be given.' unless $time-ago && $message;
 
     my Int $seconds = 0;
-    given $time {
-        when / ^ ( <[0..9]>+ ) [s | <.ws> seconds] $ / { $seconds += $0.Int                    }
-        when / ^ ( <[0..9]>+ ) [m | <.ws> minutes] $ / { $seconds += $0.Int * 60               }
-        when / ^ ( <[0..9]>+ ) [h | <.ws> hours  ] $ / { $seconds += $0.Int * 60 * 60          }
-        when / ^ ( <[0..9]>+ ) [d | <.ws> days   ] $ / { $seconds += $0.Int * 60 * 60 * 24     }
-        when / ^ ( <[0..9]>+ ) [w | <.ws> weeks  ] $ / { $seconds += $0.Int * 60 * 60 * 24 * 7 }
+    given $time-ago {
+        when / ^ ( <[0..9]>+ ) [s | <.ws> seconds?] $ / { $seconds += $0.Int                    }
+        when / ^ ( <[0..9]>+ ) [m | <.ws> minutes?] $ / { $seconds += $0.Int * 60               }
+        when / ^ ( <[0..9]>+ ) [h | <.ws> hours?  ] $ / { $seconds += $0.Int * 60 * 60          }
+        when / ^ ( <[0..9]>+ ) [d | <.ws> days?   ] $ / { $seconds += $0.Int * 60 * 60 * 24     }
+        when / ^ ( <[0..9]>+ ) [w | <.ws> weeks?  ] $ / { $seconds += $0.Int * 60 * 60 * 24 * 7 }
         default                                        { return 'Invalid time.'                }
     }
 
+    my Str     $userid   = $user.id;
+    my Str     $username = $user.name;
+    my Str     $roomid   = $room.id;
+    my Instant $time     = now - $seconds;
     if $room {
-        $connection.send: "You set a reminder for $time from now.", roomid => $room.id;
-        $state.database.add-reminder: $user.name, $time, now + $seconds, $message, roomid => $room.id;
+        $connection.send: "You set a reminder for $time-ago from now.", :$roomid;
+        $state.database.add-reminder: $username, $time-ago, $time, $message, :$roomid;
     } else {
-        $connection.send: "You set a reminder for $time from now.", userid => $user.id;
-        $state.database.add-reminder: $user.name, $time, now + $seconds, $message, userid => $user.id;
+        $connection.send: "You set a reminder for $time-ago from now.", :$userid;
+        $state.database.add-reminder: $username, $time-ago, $time, $message, :$userid;
     }
 
-    my Int $id = $state.database.get-reminders.tail<id>.Int;
     $*SCHEDULER.cue({
         if $room {
-            $connection.send: "{$user.name}, you set a reminder $time ago: $message", roomid => $room.id;
+            $connection.send: "{$user.name}, you set a reminder $time-ago ago: $message", :$roomid;
+            $state.database.remove-reminder: $username, $time-ago, $time, $message, :$userid;
         } else {
-            $connection.send: "{$user.naem}, you set a reminder $time ago: $message", userid => $user.id;
+            $connection.send: "{$user.naem}, you set a reminder $time-ago ago: $message", :$userid;
+            $state.database.remove-reminder: $username, $time-ago, $time, $message, :$roomid;
         }
-        $state.database.remove-reminder: $id;
     }, at => now + $seconds);
 }
 

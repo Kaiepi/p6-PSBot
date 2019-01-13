@@ -39,13 +39,18 @@ method new() {
             $*SCHEDULER.cue({
                 if %row<roomid> {
                     $connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
+                    $state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>, %row<reminder>, roomid => %row<roomid>;
                 } else {
                     $connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
+                    $state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>, %row<reminder>, userid => %row<userid>;
                 }
-                $state.database.remove-reminder: %row<id>.Int;
             }, at => %row<time>);
         } else {
-            $state.database.remove-reminder: %row<id>.Int;
+            if %row<roomid> {
+                $state.database.remove-reminder: %row<name>, %row<time_ago>, DateTime.new(%row<time>.Num).Instant, %row<reminder>, roomid => %row<roomid>;
+            } else {
+                $state.database.remove-reminder: %row<name>, %row<time_ago>, DateTime.new(%row<time>.Num).Instant, %row<reminder>, roomid => %row<userid>;
+            }
         }
     }
 

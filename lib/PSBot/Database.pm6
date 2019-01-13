@@ -92,12 +92,20 @@ multi method add-reminder(Str $name, Str $time-ago, Instant $time, Str $reminder
     $sth.finish;
 }
 
-method remove-reminder(Int $id) {
+multi method remove-reminder(Str $name, Str $time-ago, Instant $time, Str $reminder, Str :$userid!) {
     my $sth = $!dbh.prepare: q:to/STATEMENT/;
         DELETE FROM reminders
-        WHERE id = ?;
+        WHERE name = ? AND time_ago = ? AND userid = ? AND time = ? AND reminder = ?;
         STATEMENT
-    $sth.execute: $id;
+    $sth.execute: $name, $time-ago, $userid, $time.Num, $reminder;
+    $sth.finish;
+}
+multi method remove-reminder(Str $name, Str $time-ago, Instant $time, Str $reminder, Str :$roomid!) {
+    my $sth = $!dbh.prepare: q:to/STATEMENT/;
+        DELETE FROM reminders
+        WHERE name = ? AND time_ago = ? AND roomid = ? AND time = ? AND reminder = ?;
+        STATEMENT
+    $sth.execute: $name, $time-ago, $roomid, $time.Num, $reminder;
     $sth.finish;
 }
 
