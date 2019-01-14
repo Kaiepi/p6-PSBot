@@ -11,6 +11,7 @@ unit class PSBot::StateManager;
 has Str  $.challstr;
 has Str  $.guest-username;
 has Str  $.username;
+has Str  $.userid;
 has Bool $.is-guest;
 has Str  $.avatar;
 has Str  $.group;
@@ -36,6 +37,7 @@ method authenticate(Str $username!, Str $password?, Str $challstr? --> Str) {
 
 method update-user(Str $username, Str $is-named, Str $avatar) {
     $!username       = $username;
+    $!userid         = to-id $username;
     $!guest-username = $username if $username.starts-with: 'Guest ';
     $!is-guest       = $is-named eq '0';
     $!avatar         = $avatar;

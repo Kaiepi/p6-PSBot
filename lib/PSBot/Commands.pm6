@@ -30,9 +30,8 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
         })
     );
 
-    my Str $bot-userid = to-id $state.username;
     my Str $res        = @res.join: "\n";
-    if $room && $state.users ∋ $bot-userid && $state.users{$bot-userid}.ranks{$room.id} ne ' ' {
+    if $room && $state.users ∋ $state.userid && $state.users{$state.userid}.ranks{$room.id} ne ' ' {
         return $connection.send-raw: "!code $res", roomid => $room.id;
     }
     if $res.codes > 300 {
@@ -77,9 +76,8 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
         })
     );
 
-    my Str $bot-userid = to-id $state.username;
     my Str $res        = @res.join: "\n";
-    if $room && $state.users ∋ $bot-userid && $state.users{$bot-userid}.ranks{$room.id} ne ' ' {
+    if $room && $state.users ∋ $state.userid && $state.users{$state.userid}.ranks{$room.id} ne ' ' {
         return $connection.send-raw: "!code $res", roomid => $room.id;
     }
     if $res.codes > 300 {
@@ -105,8 +103,9 @@ our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
     return "Only use passwords with this command in PMs." if $room && $password;
 
     my Str $userid = to-id $username;
-    if $userid eq to-id $state.username {
+    if $userid eq $state.userid {
         $connection.send-raw: "/trn $username";
+        await $state.pending-rename;
         return "Successfully renamed to $username!";
     }
 
@@ -209,10 +208,9 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
         "No word was given.",
         $rank, $user, $room, $connection unless $word;
 
-    my Str $userid = to-id $state.username;
     if %definitions ∋ $word {
         return $connection.send-raw: %definitions{$word}, userid => $user.id unless $state.group ne '*' || self.can: $rank, $user.ranks{$room.id};
-        return $connection.send-raw: %definitions{$word}, roomid => $room.id if $state.users{$userid}.ranks{$room.id} eq '*';
+        return $connection.send-raw: %definitions{$word}, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
     }
     return self.send:
         "Oxford Dictionary definition for $word: %urls{$word}<url>",
@@ -240,7 +238,7 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     }).flat.grep({ .defined });
     %definitions{$word} = "/addhtmlbox <ol>{@definitions.map({ "<li>{$_.head}</li>" })}</ol>";
     return $connection.send-raw: %definitions{$word}, userid => $user.id unless $state.group ne '*' || self.can: $rank, $user.ranks{$room.id};
-    return $connection.send-raw: %definitions{$word}, roomid => $room.id if $state.users{$userid}.ranks{$room.id} eq '*';
+    return $connection.send-raw: %definitions{$word}, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
 
     my Int $i   = 0;
     my Str $url = Hastebin.post: @definitions.map({ "{++$i}. {$_.head}" }).join: "\n";
