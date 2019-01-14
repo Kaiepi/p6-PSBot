@@ -30,7 +30,16 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
         })
     );
 
-    @res
+    my Str $bot-userid = to-id $state.username;
+    my Str $res        = @res.join: "\n";
+    if $room && $state.users ∋ $bot-userid && $state.users{$bot-userid}.ranks{$room.id} ne ' ' {
+        return $connection.send-raw: "!code $res", roomid => $room.id;
+    }
+    if $res.codes > 300 {
+        my Str $url = Hastebin.post: $res;
+        return "{COMMAND}eval output was too long to send. It may be found at $url.";
+    }
+    $res
 }
 
 our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -68,7 +77,16 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
         })
     );
 
-    @res
+    my Str $bot-userid = to-id $state.username;
+    my Str $res        = @res.join: "\n";
+    if $room && $state.users ∋ $bot-userid && $state.users{$bot-userid}.ranks{$room.id} ne ' ' {
+        return $connection.send-raw: "!code $res", roomid => $room.id;
+    }
+    if $res.codes > 300 {
+        my Str $url = Hastebin.post: $res;
+        return "{COMMAND}eval output was too long to send. It may be found at $url";
+    }
+    $res
 }
 
 our method say(Str $target, PSBot::User $user, PSBot::Room $room,
