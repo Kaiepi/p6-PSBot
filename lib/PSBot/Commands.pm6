@@ -93,7 +93,6 @@ our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my $assertion = $state.authenticate: $username, $password;
     if $assertion.defined {
-        $state.pending-rename .= new;
         $connection.send-raw: "/trn $username,0,$assertion";
         my $res = await $state.pending-rename;
         $res ~~ X::PSBot::NameTaken ?? $res.message !! "Successfully renamed to $res!"
