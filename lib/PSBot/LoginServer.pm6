@@ -9,6 +9,14 @@ unit class PSBot::LoginServer;
 has Cro::HTTP::Client $.client    .= new;
 has Bool              $.logged-in  = False;
 
+submethod BUILD() {
+    if %*ENV<TESTING> {
+        $_.wrap(anon method (|) {
+            return;
+        }) for self.^methods;
+    }
+}
+
 method get-assertion(Str $username!, Str $challstr!) {
     my Str                 $userid    = to-id $username;
     my Str                 $query     = "act=getassertion&userid=$userid&challstr=$challstr".subst('|', '%7C', :g);

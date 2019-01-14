@@ -4,6 +4,14 @@ unit class PSBot::Database;
 
 has $.dbh;
 
+submethod BUILD(:$!dbh) {
+    if %*ENV<TESTING> {
+        $_.wrap(anon method (|) {
+            return;
+        }) for self.^methods;
+    }
+}
+
 method new() {
     given DBIish.install-driver('SQLite') {
         unless .version {
@@ -66,7 +74,7 @@ method get-reminders(--> Array) {
         STATEMENT
     $sth.execute;
     my @rows = [$sth.fetchall-AoH];
-    @rows = @rows.flat if @rows.first ~~ List;
+    @rows = @rows.flat if @rows.head ~~ List;
     $sth.finish;
     @rows
 }
@@ -112,9 +120,9 @@ method get-mail(Str $to --> Array) {
         STATEMENT
     $sth.execute: $to;
     my @rows = [$sth.fetchall-AoH];
-    @rows = @rows.flat if @rows.first ~~ List;
+    @rows = @rows.flat if @rows.head ~~ List;
     $sth.finish;
-    @rows;
+    @rows
 }
 
 method add-mail(Str $to, Str $from, Str $message) {

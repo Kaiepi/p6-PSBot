@@ -12,6 +12,8 @@ use Test;
 
 plan 14;
 
+BEGIN %*ENV<TESTING> = 1;
+
 my $application = route {
     get -> 'showdown', 'websocket' {
         web-socket -> $incoming, $close {
@@ -246,11 +248,6 @@ subtest 'PSBot::Message::Leave', {
     $parser.parse: $state, $connection;
     ok $state.users ∌ $userid, 'Removes user state for user';
     ok $state.rooms{$roomid}.ranks ∌ $userid, 'Removes room state for user';
-
-    my $sth = $state.database.dbh.prepare: 'DELETE FROM seen WHERE userid = ?;';
-    $sth.execute: 'b' x 19;
-    $sth.execute: 'c' x 19;
-    $sth.finish;
 };
 
 subtest 'PSBot::Message::Deinit', {

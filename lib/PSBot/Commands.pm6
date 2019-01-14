@@ -93,13 +93,12 @@ our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
     }
 
     my $assertion = $state.authenticate: $username, $password;
-    if $assertion.defined {
-        $connection.send-raw: "/trn $username,0,$assertion";
-        my $res = await $state.pending-rename;
-        $res ~~ X::PSBot::NameTaken ?? $res.message !! "Successfully renamed to $res!"
-    } else {
-        "Failed to rename to $username: {$assertion.exception.message}"
-    }
+    return "Failed to rename to $username: {$assertion.message}" if $assertion ~~ Failure;
+    return unless defined $assertion; # Unit tests in progress.
+
+    $connection.send-raw: "/trn $username,0,$assertion";
+    my $res = await $state.pending-rename;
+    $res ~~ X::PSBot::NameTaken ?? $res.message !! "Successfully renamed to $res!"
 }
 
 our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -348,8 +347,10 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
     return 'No username was given.' unless $userid;
     return 'No message was given.'  unless $message;
 
-    my @mail = $state.database.get-mail: $userid;
-    return $username ~ "'s mailbox is full." if +@mail == 5;
+    with $state.database.get-mail -> \mail {
+        return unless defined mail;
+        return $username ~ "'s mailbox is full." if +mail == 5;
+    }
 
     if $state.users ∋ $userid {
         $connection.send: ["You received 1 message:", "[{$user.id}] $message"], :$userid;
@@ -368,9 +369,11 @@ our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
         'No user was given.',
         $rank, $user, $room, $connection unless $userid;
 
-    my     $time = $state.database.get-seen: $userid;
-    my Str $res  = $time.defined
-        ?? "$target was last seen on {$time.yyyy-mm-dd} at {$time.hh-mm-ss} UTC."
+    my \time = $state.database.get-seen: $userid;
+    return unless defined time;
+
+    my Str $res  = time.defined
+        ?? "$target was last seen on {time.yyyy-mm-dd} at {time.hh-mm-ss} UTC."
         !! "$target has never been seen before.";
     self.send: $res, $rank, $user, $room, $connection;
 }

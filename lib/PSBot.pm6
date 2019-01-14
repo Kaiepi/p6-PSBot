@@ -14,22 +14,26 @@ method new() {
     my PSBot::StateManager $state      .= new;
     my Supply              $messages    = $connection.receiver.Supply;
 
-    for $state.database.get-reminders -> %row {
-        if %row<time> - now > 0 {
-            $*SCHEDULER.cue({
-                if %row<roomid> {
-                    $connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
-                    $state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>, %row<reminder>, roomid => %row<roomid>;
+    with $state.database.get-reminders -> \reminders {
+        if reminders {
+            for reminders -> %row {
+                if %row<time> - now > 0 {
+                    $*SCHEDULER.cue({
+                        if %row<roomid> {
+                            $connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
+                            $state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>, %row<reminder>, roomid => %row<roomid>;
+                        } else {
+                            $connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
+                            $state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>, %row<reminder>, userid => %row<userid>;
+                        }
+                    }, at => %row<time>);
                 } else {
-                    $connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
-                    $state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>, %row<reminder>, userid => %row<userid>;
+                    if %row<roomid> {
+                        $state.database.remove-reminder: %row<name>, %row<time_ago>, DateTime.new(%row<time>.Num).Instant, %row<reminder>, roomid => %row<roomid>;
+                    } else {
+                        $state.database.remove-reminder: %row<name>, %row<time_ago>, DateTime.new(%row<time>.Num).Instant, %row<reminder>, roomid => %row<userid>;
+                    }
                 }
-            }, at => %row<time>);
-        } else {
-            if %row<roomid> {
-                $state.database.remove-reminder: %row<name>, %row<time_ago>, DateTime.new(%row<time>.Num).Instant, %row<reminder>, roomid => %row<roomid>;
-            } else {
-                $state.database.remove-reminder: %row<name>, %row<time_ago>, DateTime.new(%row<time>.Num).Instant, %row<reminder>, roomid => %row<userid>;
             }
         }
     }

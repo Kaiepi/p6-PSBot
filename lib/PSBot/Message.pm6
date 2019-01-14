@@ -56,15 +56,18 @@ our class ChallStr does Message {
 
     method parse(PSBot::StateManager $state, PSBot::Connection $connection) {
         $*SCHEDULER.cue({
-            my Str $assertion = $state.authenticate: USERNAME, PASSWORD, $!challstr;
-            my     @autojoin  = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
+            my @autojoin  = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
             $connection.send-raw:
                 "/autojoin {@autojoin.join: ','}",
-                '/cmd rooms',
-                "/trn {USERNAME},0,$assertion";
+                '/cmd rooms';
 
-            my $res = await $state.pending-rename;
-            $res.throw if $res ~~ X::PSBot::NameTaken;
+            my $assertion = $state.authenticate: USERNAME, PASSWORD, $!challstr;
+            $assertion.throw if $assertion ~~ Failure;
+            if defined $assertion {
+                $connection.send-raw: "/trn {USERNAME},0,$assertion";
+                my $res = await $state.pending-rename;
+                $res.throw if $res ~~ X::PSBot::NameTaken;
+            }
         });
     }
 
@@ -171,11 +174,11 @@ our class Users does Message {
                 $connection.send-raw: $state.users.keys.map(-> $userid { "/cmd userdetails $userid" });
 
                 for $state.users.keys -> $userid {
-                    my @mail = $state.database.get-mail: $userid;
-                    if +@mail {
+                    my \mail = $state.database.get-mail: $userid;
+                    if mail && +mail {
                         $connection.send:
-                            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-                            @mail.map(-> %data { "[%data<source>] %data<message>" }),
+                            "You received {+mail} message{+mail == 1 ?? '' !! 's'}:",
+                            mail.map(-> %data { "[%data<source>] %data<message>" }),
                             :$userid;
                         $state.database.remove-mail: $userid;
                     }
@@ -215,11 +218,11 @@ our class Join does Message {
         my Str $userid = to-id $!userinfo.substr: 1;
         $state.database.add-seen: $userid, now;
 
-        my @mail = $state.database.get-mail: $userid;
-        if +@mail {
+        my \mail = $state.database.get-mail: $userid;
+        if mail && +mail {
             $connection.send:
-                "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-                @mail.map(-> %row { "[%row<source>] %row<message>" }),
+                "You received {+mail} message{+mail == 1 ?? '' !! 's'}:",
+                mail.map(-> %row { "[%row<source>] %row<message>" }),
                 :$userid;
             $state.database.remove-mail: $userid;
         }
@@ -266,11 +269,11 @@ our class Rename does Message {
         $state.database.add-seen: $!oldid, $time;
         $state.database.add-seen: $userid, $time;
 
-        my @mail = $state.database.get-mail: $userid;
-        if +@mail {
+        my \mail = $state.database.get-mail: $userid;
+        if mail && +mail {
             $connection.send:
-                "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-                @mail.map(-> %row { "[%row<source>] %row<message>" }),
+                "You received {+mail} message{+mail == 1 ?? '' !! 's'}:",
+                mail.map(-> %row { "[%row<source>] %row<message>" }),
                 :$userid;
             $state.database.remove-mail: $userid;
         }
