@@ -5,11 +5,12 @@ use Cro::HTTP::Server;
 use JSON::Fast;
 use PSBot::Config;
 use PSBot::Connection;
-use PSBot::Exceptions;
 use PSBot::Message;
 use PSBot::StateManager;
 use PSBot::Tools;
 use Test;
+
+plan 14;
 
 my $application = route {
     get -> 'showdown', 'websocket' {
@@ -32,8 +33,6 @@ END $server.stop;
 my PSBot::StateManager $state      .= new;
 my PSBot::Connection   $connection .= new: 'localhost', $port;
 $connection.connect;
-
-my Channel $awaiter .= new;
 
 subtest 'PSBot::Message::UserUpdate', {
     my Str $protocol  = 'updateuser';
@@ -85,13 +84,13 @@ subtest 'PSBot::Message::Challstr', {
     cmp-ok $parser.roomid, '~~', Str:U, 'Does not set parser roomid attribute';
     is $parser.challstr, $challstr, 'Sets parser challstr attribute';
 
+    my Promise $p .= new;
     $parser.parse: $state, $connection;
     $*SCHEDULER.cue({
         is $state.challstr, $challstr, 'Updates state challstr attribute';
-        $awaiter.send: True;
-    }, at => now + 1);
-
-    await $awaiter;
+        $p.keep;
+    }, at => now + 2);
+    await $p;
 };
 
 subtest 'PSBot::Message::NameTaken', {
@@ -106,8 +105,6 @@ subtest 'PSBot::Message::NameTaken', {
     cmp-ok $parser.roomid, '~~', Str:U, 'Does not set parser roomid attribute';
     is $parser.username, $username, 'Sets parser username attribute';
     is $parser.reason, $reason, 'Sets parser reason attribute';
-
-    eval-dies-ok '$parser.parse: $state, $connection', "Fails to log in to $username";
 };
 
 subtest 'PSBot::Message::QueryResponse', {
@@ -148,4 +145,164 @@ subtest 'PSBot::Message::QueryResponse', {
     }
 };
 
-done-testing;
+subtest 'PSBot::Message::Init', {
+    my Str $protocol  = 'init';
+    my Str $roomid    = 'lobby';
+    my Str $type      = 'chat';
+    my Str @parts    .= new: $type;
+
+    my PSBot::Message::Init $parser .= new: $protocol, $roomid, @parts;
+    is $parser.protocol, $protocol, 'Sets parser protocol attribute';
+    is $parser.roomid, $roomid, 'Sets parser roomid attribute';
+    is $parser.type, $type, 'Sets parser type attribute';
+
+    $parser.parse: $state, $connection;
+    ok $state.rooms ∋ $roomid, 'Adds room to state';
+};
+
+subtest 'PSBot::Message::Title', {
+    my Str $protocol  = 'title';
+    my Str $roomid    = 'lobby';
+    my Str $title     = 'Lobby';
+    my Str @parts    .= new: $title;
+
+    my PSBot::Message::Title $parser .= new: $protocol, $roomid, @parts;
+    is $parser.protocol, $protocol, 'Sets parser protocol attribute';
+    is $parser.roomid, $roomid, 'Sets parser roomid attribute';
+    is $parser.title, $title, 'Sets parser title attribute';
+
+    $parser.parse: $state, $connection;
+    is $state.rooms{$roomid}.title, $title, 'Sets room title attribute';
+};
+
+subtest 'PSBot::Message::Users', {
+    my Str $protocol  = 'users';
+    my Str $roomid    = 'lobby';
+    my Str $userid    = 'a' x 19; # Ensure it's invalid.
+    my Str $userlist  = "1, $userid";
+    my Str @parts    .= new: $userlist;
+
+    my PSBot::Message::Users $parser .= new: $protocol, $roomid, @parts;
+    is $parser.protocol, $protocol, 'Sets parser protocol attribute';
+    is $parser.roomid, $roomid, 'Sets parser roomid attribute';
+    cmp-ok $parser.userlist, 'eqv', Array[Str].new(" $userid"), 'Sets parser userlist attribute';
+
+    $parser.parse: $state, $connection;
+    ok $state.users ∋ $userid, 'Adds user to user state';
+    is +$state.users, 1, 'Adds correct amount of users';
+    ok $state.rooms{$roomid}.ranks ∋ $userid, 'Adds user to room state';
+};
+
+subtest 'PSBot::Message::Join', {
+    my Str $protocol  = 'J';
+    my Str $roomid    = 'lobby';
+    my Str $userid    = 'b' x 19;
+    my Str $userinfo  = " $userid";
+    my Str @parts    .= new: $userinfo;
+
+    my PSBot::Message::Join $parser .= new: $protocol, $roomid, @parts;
+    is $parser.protocol, $protocol, 'Sets parser protocol attribute';
+    is $parser.roomid, $roomid, 'Sets parser roomid attribute';
+    is $parser.userinfo, $userinfo, 'Sets parser userinfo attribute';
+
+    $parser.parse: $state, $connection;
+    ok $state.users ∋ $userid, 'Adds user to user state';
+    ok $state.rooms{$roomid}.ranks ∋ $userid, 'Adds user to room state';
+};
+
+subtest 'PSBot::Message::Rename', {
+    my Str $protocol = 'N';
+    my Str $roomid = 'lobby';
+    my Str $userid = 'c' x 19;
+    my Str $userinfo = " $userid";
+    my Str $oldid = 'b' x 19;
+    my Str @parts .= new: $userinfo, $oldid;
+
+    my PSBot::Message::Rename $parser .= new: $protocol, $roomid, @parts;
+    is $parser.protocol, $protocol, 'Sets parser protocol attribute';
+    is $parser.roomid, $roomid, 'Sets parser roomid attribute';
+    is $parser.userinfo, $userinfo, 'Sets parser userinfo attribute';
+    is $parser.oldid, $oldid, 'Sets parser oldid attribute';
+
+    $parser.parse: $state, $connection;
+    ok $state.users ∋ $userid, 'Updates user state for user';
+    ok $state.users ∌ $oldid, 'Removes user state for old user';
+    ok $state.rooms{$roomid}.ranks ∋ $userid, 'Updates room state for user';
+    ok $state.rooms{$roomid}.ranks ∌ $oldid, 'Removes room state for old user';
+};
+
+subtest 'PSBot::Message::Leave', {
+    my Str $protocol = 'L';
+    my Str $roomid = 'lobby';
+    my Str $userid = 'c' x 19;
+    my Str $userinfo = " $userid";
+    my Str @parts .= new: $userinfo;
+
+    my PSBot::Message::Leave $parser .= new: $protocol, $roomid, @parts;
+    is $parser.protocol, $protocol, 'Sets parser protocol attribute';
+    is $parser.roomid, $roomid, 'Sets parser roomid attribute';
+    is $parser.userinfo, $userinfo, 'Sets parser userinfo attribute';
+
+    $parser.parse: $state, $connection;
+    ok $state.users ∌ $userid, 'Removes user state for user';
+    ok $state.rooms{$roomid}.ranks ∌ $userid, 'Removes room state for user';
+
+    my $sth = $state.database.dbh.prepare: 'DELETE FROM seen WHERE userid = ?;';
+    $sth.execute: 'b' x 19;
+    $sth.execute: 'c' x 19;
+    $sth.finish;
+};
+
+subtest 'PSBot::Message::Deinit', {
+    my Str $protocol  = 'deinit',
+    my Str $roomid    = 'lobby';
+    my Str @parts    .= new;
+
+    my PSBot::Message::Deinit $parser .= new: $protocol, $roomid, @parts;
+    is $parser.protocol, $protocol, 'Sets parser protocol attribute';
+    is $parser.roomid, $roomid, 'Sets parser roomid attribute';
+
+    $parser.parse: $state, $connection;
+    ok $state.rooms ∌ $roomid, 'Deletes room from room state';
+};
+
+subtest 'PSBot::Command::Chat', {
+    my Str $protocol = 'c';
+    my Str $roomid   = 'lobby';
+    my Str $userinfo = ' ' ~ 'c' x 19;
+    my Str @parts   .= new: "$userinfo|1|2|3\n".split: '|';
+
+    my PSBot::Message::Chat $parser .= new: $protocol, $roomid, @parts;
+    is $parser.protocol, $protocol, 'Sets parser protocol attribute';
+    is $parser.roomid, $roomid, 'Sets parser roomid attribute';
+    is $parser.message, @parts[1..*].join('|').subst("\n", ''), 'Sets parser message attribute';
+};
+
+subtest 'PSBot::Command::ChatWithTimestamp', {
+    my Str     $protocol  = 'c:';
+    my Str     $roomid    = 'lobby';
+    my Str     $userinfo  = ' ' ~ 'c' x 19;
+    my Instant $time      = now;
+    my Str     @parts    .= new: "{$time.Int}|$userinfo|1|2|3\n".split: '|';
+
+    my PSBot::Message::ChatWithTimestamp $parser .= new: $protocol, $roomid, @parts;
+    is $parser.protocol, $protocol, 'Sets parser protocol attribute';
+    is $parser.roomid, $roomid, 'Sets parser roomid attribute';
+    is $parser.timestamp, DateTime.new($time.Int).Instant, 'Sets parser timestamp attribute'; 
+    is $parser.message, @parts[2..*].join('|').subst("\n", ''), 'Sets parser message attribute';
+};
+
+subtest 'PSBot::Command::PrivateMessage', {
+    my Str $protocol = 'pm';
+    my Str $roomid   = 'lobby';
+    my Str $from     = ' ' ~ 'b' x 19;
+    my Str $to       = ' ' ~ 'c' x 19;
+    my Str @parts    = "$from|$to|1|2|3".split: '|';
+
+    my PSBot::Message::PrivateMessage $parser .= new: $protocol, $roomid, @parts;
+    is $parser.protocol, $protocol, 'Sets parser protocol attribute';
+    cmp-ok $parser.roomid, '~~', Str:U, 'Does not set parser roomid attribute';
+    is $parser.from, $from, 'Sets parser from attribute';
+    is $parser.to, $to, 'Sets parser to attribute';
+    is $parser.message, @parts[2..*].join('|'), 'Sets parser message attribute';
+};

@@ -6,7 +6,7 @@ use PSBot::Config;
 use PSBot::Tools;
 unit class PSBot::LoginServer;
 
-has Cro::HTTP::Client $.client    .= new: :cookie-jar;
+has Cro::HTTP::Client $.client    .= new;
 has Bool              $.logged-in  = False;
 
 method get-assertion(Str $username!, Str $challstr!) {

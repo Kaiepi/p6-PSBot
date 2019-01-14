@@ -121,12 +121,14 @@ method delete-user(Str $userinfo, Str $roomid) {
 
 method rename-user(Str $userinfo, Str $oldid, Str $roomid) {
     $!chat-mux.protect({
+        my Str $userid = to-id $userinfo.substr: 1;
         if %!users ∋ $oldid {
             %!users{$oldid}.rename: $userinfo, $roomid;
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
+            %!users{$userid} = %!users{$oldid};
+            %!users{$oldid}:delete;
         } else {
-            my PSBot::User $user   .= new: $userinfo, $roomid;
-            my Str         $userid  = to-id $userinfo.substr: 1;
+            my PSBot::User $user .= new: $userinfo, $roomid;
             %!users{$userid} = $user;
             %!rooms{$roomid}.join: $userinfo;
             %!users{$userid}.on-join: $userinfo, $roomid;

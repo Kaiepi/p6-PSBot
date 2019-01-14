@@ -290,7 +290,7 @@ our class Chat does Message {
 
     method new(Str $protocol, Str $roomid, Str @parts) {
         my (Str $userinfo) = @parts;
-        my Str $message = @parts[2..*].join: '|';
+        my Str $message = @parts[1..*].join: '|';
         # Messages end with a newline for whatever reason, so we remove it.
         $message .= substr: 0, *-1 if $message.ends-with: "\n";
         self.bless: :$protocol, :$roomid, :$userinfo, :$message;
@@ -341,7 +341,7 @@ our class ChatWithTimestamp is Chat does Message {
     method new(Str $protocol, Str $roomid, Str @parts) {
         my (Str $time, Str $userinfo) = @parts;
         my Instant $timestamp = DateTime.new($time.Int).Instant;
-        my Str     $message = @parts[2..*].join: '|';
+        my Str     $message   = @parts[2..*].join: '|';
         $message .= substr: 0, *-1 if $message.ends-with: "\n";
         self.bless: :$protocol, :$roomid, :$timestamp, :$userinfo, :$message;
     }
