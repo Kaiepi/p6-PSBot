@@ -49,6 +49,12 @@ method start() {
             # State needs to be reset on reconnect.
             $!state .= new;
         }
+        whenever signal(SIGINT) {
+            Supply.interval(1).tap({
+                try $!state.database.dbh.dispose;
+                exit 0 unless $!;
+            });
+        }
     }
 }
 
