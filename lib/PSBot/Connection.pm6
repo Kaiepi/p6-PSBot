@@ -35,13 +35,19 @@ method connect() {
 
     if $! {
         debug '[DEBUG]', "Connection to {self.uri} failed: {$!.message}";
-        await self.reconnect;
+        self.reconnect;
     } else {
         debug '[DEBUG]', "Connected to {self.uri}";
 
         # Reset state that needs to be reset on reconnect.
         $!inited  .= new;
         $!timeout  = 1;
+
+        # Throttle outgoing messages.
+        $!tap = $!sender.Supply.throttle(1, 0.6).tap(-> $data {
+            debug '[SEND]', $data;
+            $!connection.send: $data;
+        });
 
         # Pass any received messages back to PSBot to pass to the parser.
         $!connection.messages.tap(-> $data {
@@ -61,12 +67,6 @@ method connect() {
             $!disconnects.send: True;
             $!timeout *= 2;
             self.reconnect;
-        });
-
-        # Throttle outgoing messages.
-        $!tap = $!sender.Supply.throttle(1, 0.6).tap(-> $data {
-            debug '[SEND]', $data;
-            $!connection.send: $data;
         });
     }
 }

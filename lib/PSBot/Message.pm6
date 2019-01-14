@@ -25,9 +25,9 @@ my role Message {
 }
 
 our class UserUpdate does Message {
-    has Str $.username is required;
-    has Str $.is-named is required;
-    has Str $.avatar   is required;
+    has Str  $.username is required;
+    has Str  $.is-named is required;
+    has Str  $.avatar   is required;
 
     method new(Str $protocol, Str $roomid, Str @parts) {
         my (Str $username, Str $is-named, Str $avatar) = @parts;
@@ -36,7 +36,7 @@ our class UserUpdate does Message {
 
     method parse(PSBot::StateManager $state, PSBot::Connection $connection) {
         $state.update-user: $!username, $!is-named, $!avatar;
-        $state.pending-rename.send: $!username;
+        $state.pending-rename.send: $!username unless $!username.starts-with: 'Guest ';
         if USERNAME && $!username eq USERNAME {
             $connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
             $connection.send-raw: "/avatar {AVATAR}" if AVATAR;
@@ -64,7 +64,7 @@ our class ChallStr does Message {
                 "/trn {USERNAME},0,$assertion";
 
             my $res = await $state.pending-rename;
-            $res.rethrow if $res ~~ Exception;
+            $res.throw if $res ~~ X::PSBot::NameTaken;
         });
     }
 
@@ -77,7 +77,7 @@ our class NameTaken does Message {
 
     method new(Str $protocol, Str $roomid, Str @parts) {
         my (Str $username, Str $reason) = @parts;
-        self.bless: :$protocol, :$username, 
+        self.bless: :$protocol, :$username, :$reason;
     }
 
     method parse(PSBot::StateManager $state, PSBot::Connection $connection) {
@@ -218,7 +218,7 @@ our class Join does Message {
         my @mail = $state.database.get-mail: $userid;
         if +@mail {
             $connection.send:
-                "You receieved {+@mail} mail:",
+                "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
                 @mail.map(-> %row { "[%row<source>] %row<message>" }),
                 :$userid;
             $state.database.remove-mail: $userid;
@@ -269,7 +269,7 @@ our class Rename does Message {
         my @mail = $state.database.get-mail: $userid;
         if +@mail {
             $connection.send:
-                "You receieved {+@mail} mail:",
+                "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
                 @mail.map(-> %row { "[%row<source>] %row<message>" }),
                 :$userid;
             $state.database.remove-mail: $userid;
