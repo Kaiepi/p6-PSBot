@@ -12,5 +12,6 @@
     "max_reconnect_attempts": 16,
     "git":                    "https://github.com/Kaiepi/p6-PSBot",
     "dictionary_api_id":      null,
-    "dictionary_api_key":     null
+    "dictionary_api_key":     null,
+    "youtube_api_key":        null
 }

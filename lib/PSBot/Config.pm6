@@ -27,7 +27,8 @@ sub EXPORT(--> Hash) {
                 MAX_RECONNECT_ATTEMPTS => %config<max_reconnect_attempts>,
                 GIT                    => %config<git>,
                 DICTIONARY_API_ID      => %config<dictionary_api_id>,
-                DICTIONARY_API_KEY     => %config<dictionary_api_key>
+                DICTIONARY_API_KEY     => %config<dictionary_api_key>,
+                YOUTUBE_API_KEY        => %config<youtube_api_key>
             )
         }
     }

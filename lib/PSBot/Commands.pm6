@@ -10,6 +10,7 @@ use PSBot::Room;
 use PSBot::StateManager;
 use PSBot::Tools;
 use PSBot::User;
+use URI::Encode;
 unit module PSBot::Commands;
 
 our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -157,7 +158,7 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
         'No term was given.',
         $rank, $user, $room, $connection unless $target;
 
-    my Str                 $term = $target.trim.subst: ' ', '%20', :g;
+    my Str                 $term = uri_encode_component($target);
     my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
         "http://api.urbandictionary.com/v0/define?term=$term",
         content-type     => 'application/json',
@@ -261,11 +262,11 @@ our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
         'No query was given,',
         $rank, $user, $room, $connection unless $target;
 
-    my Str                 $page = $target.subst: ' ', '%20', :g;
-    my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
-        "https://wikimon.net/api.php?action=query&prop=info&titles=$page&inprop=url&format=json",
+    my Str                 $query = uri_encode_component($target);
+    my Cro::HTTP::Response $resp  = await Cro::HTTP::Client.get:
+        "https://wikimon.net/api.php?action=query&prop=info&titles=$query&inprop=url&format=json",
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
-    my                     %body = await $resp.body;
+    my                     %body  = await $resp.body;
     return self.send:
         "No Wikimon page for $target was found.",
         $rank, $user, $room, $connection unless %body<query><pages> ∋ '-1';
@@ -273,6 +274,29 @@ our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
     self.send:
         "The Wikimon page for $target is {%body<query><pages>.head.value<fullurl>}",
         $rank, $user, $room, $connection;
+}
+
+our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection) {
+    my $rank = $room ?? ($state.database.get-command($room.id, 'youtube') || '+') !! Nil;
+    return self.send:
+        'No query was given.',
+        $rank, $user, $room, $connection unless $target;
+
+    my Str                 $query = uri_encode_component($target);
+    my Cro::HTTP::Response $resp  = await Cro::HTTP::Client.get:
+        "https://www.googleapis.com/youtube/v3/search?q=$query&maxResults=1&part=snippet&key={YOUTUBE_API_KEY}",
+        http             => '1.1',
+        body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
+    my                     %body  = await $resp.body;
+    return self.send:
+        "No video was found for $query.",
+        $rank, $user, $room, $connection unless +%body<items>;
+
+    my     %data  = %body<items>.head;
+    my Str $title = %data<snippet><title>;
+    my Str $url   = "https://youtu.be/%data<id><videoId>";
+    "$title - $url"
 }
 
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -369,10 +393,10 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = $state.database.get-command($room.id, 'hangman') || '+';
     return "{COMMAND}hangman can only be used in rooms." unless $room;
 
     my (Str $subcommand, Str $guess) = $target.split: ' ';
+    my $rank = $state.database.get-command($room.id, 'hangman') || '+';
     given $subcommand {
         when 'new' {
             return "There is already a game of {$room.game.name} in progress!" if $room.game;
@@ -468,6 +492,10 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
 
         - wikimon <query>:
           Returns the Wikimon page for the given query.
+          Requires at least rank + by default.
+
+        - youtube <query>
+          Returns the first YouTube result for the given query.
           Requires at least rank + by default.
 
         - reminder <time>, <message>:
