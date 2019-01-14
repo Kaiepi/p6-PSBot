@@ -3,6 +3,7 @@ use PSBot::Config;
 use PSBot::Database;
 use PSBot::LoginServer;
 use PSBot::Room;
+use PSBot::Rules;
 use PSBot::Tools;
 use PSBot::User;
 unit class PSBot::StateManager;
@@ -15,7 +16,8 @@ has Str  $.avatar;
 has Str  $.group;
 has Set  $.public-rooms;
 
-has Channel $.pending-rename.= new;
+has Channel   $.pending-rename .= new;
+has atomicint $.rooms-joined    = 0;
 
 has Lock::Async $.chat-mux .= new;
 has PSBot::User %.users;
@@ -23,6 +25,7 @@ has PSBot::Room %.rooms;
 
 has PSBot::Database    $.database     .= new;
 has PSBot::LoginServer $.login-server .= new;
+has PSBot::Rules       $.rules        .= new;
 
 method authenticate(Str $username!, Str $password?, Str $challstr? --> Str) {
     $!challstr = $challstr if defined $challstr;
@@ -31,10 +34,10 @@ method authenticate(Str $username!, Str $password?, Str $challstr? --> Str) {
     $!login-server.log-in: $username, $password, $!challstr
 }
 
-method update-user(Str $username, Str $named, Str $avatar) {
+method update-user(Str $username, Str $is-named, Str $avatar) {
     $!username       = $username;
     $!guest-username = $username if $username.starts-with: 'Guest ';
-    $!is-guest       = $named eq '0';
+    $!is-guest       = $is-named eq '0';
     $!avatar         = $avatar;
 }
 
@@ -44,13 +47,21 @@ method set-public-rooms(@rooms) {
     $!public-rooms = set(@rooms);
 }
 
-method add-room(Str $roomid, Str $type, Str $title, Str @userlist) {
+method add-room(Str $roomid, Str $type) {
     $!chat-mux.protect({
         return if %!rooms ∋ $roomid;
 
         my Bool        $is-private  = $!public-rooms ∌ $roomid;
-        my PSBot::Room $room       .= new: $roomid, $title, $type, @userlist, $is-private;
+        my PSBot::Room $room       .= new: $roomid, $type, $is-private;
         %!rooms{$roomid} = $room;
+        $!rooms-joined⚛++;
+    })
+}
+
+method add-room-users(Str $roomid, Str @userlist) {
+    $!chat-mux.protect({
+        my PSBot::Room $room = %!rooms{$roomid};
+        $room.set-ranks: @userlist;
 
         for @userlist -> $userinfo {
             my Str $userid = to-id $userinfo.substr: 1;

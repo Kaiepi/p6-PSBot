@@ -4,6 +4,7 @@ use Cro::HTTP::Response;
 use Hastebin;
 use PSBot::Config;
 use PSBot::Connection;
+use PSBot::Exceptions;
 use PSBot::Games::Hangman;
 use PSBot::Room;
 use PSBot::StateManager;
@@ -95,7 +96,7 @@ our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
         $state.pending-rename .= new;
         $connection.send-raw: "/trn $username,0,$assertion";
         my $res = await $state.pending-rename;
-        $res ~~ Exception ?? $res.message !! "Successfully renamed to $res!"
+        $res ~~ X::PSBot::NameTaken ?? $res.message !! "Successfully renamed to $res!"
     } else {
         "Failed to rename to $username: {$assertion.exception.message}"
     }

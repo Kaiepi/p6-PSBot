@@ -2,17 +2,9 @@ use v6.d;
 use Cro::WebSocket::Client;
 use Cro::Uri;
 use PSBot::Config;
+use PSBot::Exceptions;
 use PSBot::Tools;
 unit class PSBot::Connection;
-
-class X::PSBot::Connection::ReconnectFailure is Exception {
-    has Str $.uri;
-    has Int $.attempts;
-
-    method message(--> Str) {
-        "Failed to connect to $!uri after $!attempts attempts."
-    }
-}
 
 has Cro::WebSocket::Client             $!client;
 has Cro::WebSocket::Client::Connection $.connection;
@@ -47,6 +39,10 @@ method connect() {
     } else {
         debug '[DEBUG]', "Connected to {self.uri}";
 
+        # Reset state that needs to be reset on reconnect.
+        $!inited  .= new;
+        $!timeout  = 1;
+
         # Pass any received messages back to PSBot to pass to the parser.
         $!connection.messages.tap(-> $data {
             my Str $text = await $data.body-text;
@@ -57,11 +53,14 @@ method connect() {
         }, done => {
             $!tap.close;
             $!disconnects.send: True;
-            await self.reconnect;
-        }, quit => {
+            $!timeout *= 2;
+            self.reconnect;
+        }, quit => -> $e {
+            note $e;
             $!tap.close;
             $!disconnects.send: True;
-            await self.reconnect;
+            $!timeout *= 2;
+            self.reconnect;
         });
 
         # Throttle outgoing messages.
@@ -69,22 +68,20 @@ method connect() {
             debug '[SEND]', $data;
             $!connection.send: $data;
         });
-
-        $!timeout = 1;
-        $!inited .= new;
     }
 }
 
-method reconnect(--> Promise) {
-    $!timeout *= 2;
+method reconnect() {
     debug '[DEBUG]', "Reconnecting in $!timeout seconds...";
 
-    X::PSBot::Connection::ReconnectFailure.new(
+    die X::PSBot::ReconnectFailure.new(
         attempts => MAX_RECONNECT_ATTEMPTS,
         uri      => self.uri
-    ).throw if $!timeout == 2 ** MAX_RECONNECT_ATTEMPTS;
+    ) if $!timeout == 2 ** MAX_RECONNECT_ATTEMPTS;
 
-    Promise.in($!timeout).then({ self.connect })
+    $*SCHEDULER.cue:
+        { self.connect },
+        at => now + $!timeout;
 }
 
 method lower-throttle() {

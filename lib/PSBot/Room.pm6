@@ -4,15 +4,19 @@ use PSBot::Tools;
 unit class PSBot::Room;
 
 has Str         $.id;
-has Str         $.title;
 has Str         $.type;
+has Str         $.title;
 has Bool        $.is-private;
 has Str         %.ranks;
 has PSBot::Game $.game;
 
-method new(Str $id, Str $title, Str $type, Str @userlist, Bool $is-private) {
-    my Str %ranks = @userlist.map({ to-id($_.substr(1)) => $_.substr(0, 1) });
-    self.bless: :$id, :$title, :$type, :$is-private, :%ranks;
+method new(Str $id, Str $type, Bool $is-private) {
+    self.bless: :$id, :$type, :$is-private;
+}
+
+method set-title(Str $!title)   {}
+method set-ranks(Str @userlist) {
+    %!ranks = @userlist.map({ to-id($_.substr(1)) => $_.substr(0, 1) });
 }
 
 method join(Str $userinfo) {

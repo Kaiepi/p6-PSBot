@@ -1,7 +1,5 @@
 use v6.d;
-use PSBot::Connection;
 use PSBot::Room;
-use PSBot::StateManager;
 use PSBot::Tools;
 use PSBot::User;
 unit class PSBot::Rules;
@@ -18,8 +16,7 @@ my class Rule {
         self.bless: :$includes, :$excludes, :$matcher, :&on-match;
     }
 
-    method match(Str $target, PSBot::Room $room, PSBot::User $user,
-            PSBot::StateManager $state, PSBot::Connection $connection) {
+    method match($target, $room, $user, $state, $connection) {
         return if $room && ((+$!includes && $!includes ∌ $room.id) || $!excludes ∋ $room.id);
         $target ~~ $!matcher;
         &!on-match($/, $room, $user, $state, $connection) if $/;
