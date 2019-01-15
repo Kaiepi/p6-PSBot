@@ -13,6 +13,8 @@ use PSBot::User;
 use URI::Encode;
 unit module PSBot::Commands;
 
+my Set constant ADMINISTRATIVE .= new: <eval evalcommand say nick suicide>;
+
 our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
@@ -412,6 +414,9 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
     return self.send: $rank.exception.message, '%', $user, $room, $connection unless $rank.defined;
 
     my (Str $command, $target-rank) = $target.split(',').map({ .trim });
+    $command = to-id $command;
+    return "{COMMAND}$command is an administrative command and thus can't have its rank set." if ADMINISTRATIVE ∋ $command;
+
     $target-rank = ' ' unless $target-rank;
     return "'$target-rank' is not a rank." unless self.is-rank: $target-rank;
 
@@ -431,6 +436,7 @@ our method toggle(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my Str $command = to-id $target;
     return 'No command was given.' unless $command;
+    return "{COMMAND}$command is an administrative command and thus can't be disabled." if ADMINISTRATIVE ∋ $command;
     return "{COMMAND}{&?ROUTINE.name} can't be disabled." if $command eq &?ROUTINE.name;
 
     my &command = try &::("OUR::$command");
