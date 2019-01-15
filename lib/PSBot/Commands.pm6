@@ -14,6 +14,22 @@ use URI::Encode;
 unit module PSBot::Commands;
 
 my Set constant ADMINISTRATIVE .= new: <eval evalcommand say nick suicide>;
+my Map constant DEFAULT_RANKS  .= new: (
+    git        => '+',
+    eightball  => '+',
+    urban      => '+',
+    dictionary => '+',
+    wikipedia  => '+',
+    wikimon    => '+',
+    youtube    => '+',
+    reminder   => ' ',
+    mail       => ' ',
+    seen       => '+',
+    set        => '%',
+    toggle     => '%',
+    hangman    => '+',
+    help       => '+'
+);
 
 our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
@@ -132,8 +148,9 @@ our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method git(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res  = "{$state.username}'s source code may be found at {GIT}";
     self.send: $res, $rank, $user, $room, $connection;
@@ -141,8 +158,9 @@ our method git(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res  = do given floor rand * 20 {
         when 0  { 'It is certain.'             }
@@ -172,8 +190,9 @@ our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res = 'No term was given.';
     return self.send: $res, $rank, $user, $room, $connection unless $target;
@@ -197,8 +216,9 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     state %urls;
     state %definitions;
 
-    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res = "{$state.username} has no configured dictionary API ID.";
     return self.send: $res, $rank, $user, $room, $connection unless DICTIONARY_API_ID;
@@ -251,8 +271,9 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res = 'No query was given,';
     return self.send: $res, $rank, $user, $room, $connection unless $target;
@@ -272,8 +293,9 @@ our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res = 'No query was given,';
     return self.send: $res, $rank, $user, $room, $connection unless $target;
@@ -293,8 +315,9 @@ our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res = "{$state.username} has no configured YouTube API key.";
     return self.send: $res, $rank, $user, $room, $connection unless YOUTUBE_API_KEY;
@@ -321,8 +344,9 @@ our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = self.get-permission: &?ROUTINE.name, ' ', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, ' ', $user, $room, $connection unless $rank.defined;
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my (Str $time-ago, Str $message) = $target.split(',').map({ .trim });
     return 'A time (e.g. 30s, 10m, 2h) and a message must be given.' unless $time-ago && $message;
@@ -362,8 +386,9 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    my $rank = self.get-permission: &?ROUTINE.name, ' ', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, ' ', $user, $room, $connection unless $rank.defined;
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Int $idx = $target.index: ',';
     return 'A username and a message must be included.' unless $idx;
@@ -390,8 +415,9 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res    = 'No user was given.';
     my Str $userid = to-id $target;
@@ -408,10 +434,11 @@ our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method set(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return $connection.send: "{COMMAND}{&?ROUTINE.name} can only be used in rooms.", userid => $user.id unless $room;
+    return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
 
-    my $rank = self.get-permission: &?ROUTINE.name, '%', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, '%', $user, $room, $connection unless $rank.defined;
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my (Str $command, $target-rank) = $target.split(',').map({ .trim });
     $command = to-id $command;
@@ -429,10 +456,11 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method toggle(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return $connection.send: "{COMMAND}{&?ROUTINE.name} can only be used in rooms.", userid => $user.id unless $room;
+    return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
 
-    my $rank = self.get-permission: &?ROUTINE.name, '%', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, '%', $user, $room, $connection unless $rank.defined;
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $command = to-id $target;
     return 'No command was given.' unless $command;
@@ -455,8 +483,9 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         when 'new' {
             return "There is already a game of {$room.game.name} in progress!" if $room.game;
 
-            my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
-            return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+            my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+            my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+            return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
             $room.add-game: PSBot::Games::Hangman.new: $user, :allow-late-joins;
             "A game of {$room.game.name} has been created."
@@ -500,6 +529,11 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     state Str     $url;
     state Instant $timeout = now;
+
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
+
     return "{$state.username} help may be found at: $url" if defined($url) && now - $timeout <= 60 * 60 * 24 * 30;
 
     my Str $help = q:to/END/;
@@ -578,11 +612,14 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
             - hangman guess <word>:   Guesses the given word.
             - hangman end:            Ends the hangman game.
             - hangman players:        Returns a list of the players in the hangman game.
-                                      Requires at least rank + by default.
+                                      Requires at least rank +.
+
+        - help:
+          Returns a link to this help page.
+          Requires at least rank + by default.
         END
 
     $url     = Hastebin.post: $help;
     $timeout = now;
-
     "{$state.username} help may be found at: $url"
 }
