@@ -37,7 +37,7 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
     }
     if $res.codes > 300 {
         my Str $url = Hastebin.post: $res;
-        return "{COMMAND}eval output was too long to send. It may be found at $url";
+        return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
     }
     "``$res``"
 }
@@ -84,7 +84,7 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
     }
     if $res.codes > 300 {
         my Str $url = Hastebin.post: $res;
-        return "{COMMAND}eval output was too long to send. It may be found at $url";
+        return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
     }
     "``$res``"
 }
@@ -408,7 +408,7 @@ our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method set(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return $connection.send: "{COMMAND}set can only be used in rooms.", userid => $user.id unless $room;
+    return $connection.send: "{COMMAND}{&?ROUTINE.name} can only be used in rooms.", userid => $user.id unless $room;
 
     my $rank = self.get-permission: &?ROUTINE.name, '%', $user, $room, $state, $connection;
     return self.send: $rank.exception.message, '%', $user, $room, $connection unless $rank.defined;
@@ -426,14 +426,14 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method toggle(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return $connection.send: "{COMMAND}set can only be used in rooms.", userid => $user.id unless $room;
+    return $connection.send: "{COMMAND}{&?ROUTINE.name} can only be used in rooms.", userid => $user.id unless $room;
 
     my $rank = self.get-permission: &?ROUTINE.name, '%', $user, $room, $state, $connection;
     return self.send: $rank.exception.message, '%', $user, $room, $connection unless $rank.defined;
 
     my Str $command = to-id $target;
     return 'No command was given.' unless $command;
-    return "{COMMAND}toggle can't be disabled." if $command eq 'toggle';
+    return "{COMMAND}{&?ROUTINE.name} can't be disabled." if $command eq &?ROUTINE.name;
 
     my &command = try &::("OUR::$command");
     return "{COMMAND}$command does not exist." unless defined &command;
@@ -444,14 +444,16 @@ our method toggle(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return "{COMMAND}hangman can only be used in rooms." unless $room;
+    return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
 
     my (Str $subcommand, Str $guess) = $target.split: ' ';
-    my Str $rank = self.get-rank: $state, 'hangman', $room.id, '+';
     given $subcommand {
         when 'new' {
             return "There is already a game of {$room.game.name} in progress!" if $room.game;
-            return $connection.send: 'Permission denied.', userid => $user.id unless !$room || self.can: $rank, $user.ranks{$room.id};
+
+            my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
+            return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+
             $room.add-game: PSBot::Games::Hangman.new: $user, :allow-late-joins;
             "A game of {$room.game.name} has been created."
         }
@@ -466,9 +468,8 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         when 'players' {
             return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
 
-            my Str $res = $room.game.players;
-            return $connection.send: $res, userid => $user.id unless !$room || self.can: $rank, $user.ranks{$room.id};
-
+            my Str $res  = $room.game.players;
+            return $connection.send: $res, userid => $user.id unless self.can: '+', $user.ranks{$room.id};
             $res
         }
         when 'start' {
@@ -487,7 +488,7 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
             $room.remove-game;
             res
         }
-        default { "Unknown {COMMAND}hangman subcommand: $subcommand" }
+        default { "Unknown {COMMAND}{&?ROUTINE.name} subcommand: $subcommand" }
     }
 }
 
