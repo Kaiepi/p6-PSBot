@@ -299,7 +299,10 @@ our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
     my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
     return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
 
-    my Str $res = 'No query was given,';
+    my Str $res = "{$state.username} has no configured YouTube API key.";
+    return self.send: $res, $rank, $user, $room, $connection unless YOUTUBE_API_KEY;
+
+    $res = 'No query was given,';
     return self.send: $res, $rank, $user, $room, $connection unless $target;
 
     my Str                 $query = uri_encode_component($target);
