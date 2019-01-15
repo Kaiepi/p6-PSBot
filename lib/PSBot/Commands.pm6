@@ -77,7 +77,7 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
         })
     );
 
-    my Str $res        = @res.join: "\n";
+    my Str $res = @res.join: "\n";
     if $room && $state.users ∋ $state.userid && $state.users{$state.userid}.ranks{$room.id} ne ' ' {
         return $connection.send-raw: "!code $res", roomid => $room.id if $res.contains: "\n";
         return "``$res``";
@@ -433,6 +433,7 @@ our method toggle(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my Str $command = to-id $target;
     return 'No command was given.' unless $command;
+    return "{COMMAND}toggle can't be disabled." if $command eq 'toggle';
 
     my &command = try &::("OUR::$command");
     return "{COMMAND}$command does not exist." unless defined &command;
