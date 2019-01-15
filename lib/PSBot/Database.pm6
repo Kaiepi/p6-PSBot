@@ -178,6 +178,18 @@ method add-seen(Str $userid, Instant $time) {
     }
 }
 
+method get-commands(Str $roomid --> Array) {
+    my $sth = $!dbh.prepare: q:to/STATEMENT/;
+        SELECT * FROM settings
+        WHERE roomid = ?;
+        STATEMENT
+    $sth.execute: $roomid;
+    my @rows = [$sth.fetchall-AoH];
+    @rows = @rows.flat if @rows.head ~~ List;
+    $sth.finish;
+    @rows
+}
+
 method get-command(Str $roomid, Str $command) {
     my $sth = $!dbh.prepare: q:to/STATEMENT/;
         SELECT * FROM settings

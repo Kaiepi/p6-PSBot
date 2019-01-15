@@ -27,6 +27,7 @@ my Map constant DEFAULT_RANKS  .= new: (
     seen       => '+',
     set        => '%',
     toggle     => '%',
+    settings   => '%',
     hangman    => '+',
     help       => '+'
 );
@@ -213,9 +214,6 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    state %urls;
-    state %definitions;
-
     my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
     my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
@@ -227,16 +225,6 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     my Str $word = to-id $target;
     $res = 'No word was given.';
     return self.send: $res, $rank, $user, $room, $connection unless $word;
-
-    if %definitions ∋ $word {
-        return $connection.send-raw: %definitions{$word}, userid => $user.id unless $state.group ne '*' || self.can: $rank, $user.ranks{$room.id};
-        return $connection.send-raw: %definitions{$word}, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
-    }
-
-    if %urls ∋ $word && now - %urls{$word}<time> <= 60 * 60 * 24 * 30 {
-        $res = "Oxford Dictionary definition for $word: %urls{$word}<url>";
-        return self.send: $res, $rank, $user, $room, $connection ;
-    }
 
     my Cro::HTTP::Response $resp = try await Cro::HTTP::Client.get:
         "https://od-api.oxforddictionaries.com:443/api/v1/entries/en/$word",
@@ -257,14 +245,13 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
             })
         })
     }).flat.grep({ .defined });
-    %definitions{$word} = "/addhtmlbox <ol>{@definitions.map({ "<li>{$_.head}</li>" })}</ol>";
-    return $connection.send-raw: %definitions{$word}, userid => $user.id unless $state.group ne '*' || self.can: $rank, $user.ranks{$room.id};
-    return $connection.send-raw: %definitions{$word}, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
+
+    $res = "/addhtmlbox <ol>{@definitions.map({ "<li>{$_.head}</li>" })}</ol>";
+    return $connection.send-raw: $res, userid => $user.id unless $state.group ne '*' || self.can: $rank, $user.ranks{$room.id};
+    return $connection.send-raw: $res, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
 
     my Int $i   = 0;
     my Str $url = Hastebin.post: @definitions.map({ "{++$i}. {$_.head}" }).join: "\n";
-    %urls{$word} = {url => $url, time => now};
-
     $res = "Oxford Dictionary definition for $word: $url";
     self.send: $res, $rank, $user, $room, $connection;
 }
@@ -474,6 +461,34 @@ our method toggle(Str $target, PSBot::User $user, PSBot::Room $room,
     "{COMMAND}$command has been {$enabled ?? 'enabled' !! 'disabled'}."
 }
 
+our method settings(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection) {
+    return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
+
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
+
+    my @rows = $state.database.get-commands: $room.id;
+    my @requirements = eager gather for DEFAULT_RANKS.pairs.sort {
+        my Str $command = .key;
+        my Str $rank    = .value eq ' ' ?? 'regular user' !! .value;
+        my     $row     = @rows.first({ $_<command> eq $command });
+        take [$command, "requires rank $rank"     ] andthen next unless defined $row;
+        take [$command, 'disabled'                ] andthen next unless $row<enabled>.Int;
+        take [$command, "requires rank $rank"     ] andthen next unless defined $row<rank>;
+        take [$command, "requires rank $row<rank>"];
+    };
+
+    my Str $res = "/addhtmlbox <details><summary>Command Settings</summary><table>{@requirements.map({ "<tr><td>{.head}</td><td>{.tail}</td></tr>" })}</table></details>";
+    return $connection.send-raw: $res, userid => $user.id unless $state.group ne '*' || self.can: $rank, $user.ranks{$room.id};
+    return $connection.send-raw: $res, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
+
+    $res = @requirements.map({ .join: ': ' }).join: "\n";
+    my Str $url = Hastebin.post: $res;
+    "Settings for commands in {$room.title} may be found at: $url"
+}
+
 our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
@@ -601,6 +616,10 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
 
         - toggle <command>
           Enables/disables the given command.
+          Requires at least rank % by default.
+
+        - settings
+          Returns the list of commands and their usability in the room.
           Requires at least rank % by default.
 
         - hangman:
