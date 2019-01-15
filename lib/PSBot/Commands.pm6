@@ -137,11 +137,6 @@ our method git(Str $target, PSBot::User $user, PSBot::Room $room,
     self.send: $res, $rank, $user, $room, $connection;
 }
 
-our method primal(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    'C# sucks'
-}
-
 our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
@@ -525,9 +520,6 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
         - git:
           Returns the GitHub repo for the bot.
           Requires at least rank + by default.
-
-        - primal:
-          Returns 'C# sucks'.
 
         - eightball <question>:
           Returns an 8ball message in response to the given question.
