@@ -32,13 +32,14 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my Str $res        = @res.join: "\n";
     if $room && $state.users ∋ $state.userid && $state.users{$state.userid}.ranks{$room.id} ne ' ' {
-        return $connection.send-raw: "!code $res", roomid => $room.id;
+        return $connection.send-raw: "!code $res", roomid => $room.id if $res.contains: "\n";
+        return "``$res``";
     }
     if $res.codes > 300 {
         my Str $url = Hastebin.post: $res;
-        return "{COMMAND}eval output was too long to send. It may be found at $url.";
+        return "{COMMAND}eval output was too long to send. It may be found at $url";
     }
-    $res
+    "``$res``"
 }
 
 our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -78,13 +79,14 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my Str $res        = @res.join: "\n";
     if $room && $state.users ∋ $state.userid && $state.users{$state.userid}.ranks{$room.id} ne ' ' {
-        return $connection.send-raw: "!code $res", roomid => $room.id;
+        return $connection.send-raw: "!code $res", roomid => $room.id if $res.contains: "\n";
+        return "``$res``";
     }
     if $res.codes > 300 {
         my Str $url = Hastebin.post: $res;
         return "{COMMAND}eval output was too long to send. It may be found at $url";
     }
-    $res
+    "``$res``"
 }
 
 our method say(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -110,7 +112,7 @@ our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
     }
 
     my $assertion = $state.authenticate: $username, $password;
-    return "Failed to rename to $username: {$assertion.message}" if $assertion ~~ Failure;
+    return "Failed to rename to $username: {$assertion.exception.message}" if $assertion ~~ Failure;
     return unless defined $assertion; # Unit tests in progress.
 
     $connection.send-raw: "/trn $username,0,$assertion";
@@ -128,7 +130,9 @@ our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method git(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my     $rank = $room ?? ($state.database.get-command($room.id, 'git') || '+') !! Nil;
+    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+
     my Str $res  = "{$state.username}'s source code may be found at {GIT}";
     self.send: $res, $rank, $user, $room, $connection;
 }
@@ -140,7 +144,9 @@ our method primal(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my     $rank = $room ?? ($state.database.get-command($room.id, 'eightball') || '+') !! Nil;
+    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+
     my Str $res  = do given floor rand * 20 {
         when 0  { 'It is certain.'             }
         when 1  { 'It is decidedly so.'        }
@@ -169,10 +175,11 @@ our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = $room ?? ($state.database.get-command($room.id, 'urban') || '+') !! Nil;
-    return self.send:
-        'No term was given.',
-        $rank, $user, $room, $connection unless $target;
+    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+
+    my Str $res = 'No term was given.';
+    return self.send: $res, $rank, $user, $room, $connection unless $target;
 
     my Str                 $term = uri_encode_component($target);
     my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
@@ -180,14 +187,12 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
         content-type     => 'application/json',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
     my                     %body = await $resp.body;
-    return self.send:
-        "Urban Dictionary definition for $target was not found.",
-        $rank, $user, $room, $connection unless +%body<list>;
+    $res = "Urban Dictionary definition for $target was not found.";
+    self.send: $res, $rank, $user, $room, $connection unless +%body<list>;
 
     my %info = %body<list>.head;
-    self.send:
-        "Urban Dictionary definition for $target: %info<permalink>",
-        $rank, $user, $room, $connection;
+    $res = "Urban Dictionary definition for $target: %info<permalink>";
+    self.send: $res, $rank, $user, $room, $connection;
 }
 
 our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -195,34 +200,33 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     state %urls;
     state %definitions;
 
-    my $rank = $room ?? ($state.database.get-command($room.id, 'dictionary') || '+') !! Nil;
-    return self.send:
-        "{$state.username} has no configured dictionary API ID.",
-        $rank, $user, $room, $connection unless DICTIONARY_API_ID;
-    return self.send:
-        "{$state.username} has no configured dictionary API key.",
-        $rank, $user, $room, $connection unless DICTIONARY_API_KEY;
+    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+
+    my Str $res = "{$state.username} has no configured dictionary API ID.";
+    return self.send: $res, $rank, $user, $room, $connection unless DICTIONARY_API_ID;
+    return self.send: $res, $rank, $user, $room, $connection unless DICTIONARY_API_KEY;
 
     my Str $word = to-id $target;
-    return self.send:
-        "No word was given.",
-        $rank, $user, $room, $connection unless $word;
+    $res = 'No word was given.';
+    return self.send: $res, $rank, $user, $room, $connection unless $word;
 
     if %definitions ∋ $word {
         return $connection.send-raw: %definitions{$word}, userid => $user.id unless $state.group ne '*' || self.can: $rank, $user.ranks{$room.id};
         return $connection.send-raw: %definitions{$word}, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
     }
-    return self.send:
-        "Oxford Dictionary definition for $word: %urls{$word}<url>",
-        $rank, $user, $room, $connection if %urls ∋ $word && now - %urls{$word}<time> <= 60 * 60 * 24 * 30;
+
+    if %urls ∋ $word && now - %urls{$word}<time> <= 60 * 60 * 24 * 30 {
+        $res = "Oxford Dictionary definition for $word: %urls{$word}<url>";
+        return self.send: $res, $rank, $user, $room, $connection ;
+    }
 
     my Cro::HTTP::Response $resp = try await Cro::HTTP::Client.get:
         "https://od-api.oxforddictionaries.com:443/api/v1/entries/en/$word",
         headers          => [app_id => DICTIONARY_API_ID, app_key => DICTIONARY_API_KEY],
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
-    return self.send:
-        "Definition for $word not found.",
-        $rank, $user, $room, $connection unless $resp;
+    $res = "Definition for $word not found.";
+    return self.send: $res, $rank, $user, $room, $connection unless $resp;
 
     my %body        = await $resp.body;
     my @definitions = %body<results>.flat.map({
@@ -244,59 +248,59 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     my Str $url = Hastebin.post: @definitions.map({ "{++$i}. {$_.head}" }).join: "\n";
     %urls{$word} = {url => $url, time => now};
 
-    self.send:
-        "Oxford Dictionary definition for $word: $url",
-        $rank, $user, $room, $connection unless $resp;
+    $res = "Oxford Dictionary definition for $word: $url";
+    self.send: $res, $rank, $user, $room, $connection;
 }
 
 our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = $room ?? ($state.database.get-command($room.id, 'wikimon') || '+') !! Nil;
-    return self.send:
-        'No query was given,',
-        $rank, $user, $room, $connection unless $target;
+    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
 
-    my Str                 $page = $target.subst: ' ', '%20', :g;
-    my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
-        "https://en.wikipedia.org/w/api.php?action=query&prop=info&titles=$page&inprop=url&format=json",
+    my Str $res = 'No query was given,';
+    return self.send: $res, $rank, $user, $room, $connection unless $target;
+
+    my Str                 $query = uri_encode_component($target);
+    my Cro::HTTP::Response $resp  = await Cro::HTTP::Client.get:
+        "https://en.wikipedia.org/w/api.php?action=query&prop=info&titles=$query&inprop=url&format=json",
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
     my                     %body = await $resp.body;
-    return self.send:
-        "No Wikipedia page for $target was found.",
-        $rank, $user, $room, $connection unless %body<query><pages> ∋ '-1';
 
-    self.send:
-        "The Wikipedia page for $target is {%body<query><pages>.head.value<fullurl>}",
-        $rank, $user, $room, $connection;
+    $res = "No Wikipedia page for $target was found.";
+    return self.send: $res, $rank, $user, $room, $connection unless %body<query><pages> ∋ '-1';
+
+    $res = "The Wikipedia page for $target is {%body<query><pages>.head.value<fullurl>}";
+    self.send: $res, $rank, $user, $room, $connection;
 }
 
 our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = $room ?? ($state.database.get-command($room.id, 'wikimon') || '+') !! Nil;
-    return self.send:
-        'No query was given,',
-        $rank, $user, $room, $connection unless $target;
+    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+
+    my Str $res = 'No query was given,';
+    return self.send: $res, $rank, $user, $room, $connection unless $target;
 
     my Str                 $query = uri_encode_component($target);
     my Cro::HTTP::Response $resp  = await Cro::HTTP::Client.get:
         "https://wikimon.net/api.php?action=query&prop=info&titles=$query&inprop=url&format=json",
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
     my                     %body  = await $resp.body;
-    return self.send:
-        "No Wikimon page for $target was found.",
-        $rank, $user, $room, $connection unless %body<query><pages> ∋ '-1';
 
-    self.send:
-        "The Wikimon page for $target is {%body<query><pages>.head.value<fullurl>}",
-        $rank, $user, $room, $connection;
+    $res = "No Wikimon page for $target was found.";
+    return self.send: $res, $rank, $user, $room, $connection unless %body<query><pages> ∋ '-1';
+
+    $res = "The Wikimon page for $target is {%body<query><pages>.head.value<fullurl>}";
+    self.send: $res, $rank, $user, $room, $connection;
 }
 
 our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = $room ?? ($state.database.get-command($room.id, 'youtube') || '+') !! Nil;
-    return self.send:
-        'No query was given.',
-        $rank, $user, $room, $connection unless $target;
+    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+
+    my Str $res = 'No query was given,';
+    return self.send: $res, $rank, $user, $room, $connection unless $target;
 
     my Str                 $query = uri_encode_component($target);
     my Cro::HTTP::Response $resp  = await Cro::HTTP::Client.get:
@@ -304,14 +308,15 @@ our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
         http             => '1.1',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
     my                     %body  = await $resp.body;
-    return self.send:
-        "No video was found for $query.",
-        $rank, $user, $room, $connection unless +%body<items>;
+
+    $res = "No video was found for $query.";
+    return self.send: $res, $rank, $user, $room, $connection unless +%body<items>;
 
     my     %data  = %body<items>.head;
     my Str $title = %data<snippet><title>;
     my Str $url   = "https://youtu.be/%data<id><videoId>";
-    "$title - $url"
+    $res = "$title - $url";
+    self.send: $res, $rank, $user, $room, $connection;
 }
 
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -331,7 +336,7 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my Str     $userid   = $user.id;
     my Str     $username = $user.name;
-    my Str     $roomid   = $room.id;
+    my Str     $roomid   = $room ?? $room.id !! Nil;
     my Instant $time     = now - $seconds;
     if $room {
         $connection.send: "You set a reminder for $time-ago from now.", :$roomid;
@@ -346,7 +351,7 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
             $connection.send: "{$user.name}, you set a reminder $time-ago ago: $message", :$roomid;
             $state.database.remove-reminder: $username, $time-ago, $time, $message, :$userid;
         } else {
-            $connection.send: "{$user.naem}, you set a reminder $time-ago ago: $message", :$userid;
+            $connection.send: "{$user.name}, you set a reminder $time-ago ago: $message", :$userid;
             $state.database.remove-reminder: $username, $time-ago, $time, $message, :$roomid;
         }
     }, at => now + $seconds);
@@ -380,15 +385,16 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
 our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     my Str $userid = to-id $target;
-    my     $rank   = $room ?? ($state.database.get-command($room.id, 'seen') || '+') !! Nil;
-    return self.send:
-        'No user was given.',
-        $rank, $user, $room, $connection unless $userid;
+    my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
+
+    my Str $res = 'No user was given.';
+    return self.send: $res, $rank, $user, $room, $connection unless $userid;
 
     my \time = $state.database.get-seen: $userid;
-    return unless defined time;
+    return unless time ~~ DateTime | Failure;
 
-    my Str $res  = time.defined
+    $res  = time.defined
         ?? "$target was last seen on {time.yyyy-mm-dd} at {time.hh-mm-ss} UTC."
         !! "$target has never been seen before.";
     self.send: $res, $rank, $user, $room, $connection;
@@ -396,18 +402,37 @@ our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method set(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my $rank = $state.database.get-command($room.id, 'set') || '#';
-    return $connection.send: 'Permission denied.', userid => $user.id unless $room && self.can: $rank, $user.ranks{$room.id};
+    return $connection.send: "{COMMAND}set can only be used in rooms.", userid => $user.id unless $room;
+
+    my $rank = self.get-permission: &?ROUTINE.name, '#', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, '#', $user, $room, $connection unless $rank.defined;
 
     my (Str $command, $target-rank) = $target.split(',').map({ .trim });
     $target-rank = ' ' unless $target-rank;
     return "'$target-rank' is not a rank." unless self.is-rank: $target-rank;
 
     my &command = try &::("OUR::$command");
-    return "{COMMAND}$command doe not exist." unless defined &command;
+    return "{COMMAND}$command does not exist." unless defined &command;
 
     $state.database.set-command: $room.id, $command, $target-rank;
     "{COMMAND}$command was set to '$target-rank'.";
+}
+
+our method toggle(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection) {
+    return $connection.send: "{COMMAND}set can only be used in rooms.", userid => $user.id unless $room;
+
+    my $rank = self.get-permission: &?ROUTINE.name, '#', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, '#', $user, $room, $connection unless $rank.defined;
+
+    my Str $command = to-id $target;
+    return 'No command was given.' unless $command;
+
+    my &command = try &::("OUR::$command");
+    return "{COMMAND}$command does not exist." unless defined &command;
+
+    my Bool $enabled = $state.database.toggle-command: $room.id, $command;
+    "{COMMAND}$command has been {$enabled ?? 'enabled' !! 'disabled'}."
 }
 
 our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -415,7 +440,7 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
     return "{COMMAND}hangman can only be used in rooms." unless $room;
 
     my (Str $subcommand, Str $guess) = $target.split: ' ';
-    my $rank = $state.database.get-command($room.id, 'hangman') || '+';
+    my Str $rank = self.get-rank: $state, 'hangman', $room.id, '+';
     given $subcommand {
         when 'new' {
             return "There is already a game of {$room.game.name} in progress!" if $room.game;
@@ -529,6 +554,10 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
 
         - set <command>, <rank>:
           Sets the rank required to use the given command to the given rank.
+          Requires at least rank # by default.
+
+        - toggle <command>
+          Enables/disables the given command.
           Requires at least rank # by default.
 
         - hangman:
