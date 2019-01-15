@@ -175,7 +175,7 @@ our class Users does Message {
 
                 for $state.users.keys -> $userid {
                     my \mail = $state.database.get-mail: $userid;
-                    if mail && +mail {
+                    if defined(mail) && +mail {
                         $connection.send:
                             "You received {+mail} message{+mail == 1 ?? '' !! 's'}:",
                             mail.map(-> %data { "[%data<source>] %data<message>" }),
@@ -219,7 +219,7 @@ our class Join does Message {
         $state.database.add-seen: $userid, now;
 
         my \mail = $state.database.get-mail: $userid;
-        if mail && +mail {
+        if defined(mail) && +mail {
             $connection.send:
                 "You received {+mail} message{+mail == 1 ?? '' !! 's'}:",
                 mail.map(-> %row { "[%row<source>] %row<message>" }),
@@ -270,7 +270,7 @@ our class Rename does Message {
         $state.database.add-seen: $userid, $time;
 
         my \mail = $state.database.get-mail: $userid;
-        if mail && +mail {
+        if defined(mail) && +mail {
             $connection.send:
                 "You received {+mail} message{+mail == 1 ?? '' !! 's'}:",
                 mail.map(-> %row { "[%row<source>] %row<message>" }),

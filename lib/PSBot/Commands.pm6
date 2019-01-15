@@ -321,6 +321,9 @@ our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
+    my $rank = self.get-permission: &?ROUTINE.name, ' ', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, ' ', $user, $room, $connection unless $rank.defined;
+
     my (Str $time-ago, Str $message) = $target.split(',').map({ .trim });
     return 'A time (e.g. 30s, 10m, 2h) and a message must be given.' unless $time-ago && $message;
 
@@ -359,6 +362,9 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+    my $rank = self.get-permission: &?ROUTINE.name, ' ', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, ' ', $user, $room, $connection unless $rank.defined;
+
     my Int $idx = $target.index: ',';
     return 'A username and a message must be included.' unless $idx;
 
@@ -368,7 +374,7 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
     return 'No username was given.' unless $userid;
     return 'No message was given.'  unless $message;
 
-    with $state.database.get-mail -> \mail {
+    with $state.database.get-mail: $userid  -> \mail {
         return unless defined mail;
         return $username ~ "'s mailbox is full." if +mail == 5;
     }
@@ -384,11 +390,11 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str $userid = to-id $target;
     my $rank = self.get-permission: &?ROUTINE.name, '+', $user, $room, $state, $connection;
     return self.send: $rank.exception.message, '+', $user, $room, $connection unless $rank.defined;
 
-    my Str $res = 'No user was given.';
+    my Str $res    = 'No user was given.';
+    my Str $userid = to-id $target;
     return self.send: $res, $rank, $user, $room, $connection unless $userid;
 
     my \time = $state.database.get-seen: $userid;
@@ -404,8 +410,8 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return $connection.send: "{COMMAND}set can only be used in rooms.", userid => $user.id unless $room;
 
-    my $rank = self.get-permission: &?ROUTINE.name, '#', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, '#', $user, $room, $connection unless $rank.defined;
+    my $rank = self.get-permission: &?ROUTINE.name, '%', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, '%', $user, $room, $connection unless $rank.defined;
 
     my (Str $command, $target-rank) = $target.split(',').map({ .trim });
     $target-rank = ' ' unless $target-rank;
@@ -422,8 +428,8 @@ our method toggle(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return $connection.send: "{COMMAND}set can only be used in rooms.", userid => $user.id unless $room;
 
-    my $rank = self.get-permission: &?ROUTINE.name, '#', $user, $room, $state, $connection;
-    return self.send: $rank.exception.message, '#', $user, $room, $connection unless $rank.defined;
+    my $rank = self.get-permission: &?ROUTINE.name, '%', $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, '%', $user, $room, $connection unless $rank.defined;
 
     my Str $command = to-id $target;
     return 'No command was given.' unless $command;
@@ -554,11 +560,11 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
 
         - set <command>, <rank>:
           Sets the rank required to use the given command to the given rank.
-          Requires at least rank # by default.
+          Requires at least rank % by default.
 
         - toggle <command>
           Enables/disables the given command.
-          Requires at least rank # by default.
+          Requires at least rank % by default.
 
         - hangman:
             - hangman new:            Starts a new hangman game.
