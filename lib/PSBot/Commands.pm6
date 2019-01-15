@@ -431,7 +431,7 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
     $command = to-id $command;
     return "{COMMAND}$command is an administrative command and thus can't have its rank set." if ADMINISTRATIVE ∋ $command;
 
-    $target-rank = ' ' unless $target-rank;
+    $target-rank = ' ' unless $target-rank && $target-rank ne 'regular user';
     return "'$target-rank' is not a rank." unless self.is-rank: $target-rank;
 
     my &command = try &::("OUR::$command");
