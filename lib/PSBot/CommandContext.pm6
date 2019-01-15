@@ -20,9 +20,11 @@ method is-rank($rank --> Bool) {
 method send(Str $message, Str $rank, PSBot::User $user,
     PSBot::Room $room, PSBot::Connection $connection, Bool :$raw = False) {
     if $raw {
+        return $connection.send-raw: $message, roomid => $room.id if $room && ADMINS ∋ $user.id;
         return $connection.send-raw: $message, userid => $user.id unless $room && self.can: $rank, $user.ranks{$room.id};
         $connection.send-raw: $message, roomid => $room.id;
     } else {
+        return $connection.send: $message, roomid => $room.id if $room && ADMINS ∋ $user.id;
         return $connection.send: $message, userid => $user.id unless $room && self.can: $rank, $user.ranks{$room.id};
         $connection.send: $message, roomid => $room.id;
     }
