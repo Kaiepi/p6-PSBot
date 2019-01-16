@@ -184,7 +184,7 @@ our class Users does Message {
                     }
                 }
 
-                $connection.inited.keep;
+                $connection.inited.keep if $connection.inited.status ~~ Planned;
             });
         }
     }

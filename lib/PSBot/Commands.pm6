@@ -348,10 +348,10 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
         default                                        { return 'Invalid time.'                }
     }
 
-    my Str     $userid   = $user.id;
-    my Str     $username = $user.name;
-    my Str     $roomid   = $room ?? $room.id !! Nil;
-    my Instant $time     = now - $seconds;
+    my Str $userid   = $user.id;
+    my Str $username = $user.name;
+    my Str $roomid   = $room ?? $room.id !! Nil;
+    my Num $time     = (now + $seconds).Num;
     if $room {
         $connection.send: "You set a reminder for $time-ago from now.", :$roomid;
         $state.database.add-reminder: $username, $time-ago, $time, $message, :$roomid;
@@ -363,10 +363,10 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
     $*SCHEDULER.cue({
         if $room {
             $connection.send: "{$user.name}, you set a reminder $time-ago ago: $message", :$roomid;
-            $state.database.remove-reminder: $username, $time-ago, $time, $message, :$userid;
+            $state.database.remove-reminder: $username, $time-ago, $time, $message, :$roomid;
         } else {
             $connection.send: "{$user.name}, you set a reminder $time-ago ago: $message", :$userid;
-            $state.database.remove-reminder: $username, $time-ago, $time, $message, :$roomid;
+            $state.database.remove-reminder: $username, $time-ago, $time, $message, :$userid;
         }
     }, at => now + $seconds);
 }

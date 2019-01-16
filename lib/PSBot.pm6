@@ -13,31 +13,6 @@ method new() {
     my PSBot::Connection   $connection .= new: HOST, PORT, SSL;
     my PSBot::StateManager $state      .= new;
     my Supply              $messages    = $connection.receiver.Supply;
-
-    with $state.database.get-reminders -> \reminders {
-        if reminders {
-            for reminders -> %row {
-                if %row<time> - now > 0 {
-                    $*SCHEDULER.cue({
-                        if %row<roomid> {
-                            $connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
-                            $state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>, %row<reminder>, roomid => %row<roomid>;
-                        } else {
-                            $connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
-                            $state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>, %row<reminder>, userid => %row<userid>;
-                        }
-                    }, at => %row<time>);
-                } else {
-                    if %row<roomid> {
-                        $state.database.remove-reminder: %row<name>, %row<time_ago>, DateTime.new(%row<time>.Num).Instant, %row<reminder>, roomid => %row<roomid>;
-                    } else {
-                        $state.database.remove-reminder: %row<name>, %row<time_ago>, DateTime.new(%row<time>.Num).Instant, %row<reminder>, roomid => %row<userid>;
-                    }
-                }
-            }
-        }
-    }
-
     self.bless: :$connection, :$state, :$messages;
 }
 
@@ -52,6 +27,23 @@ method start() {
         whenever $!connection.disconnects {
             # State needs to be reset on reconnect.
             $!state .= new;
+        }
+        whenever $!connection.inited {
+            my \reminders = $!state.database.get-reminders;
+            if reminders {
+                for reminders -> %row {
+                    my Num $time = %row<time>.Num;
+                    $*SCHEDULER.cue({
+                        if %row<roomid> {
+                            $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
+                            $!state.database.remove-reminder: %row<name>, %row<time_ago>, $time, %row<reminder>, roomid => %row<roomid>;
+                        } else {
+                            $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
+                            $!state.database.remove-reminder: %row<name>, %row<time_ago>, $time, %row<reminder>, userid => %row<userid>;
+                        }
+                    }, at => $time);
+                }
+            }
         }
         whenever signal(SIGINT) {
             Supply.interval(1).tap({

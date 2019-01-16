@@ -80,37 +80,37 @@ method get-reminders(--> Array) {
     @rows
 }
 
-multi method add-reminder(Str $name, Str $time-ago, Instant $time, Str $reminder, Str :$userid!) {
+multi method add-reminder(Str $name, Str $time-ago, Num $time, Str $reminder, Str :$userid!) {
     my $sth = $!dbh.prepare: q:to/STATEMENT/;
         INSERT INTO reminders (name, time_ago, userid,  roomid, time, reminder)
         VALUES (?, ?, ?, NULL, ?, ?);
         STATEMENT
-    $sth.execute: $name, $time-ago, $userid, $time.Num, $reminder;
+    $sth.execute: $name, $time-ago, $userid, $time, $reminder;
     $sth.finish;
 }
-multi method add-reminder(Str $name, Str $time-ago, Instant $time, Str $reminder, Str :$roomid!) {
+multi method add-reminder(Str $name, Str $time-ago, Num $time, Str $reminder, Str :$roomid!) {
     my $sth = $!dbh.prepare: q:to/STATEMENT/;
         INSERT INTO reminders (name, time_ago, userid, roomid, time, reminder)
         VALUES (?, ?, NULL, ?, ?, ?);
         STATEMENT
-    $sth.execute: $name, $time-ago, $roomid, $time.Num, $reminder;
+    $sth.execute: $name, $time-ago, $roomid, $time, $reminder;
     $sth.finish;
 }
 
-multi method remove-reminder(Str $name, Str $time-ago, Instant $time, Str $reminder, Str :$userid!) {
+multi method remove-reminder(Str $name, Str $time-ago, Num $time, Str $reminder, Str :$userid!) {
     my $sth = $!dbh.prepare: q:to/STATEMENT/;
         DELETE FROM reminders
         WHERE name = ? AND time_ago = ? AND userid = ? AND time = ? AND reminder = ?;
         STATEMENT
-    $sth.execute: $name, $time-ago, $userid, $time.Num, $reminder;
+    $sth.execute: $name, $time-ago, $userid, $time, $reminder;
     $sth.finish;
 }
-multi method remove-reminder(Str $name, Str $time-ago, Instant $time, Str $reminder, Str :$roomid!) {
+multi method remove-reminder(Str $name, Str $time-ago, Num $time, Str $reminder, Str :$roomid!) {
     my $sth = $!dbh.prepare: q:to/STATEMENT/;
         DELETE FROM reminders
         WHERE name = ? AND time_ago = ? AND roomid = ? AND time = ? AND reminder = ?;
         STATEMENT
-    $sth.execute: $name, $time-ago, $roomid, $time.Num, $reminder;
+    $sth.execute: $name, $time-ago, $roomid, $time, $reminder;
     $sth.finish;
 }
 
