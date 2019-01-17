@@ -1,4 +1,5 @@
 use v6.d;
+use Pastebin::Shadowcat;
 unit module PSBot::Tools;
 
 sub to-id(Str $data! --> Str) is export {
@@ -20,4 +21,10 @@ sub debug(**@data) is export {
     };
 
     say @data».gist.join("\n");
+}
+
+sub paste(Str $data --> Str) is export {
+    state Pastebin::Shadowcat $pastebin .= new;
+    my Str $url = $pastebin.paste: $data;
+    "$url?tx=on"
 }

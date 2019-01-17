@@ -1,7 +1,6 @@
 use v6.d;
 use Cro::HTTP::Client;
 use Cro::HTTP::Response;
-use Hastebin;
 use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Exceptions;
@@ -55,7 +54,7 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
         return "``$res``";
     }
     if @res.first(*.codes > 296) {
-        my Str $url = Hastebin.post: $res;
+        my Str $url = paste($res);
         return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
     }
     @res.map({ "``$_``" })
@@ -102,7 +101,7 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
         return "``$res``";
     }
     if @res.first(*.codes > 296) {
-        my Str $url = Hastebin.post: $res;
+        my Str $url = paste($res);
         return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
     }
     @res.map({ "``$_``" })
@@ -251,7 +250,7 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     return $connection.send-raw: $res, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
 
     my Int $i   = 0;
-    my Str $url = Hastebin.post: @definitions.map({ "{++$i}. {$_.head}" }).join: "\n";
+    my Str $url = paste(@definitions.map({ "{++$i}. {$_.head}" }).join: "\n");
     $res = "Oxford Dictionary definition for $word: $url";
     self.send: $res, $rank, $user, $room, $connection;
 }
@@ -485,7 +484,7 @@ our method settings(Str $target, PSBot::User $user, PSBot::Room $room,
     return $connection.send-raw: $res, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
 
     $res = @requirements.map({ .join: ': ' }).join: "\n";
-    my Str $url = Hastebin.post: $res;
+    my Str $url = paste($res);
     "Settings for commands in {$room.title} may be found at: $url"
 }
 
@@ -638,7 +637,7 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
           Requires at least rank + by default.
         END
 
-    $url     = Hastebin.post: $help;
+    $url     = paste($help);
     $timeout = now;
     "{$state.username} help may be found at: $url"
 }

@@ -3,7 +3,7 @@
     "Ben Davies"
   ],
   "build-depends" : [ ],
-  "depends" : [ "Cro::HTTP", "Cro::WebSocket", "DBIish", "Hastebin", "URI::Encode" ],
+  "depends" : [ "Cro::HTTP", "Cro::WebSocket", "DBIish", "Pastebin::Shadowcat", "URI::Encode" ],
   "description" : "Pokémon Showdown chat bot",
   "license" : "Artistic-2.0",
   "name" : "PSBot",
