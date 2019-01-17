@@ -272,7 +272,7 @@ our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
     my                     %body = await $resp.body;
 
     $res = "No Wikipedia page for $target was found.";
-    return self.send: $res, $rank, $user, $room, $connection unless %body<query><pages> ∋ '-1';
+    return self.send: $res, $rank, $user, $room, $connection if %body<query><pages> ∋ '-1';
 
     $res = "The Wikipedia page for $target is {%body<query><pages>.head.value<fullurl>}";
     self.send: $res, $rank, $user, $room, $connection;
@@ -294,7 +294,7 @@ our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
     my                     %body  = await $resp.body;
 
     $res = "No Wikimon page for $target was found.";
-    return self.send: $res, $rank, $user, $room, $connection unless %body<query><pages> ∋ '-1';
+    return self.send: $res, $rank, $user, $room, $connection if %body<query><pages> ∋ '-1';
 
     $res = "The Wikimon page for $target is {%body<query><pages>.head.value<fullurl>}";
     self.send: $res, $rank, $user, $room, $connection;
