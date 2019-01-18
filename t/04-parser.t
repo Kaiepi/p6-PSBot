@@ -187,7 +187,7 @@ subtest 'PSBot::Message::Users', {
     my PSBot::Message::Users $parser .= new: $protocol, $roomid, @parts;
     is $parser.protocol, $protocol, 'Sets parser protocol attribute';
     is $parser.roomid, $roomid, 'Sets parser roomid attribute';
-    cmp-ok $parser.userlist, 'eqv', Array[Str].new(" $userid"), 'Sets parser userlist attribute';
+    cmp-ok $parser.userlist, '~~', Array[Str].new(" $userid"), 'Sets parser userlist attribute';
 
     $parser.parse: $state, $connection;
     ok $state.users ∋ $userid, 'Adds user to user state';
@@ -303,3 +303,5 @@ subtest 'PSBot::Command::PrivateMessage', {
     is $parser.to, $to, 'Sets parser to attribute';
     is $parser.message, @parts[2..*].join('|'), 'Sets parser message attribute';
 };
+
+# vim: ft=perl6 sw=4 ts=4 sts=4 expandtab

@@ -88,7 +88,7 @@ method delete-room(Str $roomid) {
         %!rooms{$roomid}:delete;
         for %!users.kv -> $userid, $user {
             $user.on-leave: $roomid;
-            %!users{$userid}:delete unless $user.roomids;
+            %!users{$userid}:delete unless +$user.ranks;
         }
     })
 }
