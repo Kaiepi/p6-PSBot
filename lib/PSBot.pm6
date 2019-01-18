@@ -179,12 +179,20 @@ throw.
 
 The link to the GitHub repo for the bot.
 
-=item Str C<dictionary_api_id>
+=item Str I<dictionary_api_id>
 
 The API ID for Oxford Dictionary. Set to null if you don't want to use the dictionary command.
 
-=item Str C<dictionary_api_key>
+=item Str I<dictionary_api_key>
 
 The API key for Oxford Dictionary. Set to null if you don't want to use the dictionary command.
+
+=item Str I<youtube_api_key>
+
+The API key for Youtube. Set to null if you don't want to use the youtube command.
+
+=item Str I<translate_api_key>
+
+The API key for Google Translate. Set to null if you don't want to use the badtranslate command.
 
 =end pod

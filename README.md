@@ -72,11 +72,19 @@ The maximum consecutive reconnect attempts allowed before the connection will th
 
 The link to the GitHub repo for the bot.
 
-  * Str `dictionary_api_id`
+  * Str *dictionary_api_id*
 
 The API ID for Oxford Dictionary. Set to null if you don't want to use the dictionary command.
 
-  * Str `dictionary_api_key`
+  * Str *dictionary_api_key*
 
 The API key for Oxford Dictionary. Set to null if you don't want to use the dictionary command.
+
+  * Str *youtube_api_key*
+
+The API key for Youtube. Set to null if you don't want to use the youtube command.
+
+  * Str *translate_api_key*
+
+The API key for Google Translate. Set to null if you don't want to use the badtranslate command.
 
