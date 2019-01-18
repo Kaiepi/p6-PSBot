@@ -6,7 +6,6 @@ has Str     $.id;
 has Str     $.name;
 has Str     $.group;
 has Str     %.ranks;
-has SetHash $.roomids;
 
 multi method new(Str $userinfo) {
     my Str     $name     = $userinfo.substr: 1;
