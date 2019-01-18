@@ -13,5 +13,6 @@
     "git":                    "https://github.com/Kaiepi/p6-PSBot",
     "dictionary_api_id":      null,
     "dictionary_api_key":     null,
-    "youtube_api_key":        null
+    "youtube_api_key":        null,
+    "translate_api_key":      null
 }

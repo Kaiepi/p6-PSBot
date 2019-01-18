@@ -14,21 +14,22 @@ unit module PSBot::Commands;
 
 my Set constant ADMINISTRATIVE .= new: <eval evalcommand say nick suicide>;
 my Map constant DEFAULT_RANKS  .= new: (
-    git        => '+',
-    eightball  => '+',
-    urban      => '+',
-    dictionary => '+',
-    wikipedia  => '+',
-    wikimon    => '+',
-    youtube    => '+',
-    reminder   => ' ',
-    mail       => ' ',
-    seen       => '+',
-    set        => '%',
-    toggle     => '%',
-    settings   => '%',
-    hangman    => '+',
-    help       => '+'
+    git          => '+',
+    eightball    => '+',
+    urban        => '+',
+    dictionary   => '+',
+    wikipedia    => '+',
+    wikimon      => '+',
+    youtube      => '+',
+    badtranslate => '+',
+    reminder     => ' ',
+    mail         => ' ',
+    seen         => '+',
+    set          => '%',
+    toggle       => '%',
+    settings     => '%',
+    hangman      => '+',
+    help         => '+'
 );
 
 our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -328,6 +329,57 @@ our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
     self.send: $res, $rank, $user, $room, $connection;
 }
 
+our method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection) {
+    state Str @languages;
+
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
+
+    my Str $res = "{$state.username} has no configured Google Translate API key.";
+    return self.send: $res, $rank, $user, $room, $connection unless TRANSLATE_API_KEY;
+
+    $res = 'No phrase was given.';
+    return self.send: $res, $rank, $user, $room, $connection unless $target;
+
+    unless @languages {
+        self.send: 'Fetching list of languages...', $rank, $user, $room, $connection;
+        my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
+            "https://translation.googleapis.com/language/translate/v2/languages?key={TRANSLATE_API_KEY}",
+            http             => '1.1',
+            body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
+        my                     %body = await $resp.body;
+        @languages = %body<data><languages>.map({ $_<language> });
+    }
+
+    my Str $query = uri_encode_component($target);
+    for 0..^10 {
+        my Str                 $target = @languages[floor rand * +@languages];
+        my Cro::HTTP::Response $resp   = await Cro::HTTP::Client.get:
+            "https://translation.googleapis.com/language/translate/v2?q=$query&target=$target&key={TRANSLATE_API_KEY}",
+            http             => '1.1',
+            body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
+        my                     %body   = await $resp.body;
+        $query = uri_encode_component(%body<data><translations>.head<translatedText>);
+    }
+
+    my Cro::HTTP::Response $resp   = await Cro::HTTP::Client.get:
+        "https://translation.googleapis.com/language/translate/v2?q=$query&target=en&key={TRANSLATE_API_KEY}",
+        http             => '1.1',
+        body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
+    my                     %body   = await $resp.body;
+    my Str                 $output = %body<data><translations>.head<translatedText>;
+
+    if $output.codes > 300 {
+        my Str $url = paste($output);
+        $res = "{COMMAND}{&?ROUTINE.name} output was too long. It may be found at $url";
+        return self.send: $res, $rank, $user, $room, $connection;
+    }
+
+    self.send: $output, $rank, $user, $room, $connection;
+}
+
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
@@ -480,7 +532,6 @@ our method settings(Str $target, PSBot::User $user, PSBot::Room $room,
     };
 
     my Str $res = "/addhtmlbox <details><summary>Command Settings</summary><table>{@requirements.map({ "<tr><td>{.head}</td><td>{.tail}</td></tr>" })}</table></details>";
-    return $connection.send-raw: $res, userid => $user.id unless $state.group ne '*' || self.can: $rank, $user.ranks{$room.id};
     return $connection.send-raw: $res, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
 
     $res = @requirements.map({ .join: ': ' }).join: "\n";
@@ -597,6 +648,10 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
 
         - youtube <query>
           Returns the first YouTube result for the given query.
+          Requires at least rank + by default.
+
+        - badtranslate <query>
+          Runs the given query through Google Translate 10 times using random languages before translating back to English.
           Requires at least rank + by default.
 
         - reminder <time>, <message>:

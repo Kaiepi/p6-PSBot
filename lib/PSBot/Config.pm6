@@ -28,7 +28,8 @@ sub EXPORT(--> Hash) {
                 GIT                    => %config<git>,
                 DICTIONARY_API_ID      => %config<dictionary_api_id>,
                 DICTIONARY_API_KEY     => %config<dictionary_api_key>,
-                YOUTUBE_API_KEY        => %config<youtube_api_key>
+                YOUTUBE_API_KEY        => %config<youtube_api_key>,
+                TRANSLATE_API_KEY      => %config<translate_api_key>
             )
         }
     }
