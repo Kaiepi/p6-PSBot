@@ -6,6 +6,8 @@ perl6:
   - latest
 install:
   - rakudobrew build zef
+  - mkdir -p ~/.config/PSBot
+  - cp config.json.example ~/.config/PSBot/config.json
   - zef install --deps-only --/test .
 script:
   - PERL6LIB=$PWD/lib prove -e perl6 -vr t/
