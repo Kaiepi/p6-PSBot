@@ -20,7 +20,7 @@ has Set  $.public-rooms;
 has Channel   $.pending-rename .= new;
 has atomicint $.rooms-joined    = 0;
 
-has Lock::Async $.chat-mux .= new;
+has Lock::Async $!chat-mux .= new;
 has PSBot::User %.users;
 has PSBot::Room %.rooms;
 

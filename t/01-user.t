@@ -6,36 +6,36 @@ plan 4;
 
 subtest 'Constructing with userinfo', {
     my Str         $userinfo  = ' Morfent';
-	my PSBot::User $user     .= new: $userinfo;
+    my PSBot::User $user     .= new: $userinfo;
 
-	is $user.id, 'morfent', 'Can get user userid';
-	is $user.name, 'Morfent', 'Can get user name';
+    is $user.id, 'morfent', 'Can set user userid attribute';
+    is $user.name, 'Morfent', 'Can set user name attribute';
 };
 
 subtest 'Constructing with userinfo and roomid', {
     my Str         $userinfo  = ' Morfent';
     my Str         $roomid    = 'lobby';
-	my PSBot::User $user     .= new: $userinfo, $roomid;
+    my PSBot::User $user     .= new: $userinfo, $roomid;
 
-	is $user.id, 'morfent', 'Can get user userid';
-	is $user.name, 'Morfent', 'Can get user name';
-	ok $user.ranks ∋ $roomid, 'Can get user ranks roomid';
-    is $user.ranks{$roomid}, ' ', 'Can get user ranks rank';
+    is $user.id, 'morfent', 'Can set user userid attribute';
+    is $user.name, 'Morfent', 'Can set user name attribute';
+    ok $user.ranks ∋ $roomid, 'Can set user ranks roomid';
+    is $user.ranks{$roomid}, ' ', 'Can set user ranks rank';
 };
 
 subtest 'Setting ranks', {
     my Str $userinfo = ' Morfent';
     my Str $roomid   = 'lobby';
-	my PSBot::User $user .= new: $userinfo, $roomid;
+    my PSBot::User $user .= new: $userinfo, $roomid;
 
     $user.set-group: '@';
-    is $user.group, '@', 'Can set user rank';
+    is $user.group, '@', 'Can set user rank attribute';
 };
 
 subtest 'Join/leave/rename', {
     my Str         $userinfo  = ' Morfent';
     my Str         $roomid    = 'lobby';
-	my PSBot::User $user     .= new: $userinfo;
+    my PSBot::User $user     .= new: $userinfo;
 
     $user.on-join: $userinfo, $roomid;
     ok $user.ranks ∋ $roomid, 'Can get user ranks roomid on join';
