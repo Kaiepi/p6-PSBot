@@ -247,7 +247,6 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     }).flat.grep({ .defined });
 
     $res = "/addhtmlbox <ol>{@definitions.map({ "<li>{$_.head}</li>" })}</ol>";
-    return $connection.send-raw: $res, userid => $user.id unless $state.group ne '*' || self.can: $rank, $user.ranks{$room.id};
     return $connection.send-raw: $res, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
 
     my Int $i   = 0;
