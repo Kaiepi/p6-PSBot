@@ -1,11 +1,11 @@
 use v6.d;
 use Cro::HTTP::Client;
 use Cro::HTTP::Response;
-use HTML::Entity;
 use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Exceptions;
 use PSBot::Games::Hangman;
+use PSBot::Plugins::Translate;
 use PSBot::Room;
 use PSBot::StateManager;
 use PSBot::Tools;
@@ -331,8 +331,6 @@ our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    state Str @languages;
-
     my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
     my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
@@ -343,34 +341,17 @@ our method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
     $res = 'No phrase was given.';
     return self.send: $res, $rank, $user, $room, $connection unless $target;
 
-    unless @languages {
-        self.send: 'Fetching list of languages...', $rank, $user, $room, $connection;
-        my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
-            "https://translation.googleapis.com/language/translate/v2/languages?key={TRANSLATE_API_KEY}",
-            http             => '1.1',
-            body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
-        my                     %body = await $resp.body;
-        @languages = %body<data><languages>.map({ $_<language> });
-    }
+    my @languages = get-languages;
+    return self.send: @languages.exception.message, $rank, $user, $room, $connection unless @languages.defined;
 
-    my Str $query = uri_encode_component($target);
+    my $query = $target;
     for 0..^10 {
-        my Str                 $target = @languages[floor rand * +@languages];
-        my Cro::HTTP::Response $resp   = await Cro::HTTP::Client.get:
-            "https://translation.googleapis.com/language/translate/v2?q=$query&target=$target&key={TRANSLATE_API_KEY}",
-            http             => '1.1',
-            body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
-        my                     %body   = await $resp.body;
-        $query = uri_encode_component(%body<data><translations>.head<translatedText>);
+        my Str $target = @languages[floor rand * +@languages];
+        $query = get-translation($query, $target);
+        return self.send: $query.exception.message, $rank, $user, $room, $connection unless $query.defined;
     }
 
-    my Cro::HTTP::Response $resp   = await Cro::HTTP::Client.get:
-        "https://translation.googleapis.com/language/translate/v2?q=$query&target=en&key={TRANSLATE_API_KEY}",
-        http             => '1.1',
-        body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
-    my                     %body   = await $resp.body;
-    my Str                 $output = decode-entities(%body<data><translations>.head<translatedText>);
-
+    my Str $output = get-translation($query, 'en');
     if $output.codes > 300 {
         my Str $url = paste($output);
         $res = "{COMMAND}{&?ROUTINE.name} output was too long. It may be found at $url";
