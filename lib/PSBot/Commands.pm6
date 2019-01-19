@@ -336,14 +336,18 @@ our method translate(Str $target, PSBot::User $user, PSBot::Room $room,
     my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
-    my Int $idx = $target.index: ',';
+    my Str @parts = $target.split: ',';
     my Str $res = 'No source language, target language, and phrase were given.';
-    return self.send: $res, $rank, $user, $room, $connection unless $idx;
+    return self.send: $res, $rank, $user, $room, $connection unless +@parts >= 3;
 
-    my (Str $source-lang, Str $target-lang, Str $query) = $target.split(',').map({ .trim });
+    my Str $source-lang = trim @parts[0];
     return self.send: 'No source language was given', $rank, $user, $room, $connection unless $source-lang;
+
+    my Str $target-lang = trim @parts[1];
     return self.send: 'No target language was given', $rank, $user, $room, $connection unless $target-lang;
-    return self.send: 'No phrase was given', $rank, $user, $room, $connection          unless $query;
+
+    my Str $query = trim @parts[2..*].join: ',';
+    return self.send: 'No phrase was given', $rank, $user, $room, $connection unless $query;
 
     my @languages = get-languages;
     return self.send: @languages.exception.message, $rank, $user, $room, $connection unless @languages.defined;
@@ -496,6 +500,9 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my (Str $command, $target-rank) = $target.split(',').map({ .trim });
+    return 'No command was given.' unless $command;
+    return 'No rank was given.' unless $target-rank;
+
     $command = to-id $command;
     return "{COMMAND}$command is an administrative command and thus can't have its rank set." if ADMINISTRATIVE ∋ $command;
 
