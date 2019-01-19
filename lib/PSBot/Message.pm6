@@ -60,8 +60,9 @@ our class ChallStr does Message {
             $connection.send-raw:
                 "/autojoin {@autojoin.join: ','}",
                 '/cmd rooms';
+            return unless USERNAME;
 
-            my $assertion = $state.authenticate: USERNAME, PASSWORD, $!challstr;
+            my $assertion = $state.authenticate: USERNAME, (PASSWORD || ''), $!challstr;
             $assertion.throw if $assertion ~~ Failure;
             if defined $assertion {
                 $connection.send-raw: "/trn {USERNAME},0,$assertion";
