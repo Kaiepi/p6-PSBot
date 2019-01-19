@@ -22,6 +22,7 @@ my Map constant DEFAULT_RANKS  .= new: (
     wikipedia    => '+',
     wikimon      => '+',
     youtube      => '+',
+    translate    => '+',
     badtranslate => '+',
     reminder     => ' ',
     mail         => ' ',
@@ -56,7 +57,7 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
         return "``$res``";
     }
     if @res.first(*.codes > 296) {
-        my Str $url = paste($res);
+        my Str $url = paste $res;
         return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
     }
     @res.map({ "``$_``" })
@@ -103,7 +104,7 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
         return "``$res``";
     }
     if @res.first(*.codes > 296) {
-        my Str $url = paste($res);
+        my Str $url = paste $res;
         return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
     }
     @res.map({ "``$_``" })
@@ -251,7 +252,7 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     return $connection.send-raw: $res, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
 
     my Int $i   = 0;
-    my Str $url = paste(@definitions.map({ "{++$i}. {$_.head}" }).join: "\n");
+    my Str $url = paste @definitions.map({ "{++$i}. {$_.head}" }.join: "\n");
     $res = "Oxford Dictionary definition for $word: $url";
     self.send: $res, $rank, $user, $room, $connection;
 }
@@ -329,16 +330,49 @@ our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
     self.send: $res, $rank, $user, $room, $connection;
 }
 
+our method translate(Str $target, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection) {
+    my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
+
+    my Int $idx = $target.index: ',';
+    my Str $res = 'No source language, target language, and phrase were given.';
+    return self.send: $res, $rank, $user, $room, $connection unless $idx;
+
+    my (Str $source-lang, Str $target-lang, Str $query) = $target.split(',').map({ .trim });
+    return self.send: 'No source language was given', $rank, $user, $room, $connection unless $source-lang;
+    return self.send: 'No target language was given', $rank, $user, $room, $connection unless $target-lang;
+    return self.send: 'No phrase was given', $rank, $user, $room, $connection          unless $query;
+
+    my @languages = get-languages;
+    return self.send: @languages.exception.message, $rank, $user, $room, $connection unless @languages.defined;
+
+    unless @languages ∋ $source-lang && @languages ∋ $target-lang {
+        my Str $url = paste @languages.join: "\n";
+        $res = "A list of valid languages may be found at $url";
+        return self.send: $res, $rank, $user, $room, $connection;
+    }
+
+    my $output = get-translation $query, $source-lang, $target-lang;
+    return self.send: $output.exception.message, $rank, $user, $room, $connection unless $output.defined;
+
+    if $output.codes > 300 {
+        my Str $url = paste $output;
+        $res = "{COMMAND}{&?ROUTINE.name} output was too long. It may be found at $url";
+        return self.send: $res, $rank, $user, $room, $connection;
+    }
+
+    self.send: $output, $rank, $user, $room, $connection;
+}
+
 our method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
     my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
-    my Str $res = "{$state.username} has no configured Google Translate API key.";
-    return self.send: $res, $rank, $user, $room, $connection unless TRANSLATE_API_KEY;
-
-    $res = 'No phrase was given.';
+    my Str $res = 'No phrase was given.';
     return self.send: $res, $rank, $user, $room, $connection unless $target;
 
     my @languages = get-languages;
@@ -347,13 +381,15 @@ our method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
     my $query = $target;
     for 0..^10 {
         my Str $target = @languages[floor rand * +@languages];
-        $query = get-translation($query, $target);
+        $query = get-translation $query, $target;
         return self.send: $query.exception.message, $rank, $user, $room, $connection unless $query.defined;
     }
 
-    my Str $output = get-translation($query, 'en');
+    my $output = get-translation $query, 'en';
+    return self.send: $output.exception.message, $rank, $user, $room, $connection unless $output.defined;
+
     if $output.codes > 300 {
-        my Str $url = paste($output);
+        my Str $url = paste $output;
         $res = "{COMMAND}{&?ROUTINE.name} output was too long. It may be found at $url";
         return self.send: $res, $rank, $user, $room, $connection;
     }
@@ -516,7 +552,7 @@ our method settings(Str $target, PSBot::User $user, PSBot::Room $room,
     return $connection.send-raw: $res, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
 
     $res = @requirements.map({ .join: ': ' }).join: "\n";
-    my Str $url = paste($res);
+    my Str $url = paste $res;
     "Settings for commands in {$room.title} may be found at: $url"
 }
 
@@ -631,6 +667,10 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
           Returns the first YouTube result for the given query.
           Requires at least rank + by default.
 
+        - translate <source>, <target>, <query>
+          Translates the given query from the given source language to the given target language.
+          Requires at least rank + by default.
+
         - badtranslate <query>
           Runs the given query through Google Translate 10 times using random languages before translating back to English.
           Requires at least rank + by default.
@@ -673,7 +713,7 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
           Requires at least rank + by default.
         END
 
-    $url     = paste($help);
+    $url     = paste $help;
     $timeout = now;
     "{$state.username} help may be found at: $url"
 }
