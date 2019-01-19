@@ -222,6 +222,8 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my Str $res = "{$state.username} has no configured dictionary API ID.";
     return self.send: $res, $rank, $user, $room, $connection unless DICTIONARY_API_ID;
+
+    my Str $res = "{$state.username} has no configured dictionary API key.";
     return self.send: $res, $rank, $user, $room, $connection unless DICTIONARY_API_KEY;
 
     my Str $word = to-id $target;
@@ -249,10 +251,10 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     }).flat.grep({ .defined });
 
     $res = "/addhtmlbox <ol>{@definitions.map({ "<li>{$_.head}</li>" })}</ol>";
-    return $connection.send-raw: $res, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
+    return $connection.send-raw: $res, roomid => $room.id if $room && $state.users{$state.userid}.ranks{$room.id} eq '*';
 
     my Int $i   = 0;
-    my Str $url = paste @definitions.map({ "{++$i}. {$_.head}" }.join: "\n");
+    my Str $url = paste @definitions.map({ "{++$i}. {$_.head}" }).join: "\n";
     $res = "Oxford Dictionary definition for $word: $url";
     self.send: $res, $rank, $user, $room, $connection;
 }
