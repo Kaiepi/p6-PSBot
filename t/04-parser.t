@@ -86,13 +86,12 @@ subtest 'PSBot::Message::Challstr', {
     cmp-ok $parser.roomid, '~~', Str:U, 'Does not set parser roomid attribute';
     is $parser.challstr, $challstr, 'Sets parser challstr attribute';
 
-    my Promise $p .= new;
     $parser.parse: $state, $connection;
-    $*SCHEDULER.cue({
+    if USERNAME {
         is $state.challstr, $challstr, 'Updates state challstr attribute';
-        $p.keep;
-    }, at => now + 2);
-    await $p;
+    } else {
+        skip 'Cannot check if state challstr attribute was updated without a configured username', 1;
+    }
 };
 
 subtest 'PSBot::Message::NameTaken', {
