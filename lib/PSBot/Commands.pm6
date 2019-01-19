@@ -1,6 +1,7 @@
 use v6.d;
 use Cro::HTTP::Client;
 use Cro::HTTP::Response;
+use HTML::Entity;
 use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Exceptions;
@@ -368,7 +369,7 @@ our method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
         http             => '1.1',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
     my                     %body   = await $resp.body;
-    my Str                 $output = %body<data><translations>.head<translatedText>;
+    my Str                 $output = decode-entities(%body<data><translations>.head<translatedText>);
 
     if $output.codes > 300 {
         my Str $url = paste($output);
