@@ -60,7 +60,7 @@ subtest 'PSBot::Message::UserUpdate', {
     my $res = $state.pending-rename.poll;
     nok $res, 'Does not send username to state pending-rename channel if guest';
 
-    $username  = USERNAME;
+    $username  = USERNAME || 'PoS-Bot';
     $is-named  = '1';
     @parts    .= new: $username, $is-named, $avatar;
     $parser   .= new: $protocol, $roomid, @parts;
@@ -114,10 +114,11 @@ subtest 'PSBot::Message::QueryResponse', {
     my Str $roomid = 'lobby';
 
     {
-        my Str $type = 'userdetails';
-        my Str $userid = to-id USERNAME;
-        my Str $data = qs[{"userid":"$userid","group":"*","rooms":{}}];
-        my Str @parts .= new: $type, $data;
+        my Str $type      = 'userdetails';
+        my Str $username  = USERNAME || 'PoS-Bot';
+        my Str $userid    = to-id $username;
+        my Str $data      = qs[{"userid":"$userid","group":"*","rooms":{}}];
+        my Str @parts    .= new: $type, $data;
 
         my PSBot::Message::QueryResponse $parser .= new: $protocol, $roomid, @parts;
         is $parser.protocol, $protocol, 'Sets parser protocol attribute';
@@ -126,12 +127,12 @@ subtest 'PSBot::Message::QueryResponse', {
         cmp-ok $parser.data, 'eqv', from-json($data), 'Sets parser data attribute';
 
         $state.add-room: $roomid, 'chat';
-        $state.add-user: "*{USERNAME}", $roomid;
+        $state.add-user: "*$username", $roomid;
         $parser.parse: $state, $connection;
         is $state.group, '*', 'Sets state group attribute on userdetails';
         is $state.users{$userid}.ranks{$roomid}, '*', 'Sets state user group attribute on userdetails';
         $state.set-group: Str;
-        $state.delete-user: "*{USERNAME}", $roomid;
+        $state.delete-user: "*$username", $roomid;
         $state.delete-room: $roomid;
     }
 

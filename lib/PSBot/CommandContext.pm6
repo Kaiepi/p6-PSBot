@@ -33,7 +33,7 @@ method send(Str $message, Str $rank, PSBot::User $user,
 method get-permission(Str $command, Str $default-rank, PSBot::User $user,
         PSBot::Room $room, PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     return '~' if ADMINS ∋ $user.id;
-    my      $row         = $room ?? $state.database.get-command($room.id, $command) !! {};
+    my      $row         = $room ?? $state.database.get-command($room.id, $command) !! Nil;
     my Bool $enabled     = $room ?? ($row.defined ?? $row<enabled>.Int.Bool !! True) !! True;
     my Str  $target-rank = $room ?? ($row.defined ?? $row<rank> !! $default-rank) !! ' ';
     my Str  $source-rank = $room ?? $user.ranks{$room.id} !! $user.group;
