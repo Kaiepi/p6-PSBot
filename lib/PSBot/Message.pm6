@@ -323,7 +323,7 @@ our class Chat does Message {
             return unless $command;
 
             my &command = try &PSBot::Commands::($command);
-            return $connection.send: "{COMMAND}$command is not a valid command.", :$!roomid  unless &command;
+            return unless &command;
 
             $*SCHEDULER.cue({
                 my \output = &command(PSBot::CommandContext, $target, $user, $room, $state, $connection);

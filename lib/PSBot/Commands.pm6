@@ -712,7 +712,6 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
           Requires at least rank + by default.
         END
 
-    $url     = paste $help;
-    $timeout = now;
+    $url = paste $help;
     "{$state.username} help may be found at: $url"
 }

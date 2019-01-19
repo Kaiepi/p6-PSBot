@@ -29,8 +29,7 @@ method start() {
             $!state .= new;
         }
         whenever $!connection.inited {
-            my \reminders = $!state.database.get-reminders;
-            if reminders {
+            with $!state.database.get-reminders -> \reminders {
                 for reminders -> %row {
                     my Num $time = %row<time>.Num;
                     $*SCHEDULER.cue({
