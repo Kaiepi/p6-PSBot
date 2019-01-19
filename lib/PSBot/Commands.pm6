@@ -610,16 +610,15 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
 our method help(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     state Str     $url;
-    state Instant $timeout = now;
 
     my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
     my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
-    return "{$state.username} help may be found at: $url" if defined($url) && now - $timeout <= 60 * 60 * 24 * 30;
+    return "{$state.username} help may be found at: $url" if defined $url;
 
     my Str $help = q:to/END/;
-        - eval <expression>:
+        - eval <expression>
           Evaluates an expression.
           Requires admin access to the bot.
 
@@ -627,39 +626,39 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
           Evaluates a command with the given target, user, and room. Useful for detecting errors in commands.
           Requires admin access to the bot.
 
-        - say <message>:
+        - say <message>
           Says a message in the room or PMs the command was sent in.
           Requires admin access to the bot.
 
-        - nick <username>, <password>:
+        - nick <username>, <password>
           Logs the bot into the account given. Password is optional.
           Requires admin access to the bot.
 
-        - suicide:
+        - suicide
           Kills the bot.
           Requires admin access to the bot.
 
-        - git:
+        - git
           Returns the GitHub repo for the bot.
           Requires at least rank + by default.
 
-        - eightball <question>:
+        - eightball <question>
           Returns an 8ball message in response to the given question.
           Requires at least rank + by default.
 
-        - urban <term>:
+        - urban <term>
           Returns the link to the Urban Dictionary definition for the given term.
           Requires at least rank + by default.
 
-        - dictionary <word>:
+        - dictionary <word>
           Returns the Oxford Dictionary definitions for the given word.
           Requires at least rank + by default.
 
-        - wikipedia <query>:
+        - wikipedia <query>
           Returns the Wikipedia page for the given query.
           Requires at least rank + by default.
 
-        - wikimon <query>:
+        - wikimon <query>
           Returns the Wikimon page for the given query.
           Requires at least rank + by default.
 
@@ -675,17 +674,17 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
           Runs the given query through Google Translate 10 times using random languages before translating back to English.
           Requires at least rank + by default.
 
-        - reminder <time>, <message>:
+        - reminder <time>, <message>
           Sets a reminder with the given message to be sent in the given time.
 
-        - mail <username>, <message>:
+        - mail <username>, <message>
           Mails the given message to the given user once they log on.
 
-        - seen <username>:
+        - seen <username>
           Returns the last time the given user was seen.
           Requires at least rank + by default.
 
-        - set <command>, <rank>:
+        - set <command>, <rank>
           Sets the rank required to use the given command to the given rank.
           Requires at least rank % by default.
 
@@ -697,18 +696,18 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
           Returns the list of commands and their usability in the room.
           Requires at least rank % by default.
 
-        - hangman:
-            - hangman new:            Starts a new hangman game.
+        - hangman
+            - hangman new             Starts a new hangman game.
                                       Requires at least rank + by default.
-            - hangman join:           Joins the hangman game.
-            - hangman start:          Starts the hangman game.
-            - hangman guess <letter>: Guesses the given letter.
-            - hangman guess <word>:   Guesses the given word.
-            - hangman end:            Ends the hangman game.
-            - hangman players:        Returns a list of the players in the hangman game.
+            - hangman join            Joins the hangman game.
+            - hangman start           Starts the hangman game.
+            - hangman guess <letter>  Guesses the given letter.
+            - hangman guess <word>    Guesses the given word.
+            - hangman end             Ends the hangman game.
+            - hangman players         Returns a list of the players in the hangman game.
                                       Requires at least rank +.
 
-        - help:
+        - help
           Returns a link to this help page.
           Requires at least rank + by default.
         END
