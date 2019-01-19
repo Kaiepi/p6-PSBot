@@ -60,11 +60,10 @@ our class ChallStr does Message {
             $connection.send-raw:
                 "/autojoin {@autojoin.join: ','}",
                 '/cmd rooms';
-            return unless USERNAME;
 
-            my $assertion = $state.authenticate: USERNAME, (PASSWORD || ''), $!challstr;
-            $assertion.throw if $assertion ~~ Failure;
-            if defined $assertion {
+            if USERNAME {
+                my $assertion = $state.authenticate: USERNAME, (PASSWORD || ''), $!challstr;
+                $assertion.throw if $assertion ~~ Failure;
                 $connection.send-raw: "/trn {USERNAME},0,$assertion";
                 my $res = await $state.pending-rename;
                 $res.throw if $res ~~ X::PSBot::NameTaken;
