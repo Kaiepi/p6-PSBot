@@ -34,8 +34,8 @@ method get-permission(Str $command, Str $default-rank, PSBot::User $user,
         PSBot::Room $room, PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     return '~' if ADMINS ∋ $user.id;
     my      $row         = $room ?? $state.database.get-command($room.id, $command) !! Nil;
-    my Bool $enabled     = $room ?? ($row.defined ?? $row<enabled>.Int.Bool !! True) !! True;
-    my Str  $target-rank = $room ?? ($row.defined ?? $row<rank> !! $default-rank) !! ' ';
+    my Bool $enabled     = $room ?? (defined($row) ?? $row<enabled>.Int.Bool !! True) !! True;
+    my Str  $target-rank = $room ?? (defined($row) ?? ($row<rank> || ' ') !! $default-rank) !! ' ';
     my Str  $source-rank = $room ?? $user.ranks{$room.id} !! $user.group;
     fail "{COMMAND}$command is disabled in {$room.title}." unless $enabled;
     fail "Permission denied. {COMMAND}$command requires at least rank '$target-rank'." unless self.can: $target-rank, $source-rank;
