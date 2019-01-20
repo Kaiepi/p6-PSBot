@@ -45,10 +45,10 @@ method start() {
             }
         }
         whenever signal(SIGINT) {
-            Supply.interval(1).tap({
-                try $!state.database.dbh.dispose;
-                exit 0 unless $!;
-            });
+            $!connection.close;
+            sleep 1;
+            $!state.database.dbh.dispose;
+            exit 0;
         }
     }
 }
