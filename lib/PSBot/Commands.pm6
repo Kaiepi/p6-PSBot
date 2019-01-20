@@ -223,7 +223,7 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     my Str $res = "{$state.username} has no configured dictionary API ID.";
     return self.send: $res, $rank, $user, $room, $connection unless DICTIONARY_API_ID;
 
-    my Str $res = "{$state.username} has no configured dictionary API key.";
+    $res = "{$state.username} has no configured dictionary API key.";
     return self.send: $res, $rank, $user, $room, $connection unless DICTIONARY_API_KEY;
 
     my Str $word = to-id $target;

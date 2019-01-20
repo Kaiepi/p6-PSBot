@@ -95,7 +95,7 @@ method delete-room(Str $roomid) {
 
 method add-user(Str $userinfo, Str $roomid) {
     $!chat-mux.protect({
-        my Str $userid = to-id $userinfo.substr(1);
+        my Str $userid = to-id $userinfo.substr: 1;
         if %!users ∌ $userid {
             my PSBot::User $user .= new: $userinfo, $roomid;
             %!users{$userid} = $user;
@@ -107,17 +107,12 @@ method add-user(Str $userinfo, Str $roomid) {
 
 method delete-user(Str $userinfo, Str $roomid) {
     $!chat-mux.protect({
-        my Str $userid = to-id $userinfo.substr(1);
+        my Str $userid = to-id $userinfo.substr: 1;
         return if %!users ∌ $userid;
 
         %!rooms{$roomid}.leave: $userinfo;
         %!users{$userid}.on-leave: $roomid;
-
-        my Bool $found = False;
-        for %!rooms.kv -> $roomid, $room {
-            last if $found = $room.ranks ∋ $userid;
-        }
-        %!users{$userid}:delete unless $found;
+        %!users{$userid}:delete unless %!rooms.values.first(-> $room { $room.ranks ∋ $roomid });
     })
 }
 

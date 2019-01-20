@@ -15,25 +15,30 @@ method new(Str $id, Str $type, Bool $is-private) {
 }
 
 method set-title(Str $!title)   {}
+
 method set-ranks(Str @userlist) {
-    %!ranks = @userlist.map({ to-id($_.substr(1)) => $_.substr(0, 1) });
+    %!ranks = @userlist.map(-> $userinfo {
+        my Str $rank   = $userinfo.substr: 0, 1;
+        my Str $userid = to-id $userinfo.substr: 1;
+        $userid => $rank
+    });
 }
 
 method join(Str $userinfo) {
-    my Str $rank   = $userinfo.substr(0, 1);
-    my Str $userid = to-id $userinfo.substr(1);
+    my Str $rank   = $userinfo.substr: 0, 1;
+    my Str $userid = to-id $userinfo.substr: 1;
     %!ranks{$userid} = $rank;
 }
 
 method leave(Str $userinfo) {
-    my Str $userid = to-id $userinfo.substr(1);
+    my Str $userid = to-id $userinfo.substr: 1;
     %!ranks{$userid}:delete;
 }
 
 method on-rename(Str $oldid, Str $userinfo) {
-    my Str $rank   = $userinfo.substr(0, 1);
-    my Str $userid = to-id $userinfo.substr(1);
-    return if $oldid eq $userid && %!ranks{$oldid} eq %!ranks{$userid};
+    my Str $rank   = $userinfo.substr: 0, 1;
+    my Str $userid = to-id $userinfo.substr: 1;
+    return if $oldid eq $userid && %!ranks{$oldid} eq $rank;
 
     %!ranks{$oldid}:delete;
     %!ranks{$userid} = $rank;
