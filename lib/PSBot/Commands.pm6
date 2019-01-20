@@ -54,12 +54,22 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
     my Str $res = @res.join: "\n";
     if $room && $state.users ∋ $state.userid && $state.users{$state.userid}.ranks{$room.id} ne ' ' {
         return $connection.send-raw: "!code $res", roomid => $room.id if $res.contains: "\n";
+
+        if $res.codes > 296 {
+            my $url = paste $res;
+            return $url.exception.message unless $url.defined;
+            return "``$res``";
+        }
+
         return "``$res``";
     }
-    if @res.first(*.codes > 296) {
-        my Str $url = paste $res;
+
+    if @res.first({ .codes > 296 }) {
+        my $url = paste $res;
+        return $url.exception.message unless $url.defined;
         return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
     }
+
     @res.map({ "``$_``" })
 }
 
@@ -103,10 +113,13 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
         return $connection.send-raw: "!code $res", roomid => $room.id if $res.contains: "\n";
         return "``$res``";
     }
-    if @res.first(*.codes > 296) {
-        my Str $url = paste $res;
+
+    if @res.first({ .codes > 296 }) {
+        my $url = paste $res;
+        return $url.exception.message unless $url.defined;
         return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
     }
+
     @res.map({ "``$_``" })
 }
 
@@ -254,7 +267,9 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     return $connection.send-raw: $res, roomid => $room.id if $room && $state.users{$state.userid}.ranks{$room.id} eq '*';
 
     my Int $i   = 0;
-    my Str $url = paste @definitions.map({ "{++$i}. {$_.head}" }).join: "\n";
+    my     $url = paste @definitions.map({ "{++$i}. {$_.head}" }).join: "\n";
+    return self.send: $url.exception.message, $rank, $user, $room, $connection unless $url.defined;
+
     $res = "Oxford Dictionary definition for $word: $url";
     self.send: $res, $rank, $user, $room, $connection;
 }
@@ -355,7 +370,9 @@ our method translate(Str $target, PSBot::User $user, PSBot::Room $room,
     return self.send: @languages.exception.message, $rank, $user, $room, $connection unless @languages.defined;
 
     unless @languages ∋ $source-lang && @languages ∋ $target-lang {
-        my Str $url = paste @languages.join: "\n";
+        my $url = paste @languages.join: "\n";
+        return self.send: $url.exception.message, $rank, $user, $room, $connection unless $url.defined;
+
         $res = "A list of valid languages may be found at $url";
         return self.send: $res, $rank, $user, $room, $connection;
     }
@@ -364,7 +381,9 @@ our method translate(Str $target, PSBot::User $user, PSBot::Room $room,
     return self.send: $output.exception.message, $rank, $user, $room, $connection unless $output.defined;
 
     if $output.codes > 300 {
-        my Str $url = paste $output;
+        my $url = paste $output;
+        return self.send: $url.exception.message, $rank, $user, $room, $connection unless $url.defined;
+
         $res = "{COMMAND}{&?ROUTINE.name} output was too long. It may be found at $url";
         return self.send: $res, $rank, $user, $room, $connection;
     }
@@ -395,7 +414,9 @@ our method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
     return self.send: $output.exception.message, $rank, $user, $room, $connection unless $output.defined;
 
     if $output.codes > 300 {
-        my Str $url = paste $output;
+        my $url = paste $output;
+        return self.send: $url.exception.message, $rank, $user, $room, $connection unless $url.defined;
+
         $res = "{COMMAND}{&?ROUTINE.name} output was too long. It may be found at $url";
         return self.send: $res, $rank, $user, $room, $connection;
     }
@@ -560,8 +581,9 @@ our method settings(Str $target, PSBot::User $user, PSBot::Room $room,
     my Str $res = "/addhtmlbox <details><summary>Command Settings</summary><table>{@requirements.map({ "<tr><td>{.head}</td><td>{.tail}</td></tr>" })}</table></details>";
     return $connection.send-raw: $res, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
 
-    $res = @requirements.map({ .join: ': ' }).join: "\n";
-    my Str $url = paste $res;
+    my $url = paste @requirements.map({ .join: ': ' }).join: "\n";
+    return $url.exception.message unless $url.defined;
+
     "Settings for commands in {$room.title} may be found at: $url"
 }
 
@@ -618,7 +640,7 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method help(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    state Str     $url;
+    state $url;
 
     my $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
     my $rank = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
@@ -722,5 +744,7 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
         END
 
     $url = paste $help;
+    return $url.exception.message unless $url.defined;
+
     "{$state.username} help may be found at: $url"
 }
