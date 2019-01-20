@@ -79,19 +79,26 @@ subtest 'PSBot::Message::Challstr', {
         take $byte.base(16).Str;
     };
     my Str $challstr = '4|' ~ @challstr».lc.join: '';
-    my Str @parts   .= new: $challstr;
+    my Str @parts   .= new: $challstr.split: '|';
 
     my PSBot::Message::ChallStr $parser .= new: $protocol, $roomid, @parts;
     is $parser.protocol, $protocol, 'Sets parser protocol attribute';
     cmp-ok $parser.roomid, '~~', Str:U, 'Does not set parser roomid attribute';
-    is $parser.challstr, $challstr, 'Sets parser challstr attribute';
 
+    my Promise $p .= new;
     $parser.parse: $state, $connection;
+
     if USERNAME {
-        is $state.challstr, $challstr, 'Updates state challstr attribute';
+        $*SCHEDULER.cue({
+            is $state.challstr, $challstr, 'Sets state challstr attribute';
+            $p.keep;
+        }, at => now + 1);
     } else {
         skip 'Cannot check if state challstr attribute was updated without a configured username', 1;
+        $p.keep;
     }
+
+    await $p;
 };
 
 subtest 'PSBot::Message::NameTaken', {

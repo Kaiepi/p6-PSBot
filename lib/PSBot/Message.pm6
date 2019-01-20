@@ -64,9 +64,11 @@ our class ChallStr does Message {
             if USERNAME {
                 my $assertion = $state.authenticate: USERNAME, (PASSWORD || ''), $!challstr;
                 $assertion.throw if $assertion ~~ Failure;
-                $connection.send-raw: "/trn {USERNAME},0,$assertion";
-                my $res = await $state.pending-rename;
-                $res.throw if $res ~~ X::PSBot::NameTaken;
+                if $assertion {
+                    $connection.send-raw: "/trn {USERNAME},0,$assertion";
+                    my $res = await $state.pending-rename;
+                    $res.throw if $res ~~ X::PSBot::NameTaken;
+                }
             }
         });
     }
