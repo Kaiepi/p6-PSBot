@@ -56,17 +56,17 @@ our class ChallStr does Message {
 
     method parse(PSBot::StateManager $state, PSBot::Connection $connection) {
         $*SCHEDULER.cue({
-            my @autojoin  = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
+            my Str @autojoin  = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
             $connection.send-raw:
                 "/autojoin {@autojoin.join: ','}",
                 '/cmd rooms';
 
             if USERNAME {
-                my $assertion = $state.authenticate: USERNAME, (PASSWORD || ''), $!challstr;
+                my MaybeStr $assertion = $state.authenticate: USERNAME, (PASSWORD || ''), $!challstr;
                 $assertion.throw if $assertion ~~ Failure;
                 if $assertion {
                     $connection.send-raw: "/trn {USERNAME},0,$assertion";
-                    my $res = await $state.pending-rename;
+                    my MaybeStr $res = await $state.pending-rename;
                     $res.throw if $res ~~ X::PSBot::NameTaken;
                 }
             }
