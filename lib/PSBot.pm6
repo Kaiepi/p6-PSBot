@@ -124,7 +124,7 @@ setting the C<DEBUG> environment variable to 1.
 
 An example config file has been provided in C<config.json.example>. This is to be
 copied over to C<~/.config/PSBot/config.json>
-(C<%LOCALAPPDATA%\PSBot\config.json> on Window-s) and edited to suit your needs.
+(C<%LOCALAPPDATA%\PSBot\config.json> on Windows) and edited to suit your needs.
 
 The following are the available config options:
 
@@ -180,18 +180,22 @@ The link to the GitHub repo for the bot.
 
 =item Str I<dictionary_api_id>
 
-The API ID for Oxford Dictionary. Set to null if you don't want to use the dictionary command.
+The API ID for Oxford Dictionary. Set to null if you don't want to use the
+dictionary command.
 
 =item Str I<dictionary_api_key>
 
-The API key for Oxford Dictionary. Set to null if you don't want to use the dictionary command.
+The API key for Oxford Dictionary. Set to null if you don't want to use the
+dictionary command.
 
 =item Str I<youtube_api_key>
 
-The API key for Youtube. Set to null if you don't want to use the youtube command.
+The API key for Youtube. Set to null if you don't want to use the youtube
+command.
 
 =item Str I<translate_api_key>
 
-The API key for Google Translate. Set to null if you don't want to use the badtranslate command.
+The API key for Google Translate. Set to null if you don't want to use the
+translate and badtranslate commands.
 
 =end pod
