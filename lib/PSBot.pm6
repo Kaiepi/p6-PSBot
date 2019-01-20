@@ -45,7 +45,7 @@ method start() {
             }
         }
         whenever signal(SIGINT) {
-            $!connection.close;
+            $!connection.close: :force;
             sleep 1;
             $!state.database.dbh.dispose;
             exit 0;

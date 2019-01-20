@@ -10,6 +10,7 @@ has Cro::WebSocket::Client             $!client;
 has Cro::WebSocket::Client::Connection $.connection;
 has Int                                $.timeout      = 1;
 has Promise                            $.inited;
+has Bool                               $.force-closed = False;
 has Supplier::Preserving               $.receiver    .= new;
 has Supplier::Preserving               $.sender      .= new;
 has Channel                            $.disconnects .= new;
@@ -38,42 +39,36 @@ method connect() {
 
     $!connection = try await $!client.connect;
 
-    if $! {
+    when $! ~~ Exception {
         debug '[DEBUG]', "Connection to {self.uri} failed: {$!.message}";
         self.reconnect;
-    } else {
-        debug '[DEBUG]', "Connected to {self.uri}";
-
-        # Reset state that needs to be reset on reconnect.
-        $!inited  .= new;
-        $!timeout  = 1;
-
-        # Throttle outgoing messages.
-        $!tap = $!sender.Supply.throttle(1, 0.6).tap(-> $data {
-            debug '[SEND]', $data;
-            $!connection.send: $data;
-        });
-
-        # Pass any received messages back to PSBot to pass to the parser.
-        $!connection.messages.tap(-> $data {
-            my Str $text = await $data.body-text;
-            if $text {
-                debug '[RECV]', $text;
-                $!receiver.emit: $text;
-            }
-        }, done => {
-            $!tap.close;
-            $!disconnects.send: True;
-            $!timeout *= 2;
-            self.reconnect;
-        }, quit => -> $e {
-            note $e;
-            $!tap.close;
-            $!disconnects.send: True;
-            $!timeout *= 2;
-            self.reconnect;
-        });
     }
+
+    debug '[DEBUG]', "Connected to {self.uri}";
+
+    # Reset state that needs to be reset on reconnect.
+    $!inited  .= new;
+    $!timeout  = 1;
+
+    # Throttle outgoing messages.
+    $!tap = $!sender.Supply.throttle(1, 0.6).tap(-> $data {
+        debug '[SEND]', $data;
+        $!connection.send: $data;
+    });
+
+    # Pass any received messages back to PSBot to pass to the parser.
+    $!connection.messages.tap(-> $data {
+        my Str $text = await $data.body-text;
+        if $text {
+            debug '[RECV]', $text;
+            $!receiver.emit: $text;
+        }
+    }, done => {
+        $!tap.close;
+        $!disconnects.send: True;
+        $!timeout *= 2;
+        self.reconnect unless $!force-closed;
+    });
 }
 
 method reconnect() {
@@ -166,6 +161,7 @@ multi method send-raw(*@data, Str :$userid!) {
     }
 }
 
-method close(:$timeout = 1000 --> Promise) {
-    $!connection.close: :$timeout unless self.closed
+method close(Int :$timeout = 0, Bool :$force = False --> Promise) {
+    $!force-closed = $force;
+    $!connection.close: :$timeout
 }
