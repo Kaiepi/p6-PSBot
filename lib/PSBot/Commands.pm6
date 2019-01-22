@@ -216,11 +216,12 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
     my Str                 $term = uri_encode_component($target);
     my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
         "http://api.urbandictionary.com/v0/define?term=$term",
+        http             => '1.1',
         content-type     => 'application/json',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
     my                     %body = await $resp.body;
     $res = "Urban Dictionary definition for $target was not found.";
-    self.send: $res, $rank, $user, $room, $connection unless +%body<list>;
+    return self.send: $res, $rank, $user, $room, $connection unless +%body<list>;
 
     my %info = %body<list>.head;
     $res = "Urban Dictionary definition for $target: %info<permalink>";
@@ -245,6 +246,7 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my Cro::HTTP::Response $resp = try await Cro::HTTP::Client.get:
         "https://od-api.oxforddictionaries.com:443/api/v1/entries/en/$word",
+        http             => '1.1',
         headers          => [app_id => DICTIONARY_API_ID, app_key => DICTIONARY_API_KEY],
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
     $res = "Definition for $word not found.";
@@ -286,6 +288,7 @@ our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
     my Str                 $query = uri_encode_component($target);
     my Cro::HTTP::Response $resp  = await Cro::HTTP::Client.get:
         "https://en.wikipedia.org/w/api.php?action=query&prop=info&titles=$query&inprop=url&format=json",
+        http             => '1.1',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
     my                     %body = await $resp.body;
 
@@ -308,6 +311,7 @@ our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
     my Str                 $query = uri_encode_component($target);
     my Cro::HTTP::Response $resp  = await Cro::HTTP::Client.get:
         "https://wikimon.net/api.php?action=query&prop=info&titles=$query&inprop=url&format=json",
+        http             => '1.1',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
     my                     %body  = await $resp.body;
 
