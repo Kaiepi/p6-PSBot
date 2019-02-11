@@ -3,7 +3,7 @@ use PSBot::Connection;
 use PSBot::Config;
 use PSBot::Message;
 use PSBot::StateManager;
-unit class PSBot;
+unit class PSBot:ver<0.0.1>:auth<github:Kaiepi>;
 
 has PSBot::Connection   $.connection;
 has PSBot::StateManager $.state;
