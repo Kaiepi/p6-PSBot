@@ -47,7 +47,7 @@ multi sub get-translation(Str $input, Str $source, Str $target --> Str) is expor
         "https://translation.googleapis.com/language/translate/v2?q=$query&source=$source&target=$target&key={TRANSLATE_API_KEY}",
         http             => '1.1',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
-    fail "Request to Google Translate API failed with code {$response.status}." if $!;
+    fail "Request to Google Translate API failed with code {await $response.status}." if $!;
 
     my %body = await $response.body;
     decode-entities(%body<data><translations>.head<translatedText>)

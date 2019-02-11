@@ -2,7 +2,7 @@ use v6.d;
 use Pastebin::Shadowcat;
 unit module PSBot::Tools;
 
-subset MaybeStr is export where Str | Failure;
+subset Maybe is export where Mu | Failure;
 
 sub to-id(Str $data! --> Str) is export {
     $data.lc.samemark(' ').subst(/ <-[a..z 0..9]>+ /, '', :g)

@@ -62,11 +62,11 @@ our class ChallStr does Message {
                 '/cmd rooms';
 
             if USERNAME {
-                my MaybeStr $assertion = $state.authenticate: USERNAME, (PASSWORD || ''), $!challstr;
+                my Maybe $assertion = $state.authenticate: USERNAME, (PASSWORD || ''), $!challstr;
                 $assertion.throw if $assertion ~~ Failure;
-                if $assertion {
+                if defined $assertion {
                     $connection.send-raw: "/trn {USERNAME},0,$assertion";
-                    my MaybeStr $res = await $state.pending-rename;
+                    my Maybe $res = await $state.pending-rename;
                     $res.throw if $res ~~ X::PSBot::NameTaken;
                 }
             }
