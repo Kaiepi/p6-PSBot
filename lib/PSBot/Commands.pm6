@@ -160,6 +160,8 @@ our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
     return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
     $state.login-server.log-out: $state.username;
     $connection.send-raw: '/logout';
+    $connection.close: :force;
+    sleep 1;
     exit 0;
 }
 
