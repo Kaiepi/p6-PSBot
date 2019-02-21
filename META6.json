@@ -8,6 +8,7 @@
 	  "Cro::WebSocket",
 	  "DBIish",
 	  "HTML::Entity",
+	  "JSON::Fast",
 	  "Pastebin::Shadowcat",
 	  "URI::Encode"
   ],
