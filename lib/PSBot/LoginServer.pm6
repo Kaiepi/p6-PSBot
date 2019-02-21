@@ -58,12 +58,10 @@ method log-out(Str $username --> Bool) {
         http         => '1.1',
         content-type => 'application/x-www-form-urlencoded; charset=UTF-8',
         body         => $(act => 'logout', userid => $userid);
-    my Str                 $body     = await $response.body-text;
-    my                     %data     = from-json $body.substr: 1;
 
     $!logged-in = False;
 
-    %data<actionsuccess>
+    True
 }
 
 method upkeep(Str $challstr --> Str) {
