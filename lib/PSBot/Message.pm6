@@ -312,7 +312,7 @@ our class Chat does Message {
         if $username ne $state.username {
             for $state.rules.chat -> $rule {
                 my \result = $rule.match: $!message, $room, $user, $state, $connection;
-                $connection.send-raw: result, :$!roomid if result;
+                $*SCHEDULER.cue({ $connection.send-raw: result, :$!roomid }) if result;
                 last if result;
             }
         }
@@ -386,7 +386,7 @@ our class PrivateMessage does Message {
         if $username ne $state.username {
             for $state.rules.pm -> $rule {
                 my \result = $rule.match: $!message, $room, $user, $state, $connection;
-                $connection.send-raw: result, :$!roomid if result;
+                $*SCHEDULER.cue({ $connection.send-raw: result, :$!roomid }) if result;
                 last if result;
             }
         }
@@ -425,7 +425,7 @@ our class HTML does Message {
         my PSBot::User $user = Nil;
         for $state.rules.html -> $rule {
             my \result = $rule.match: $!html, $room, $user, $state, $connection;
-            $connection.send-raw: result, :$!roomid if result;
+            $*SCHEDULER.cue({ $connection.send-raw: result, :$!roomid }) if result;
             last if result;
         }
     }
@@ -446,7 +446,7 @@ our class Popup does Message {
         my PSBot::User $user = Nil;
         for $state.rules.popup -> $rule {
             my \result = $rule.match: $!popup, $room, $user, $state, $connection;
-            $connection.send-raw: result, :$!roomid if result;
+            $*SCHEDULER.cue({ $connection.send-raw: result, :$!roomid }) if result;
             last if result;
         }
     }
@@ -467,7 +467,7 @@ our class Raw does Message {
         my PSBot::User $user = Nil;
         for $state.rules.raw -> $rule {
             my \result = $rule.match: $!html, $room, $user, $state, $connection;
-            $connection.send-raw: result, :$!roomid if result;
+            $*SCHEDULER.cue({ $connection.send-raw: result, :$!roomid }) if result;
             last if result;
         }
     }
