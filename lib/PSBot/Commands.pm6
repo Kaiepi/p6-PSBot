@@ -437,10 +437,10 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
         default                                         { return 'Invalid time.'                }
     }
 
-    my Str $userid   = $user.id;
-    my Str $username = $user.name;
-    my Str $roomid   = $room ?? $room.id !! Nil;
-    my Num $time     = (now + $seconds).Num;
+    my Str     $userid   = $user.id;
+    my Str     $username = $user.name;
+    my Str     $roomid   = $room ?? $room.id !! Nil;
+    my Instant $time     = now + $seconds;
     if $room {
         $connection.send: "You set a reminder for $time-ago from now.", :$roomid;
         $state.database.add-reminder: $username, $time-ago, $time, $message, :$roomid;
@@ -452,12 +452,26 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
     $*SCHEDULER.cue({
         if $room {
             $connection.send: "{$user.name}, you set a reminder $time-ago ago: $message", :$roomid;
-            $state.database.remove-reminder: $username, $time-ago, $time, $message, :$roomid;
+            $state.database.remove-reminder: $username, $time-ago, $time.Rat, $message, :$roomid;
         } else {
             $connection.send: "{$user.name}, you set a reminder $time-ago ago: $message", :$userid;
-            $state.database.remove-reminder: $username, $time-ago, $time, $message, :$userid;
+            $state.database.remove-reminder: $username, $time-ago, $time.Rat, $message, :$userid;
         }
-    }, at => now + $seconds);
+    }, at => $time);
+}
+
+our method reminderlist(Str $taret, PSBot::User $user, PSBot::Room $room,
+        PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+    my @reminders = $state.database.get-reminders: $user.name;
+    return $connection.send: 'You have no reminders set.', userid => $user.id unless +@reminders;
+
+    my Str $table     = @reminders.kv.map(-> $i, %reminder {
+        my Str      $location  = %reminder<roomid> ?? "in room %reminder<roomid>" !! 'in private';
+        my DateTime $time     .= new: %reminder<time>.Rat;
+        qq[{$i + 1}: "%reminder<reminder>" ($location, set for {$time.hh-mm-ss} UTC on {$time.yyyy-mm-dd})]
+    }).join("\n");
+    my Str $url = paste $table;
+    $connection.send: "Your reminder list may be found at $url", userid => $user.id;
 }
 
 our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -701,6 +715,9 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
 
         - reminder <time>, <message>
           Sets a reminder with the given message to be sent in the given time.
+
+        - reminderlist
+          PMs a list of the reminders you currently have set.
 
         - mail <username>, <message>
           Mails the given message to the given user once they log on.

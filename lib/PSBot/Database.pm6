@@ -33,7 +33,7 @@ method new() {
             time_ago TEXT NOT NULL,
             userid   TEXT,
             roomid   TEXT,
-            time     REAL NOT NULL,
+            time     DATE NOT NULL,
             reminder TEXT NOT NULL
         );
         STATEMENT
@@ -51,7 +51,7 @@ method new() {
         CREATE TABLE IF NOT EXISTS seen (
             id     INTEGER PRIMARY KEY AUTOINCREMENT,
             userid TEXT NOT NULL,
-            time   REAL NOT NULL
+            time   DATE NOT NULL
         );
         STATEMENT
 
@@ -69,18 +69,32 @@ method new() {
 }
 
 
-method get-reminders(--> Array) {
+multi method get-reminders(--> Array) {
     my $sth = $!dbh.prepare: q:to/STATEMENT/;
         SELECT * FROM reminders;
         STATEMENT
+    $sth.column-types = [Int, Str, Str, Str, Str, Rat, Str];
     $sth.execute;
     my @rows = [$sth.fetchall-AoH];
-    @rows = @rows.flat if @rows.head ~~ List;
+    @rows .= flat if @rows.head ~~ List;
     $sth.finish;
     @rows
 }
 
-multi method add-reminder(Str $name, Str $time-ago, Num $time, Str $reminder, Str :$userid!) {
+multi method get-reminders(Str $name --> Array) {
+    my $sth = $!dbh.prepare: q:to/STATEMENT/;
+        SELECT * FROM reminders
+        WHERE name = ?;
+        STATEMENT
+    $sth.column-types = [Int, Str, Str, Str, Str, Rat, Str];
+    $sth.execute: $name;
+    my @rows = [$sth.fetchall-AoH];
+    @rows .= flat if @rows.head ~~ List;
+    $sth.finish;
+    @rows
+}
+
+multi method add-reminder(Str $name, Str $time-ago, Instant $time, Str $reminder, Str :$userid!) {
     my $sth = $!dbh.prepare: q:to/STATEMENT/;
         INSERT INTO reminders (name, time_ago, userid,  roomid, time, reminder)
         VALUES (?, ?, ?, NULL, ?, ?);
@@ -88,7 +102,7 @@ multi method add-reminder(Str $name, Str $time-ago, Num $time, Str $reminder, St
     $sth.execute: $name, $time-ago, $userid, $time, $reminder;
     $sth.finish;
 }
-multi method add-reminder(Str $name, Str $time-ago, Num $time, Str $reminder, Str :$roomid!) {
+multi method add-reminder(Str $name, Str $time-ago, Instant $time, Str $reminder, Str :$roomid!) {
     my $sth = $!dbh.prepare: q:to/STATEMENT/;
         INSERT INTO reminders (name, time_ago, userid, roomid, time, reminder)
         VALUES (?, ?, NULL, ?, ?, ?);
@@ -97,7 +111,7 @@ multi method add-reminder(Str $name, Str $time-ago, Num $time, Str $reminder, St
     $sth.finish;
 }
 
-multi method remove-reminder(Str $name, Str $time-ago, Num $time, Str $reminder, Str :$userid!) {
+multi method remove-reminder(Str $name, Str $time-ago, Rat $time, Str $reminder, Str :$userid!) {
     my $sth = $!dbh.prepare: q:to/STATEMENT/;
         DELETE FROM reminders
         WHERE name = ? AND time_ago = ? AND userid = ? AND time = ? AND reminder = ?;
@@ -105,7 +119,7 @@ multi method remove-reminder(Str $name, Str $time-ago, Num $time, Str $reminder,
     $sth.execute: $name, $time-ago, $userid, $time, $reminder;
     $sth.finish;
 }
-multi method remove-reminder(Str $name, Str $time-ago, Num $time, Str $reminder, Str :$roomid!) {
+multi method remove-reminder(Str $name, Str $time-ago, Rat $time, Str $reminder, Str :$roomid!) {
     my $sth = $!dbh.prepare: q:to/STATEMENT/;
         DELETE FROM reminders
         WHERE name = ? AND time_ago = ? AND roomid = ? AND time = ? AND reminder = ?;
@@ -119,6 +133,7 @@ method get-mail(Str $to --> Array) {
         SELECT * FROM mailbox
         WHERE target = ?;
         STATEMENT
+    $sth.column-types = [Int, Str, Str, Str];
     $sth.execute: $to;
     my @rows = [$sth.fetchall-AoH];
     @rows = @rows.flat if @rows.head ~~ List;
@@ -149,12 +164,13 @@ method get-seen(Str $userid --> DateTime) {
         SELECT * FROM seen
         WHERE userid = ?
         STATEMENT
+    $sth.column-types = [Int, Str, Rat];
     $sth.execute: $userid;
     my %row = $sth.fetchrow-hash;
     $sth.finish;
 
     fail "No row was found for $userid." unless %row;
-    DateTime.new(%row<time>.Num)
+    DateTime.new(%row<time>.Rat)
 }
 
 method add-seen(Str $userid, Instant $time) {
@@ -183,6 +199,7 @@ method get-commands(Str $roomid --> Array) {
         SELECT * FROM settings
         WHERE roomid = ?;
         STATEMENT
+    $sth.column-types = [Int, Str, Str, Str, Int];
     $sth.execute: $roomid;
     my @rows = [$sth.fetchall-AoH];
     @rows = @rows.flat if @rows.head ~~ List;
@@ -195,6 +212,7 @@ method get-command(Str $roomid, Str $command) {
         SELECT * FROM settings
         WHERE roomid = ? AND command = ?;
         STATEMENT
+    $sth.column-types = [Int, Str, Str, Str, Int];
     $sth.execute: $roomid, $command;
     my %row = $sth.fetchrow-hash;
     $sth.finish;

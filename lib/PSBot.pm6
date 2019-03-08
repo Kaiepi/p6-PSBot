@@ -31,16 +31,15 @@ method start() {
         whenever $!connection.inited {
             with $!state.database.get-reminders -> \reminders {
                 for reminders -> %row {
-                    my Num $time = %row<time>.Num;
                     $*SCHEDULER.cue({
                         if %row<roomid> {
                             $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
-                            $!state.database.remove-reminder: %row<name>, %row<time_ago>, $time, %row<reminder>, roomid => %row<roomid>;
+                            $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>.Rat, %row<reminder>, roomid => %row<roomid>;
                         } else {
                             $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
-                            $!state.database.remove-reminder: %row<name>, %row<time_ago>, $time, %row<reminder>, userid => %row<userid>;
+                            $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>.Rat, %row<reminder>, userid => %row<userid>;
                         }
-                    }, at => $time);
+                    }, at => %row<time>.Rat);
                 }
             }
         }
