@@ -303,7 +303,7 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
         for $!state.rules.pm -> $rule {
             my Result $output = $rule.match: $message, $room, $user, $!state, $!connection;
             $output = await $output if $output ~~ Awaitable:D;
-            $*SCHEDULER.cue({ $!connection.send-raw: $output, :$roomid }) if $output && $output ~~ Str:D | Iterable:D;
+            $*SCHEDULER.cue({ $!connection.send-raw: $output, :$userid }) if $output && $output ~~ Str:D | Iterable:D;
             last if $output;
         }
     }
