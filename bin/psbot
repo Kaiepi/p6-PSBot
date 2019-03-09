@@ -2,7 +2,12 @@
 use v6.d;
 use PSBot;
 
-sub MAIN() {
+multi sub MAIN() {
     my PSBot $bot .= new;
+    $bot.start;
+}
+
+multi sub MAIN(Str $host!, Int $port!, Str $serverid!) {
+    my PSBot $bot .= new: $host, $port, $serverid;
     $bot.start;
 }

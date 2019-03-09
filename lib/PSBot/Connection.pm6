@@ -66,7 +66,6 @@ method connect() {
     }, done => {
         $!tap.close;
         $!disconnects.send: True;
-        $!timeout *= 2;
         self.reconnect unless $!force-closed;
     });
 }
@@ -79,9 +78,9 @@ method reconnect() {
         uri      => self.uri
     ) if $!timeout == 2 ** MAX_RECONNECT_ATTEMPTS;
 
-    $*SCHEDULER.cue:
-        { self.connect },
-        at => now + $!timeout;
+    $*SCHEDULER.cue({ self.connect }, at => now + $!timeout);
+
+    $!timeout *= 2;
 }
 
 method lower-throttle() {
@@ -161,7 +160,7 @@ multi method send-raw(*@data, Str :$userid!) {
     }
 }
 
-method close(Int :$timeout = 0, Bool :$force = False --> Promise) {
+method close(Int :$timeout = 0, Bool :$force = False) {
     $!force-closed = $force;
-    $!connection.close: :$timeout
+    sink $!connection.close: :$timeout if $!connection;
 }

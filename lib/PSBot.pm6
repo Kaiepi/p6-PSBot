@@ -5,9 +5,9 @@ use PSBot::Parser;
 use PSBot::StateManager;
 unit class PSBot:ver<0.0.1>:auth<github:Kaiepi> does PSBot::Parser;
 
-method new() {
-    my PSBot::Connection   $connection .= new: HOST, PORT;
-    my PSBot::StateManager $state      .= new;
+method new(Str $host = HOST, Int $port = PORT, Str $serverid = SERVERID) {
+    my PSBot::Connection   $connection .= new: $host, $port;
+    my PSBot::StateManager $state      .= new: $serverid;
     self.bless: :$connection, :$state;
 }
 

@@ -24,9 +24,16 @@ has Lock::Async $!chat-mux .= new;
 has PSBot::User %.users;
 has PSBot::Room %.rooms;
 
-has PSBot::Database    $.database     .= new;
-has PSBot::LoginServer $.login-server .= new;
-has PSBot::Rules       $.rules        .= new;
+has PSBot::Database    $.database;
+has PSBot::LoginServer $.login-server;
+has PSBot::Rules       $.rules;
+
+method new(Str $serverid) {
+    my PSBot::Database    $database     .= new;
+    my PSBot::LoginServer $login-server .= new: :$serverid;
+    my PSBot::Rules       $rules        .= new;
+    self.bless: :$database, :$login-server, :$rules;
+}
 
 method authenticate(Str $username!, Str $password?, Str $challstr? --> Str) {
     $!challstr = $challstr if defined $challstr;

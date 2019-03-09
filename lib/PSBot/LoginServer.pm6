@@ -7,6 +7,7 @@ use PSBot::Tools;
 unit class PSBot::LoginServer;
 
 has Cro::HTTP::Client $.client    .= new;
+has Str               $.serverid;
 has Bool              $.logged-in  = False;
 
 submethod BUILD() {
@@ -21,7 +22,7 @@ method get-assertion(Str $username!, Str $challstr!) {
     my Str                 $userid    = to-id $username;
     my Str                 $query     = "act=getassertion&userid=$userid&challstr=$challstr".subst('|', '%7C', :g);
     my Cro::HTTP::Response $response  = await $!client.get:
-        "https://play.pokemonshowdown.com/~~{SERVERID}/action.php?$query",
+        "https://play.pokemonshowdown.com/~~$!serverid/action.php?$query",
         http => '1.1';
     my Str                 $assertion = await $response.body-text;
     fail 'this username is registered' if $assertion eq ';';
@@ -34,7 +35,7 @@ method get-assertion(Str $username!, Str $challstr!) {
 
 method log-in(Str $username!, Str $password!, Str $challstr!) {
     my Cro::HTTP::Response $response = await $!client.post:
-        "https://play.pokemonshowdown.com/~~{SERVERID}/action.php",
+        "https://play.pokemonshowdown.com/~~$!serverid/action.php",
         http         => '1.1',
         content-type => 'application/x-www-form-urlencoded; charset=UTF-8',
         body         => %(act => 'login', name => $username, pass => $password, challstr => $challstr);
@@ -54,7 +55,7 @@ method log-in(Str $username!, Str $password!, Str $challstr!) {
 method log-out(Str $username --> Bool) {
     my Str                 $userid   = to-id $username;
     my Cro::HTTP::Response $response = await $!client.post:
-        "https://play.pokemonshowdown.com/~~{SERVERID}/action.php",
+        "https://play.pokemonshowdown.com/~~$!serverid/action.php",
         http         => '1.1',
         content-type => 'application/x-www-form-urlencoded; charset=UTF-8',
         body         => $(act => 'logout', userid => $userid);
@@ -66,7 +67,7 @@ method log-out(Str $username --> Bool) {
 
 method upkeep(Str $challstr --> Str) {
     my Cro::HTTP::Response $response = await $!client.post:
-        "https://play.pokemonshowdown.com/~~{SERVERID}/action.php",
+        "https://play.pokemonshowdown.com/~~$!serverid/action.php",
         http         => '1.1',
         content-type => 'application/x-www-form-urlencoded; charset=UTF-8',
         body         => %(act => 'upkeep', challstr => $challstr);
