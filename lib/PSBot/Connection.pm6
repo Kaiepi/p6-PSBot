@@ -18,10 +18,10 @@ has Tap                                $.tap;
 
 submethod TWEAK(Cro::WebSocket::Client :$!client) { }
 
-method new(Str $host!, Int $port!, Bool $ssl = False) {
-    my Str                    $protocol  = $ssl ?? 'wss' !! 'ws';
+method new(Str $host, Int $port) {
+    my Str                    $protocol  = $port == 443 ?? 'wss' !! 'ws';
     my Cro::WebSocket::Client $client   .= new:
-            uri => "$protocol://$host:$port/showdown/websocket";
+        uri => "$protocol://$host:$port/showdown/websocket";
     self.bless: :$client;
 }
 

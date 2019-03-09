@@ -44,10 +44,6 @@ The URL of the server you wish to connect to.
 
 The port of the server you wish to connect to.
 
-  * Bool *ssl*
-
-Whether or not to enable connecting using SSL. Set to true if the port is 443.
-
   * Str *serverid*
 
 The ID of the server you wish to connect to.

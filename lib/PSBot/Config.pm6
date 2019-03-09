@@ -19,7 +19,6 @@ sub EXPORT(--> Hash) {
                 AVATAR                 => %config<avatar>,
                 HOST                   => %config<host>,
                 PORT                   => %config<port>,
-                SSL                    => %config<ssl>,
                 SERVERID               => %config<serverid>,
                 COMMAND                => %config<command>,
                 ROOMS                  => set(%config<rooms>.map: &to-roomid),

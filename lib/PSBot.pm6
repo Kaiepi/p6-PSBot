@@ -6,7 +6,7 @@ use PSBot::StateManager;
 unit class PSBot:ver<0.0.1>:auth<github:Kaiepi> does PSBot::Parser;
 
 method new() {
-    my PSBot::Connection   $connection .= new: HOST, PORT, SSL;
+    my PSBot::Connection   $connection .= new: HOST, PORT;
     my PSBot::StateManager $state      .= new;
     self.bless: :$connection, :$state;
 }
@@ -94,10 +94,6 @@ The URL of the server you wish to connect to.
 =item Int I<port>
 
 The port of the server you wish to connect to.
-
-=item Bool I<ssl>
-
-Whether or not to enable connecting using SSL. Set to true if the port is 443.
 
 =item Str I<serverid>
 
