@@ -1,42 +1,44 @@
 {
-  "authors" : [
-    "Ben Davies"
-  ],
-  "build-depends" : [ ],
-  "depends" : [
-	  "Cro::HTTP",
-	  "Cro::WebSocket",
-	  "DBIish",
-	  "HTML::Entity",
-	  "JSON::Fast",
-	  "Pastebin::Shadowcat",
-	  "URI::Encode"
-  ],
-  "description" : "Pokémon Showdown chat bot",
-  "license" : "Artistic-2.0",
-  "name" : "PSBot",
-  "perl" : "6.d",
-  "provides" : {
-    "PSBot" : "lib/PSBot.pm6",
-    "PSBot::CommandContext" : "lib/PSBot/CommandContext.pm6",
-    "PSBot::Commands" : "lib/PSBot/Commands.pm6",
-    "PSBot::Config" : "lib/PSBot/Config.pm6",
-    "PSBot::Connection" : "lib/PSBot/Connection.pm6",
-    "PSBot::Database" : "lib/PSBot/Database.pm6",
-    "PSBot::Exceptions" : "lib/PSBot/Exceptions.pm6",
-    "PSBot::Game" : "lib/PSBot/Game.pm6",
-    "PSBot::LoginServer" : "lib/PSBot/LoginServer.pm6",
-    "PSBot::Room" : "lib/PSBot/Room.pm6",
-    "PSBot::Rules" : "lib/PSBot/Rules.pm6",
-    "PSBot::StateManager" : "lib/PSBot/StateManager.pm6",
-    "PSBot::Tools" : "lib/PSBot/Tools.pm6",
-    "PSBot::User" : "lib/PSBot/User.pm6",
-    "PSBot::Games::Hangman" : "lib/PSBot/Games/Hangman.pm6",
-    "PSBot::Plugins::Translate" : "lib/PSBot/Plugins/Translate.pm6"
-  },
-  "resources" : [ "database.sqlite3", "dictionary" ],
-  "source-url" : "https://github.com/Kaiepi/p6-PSBot.git",
-  "tags" : [ ],
-  "test-depends" : [ ],
-  "version" : "0.0.1"
+	"authors" : [
+		"Ben Davies"
+	],
+	"build-depends" : [ ],
+	"depends" : [
+		"Cro::HTTP",
+		"Cro::WebSocket",
+		"DBIish",
+		"HTML::Entity",
+		"JSON::Fast",
+		"Pastebin::Shadowcat",
+		"URI::Encode"
+	],
+	"description" : "Pokémon Showdown chat bot",
+	"license" : "Artistic-2.0",
+	"name" : "PSBot",
+	"perl" : "6.d",
+	"provides" : {
+		"PSBot" : "lib/PSBot.pm6",
+		"PSBot::CommandContext" : "lib/PSBot/CommandContext.pm6",
+		"PSBot::Commands" : "lib/PSBot/Commands.pm6",
+		"PSBot::Config" : "lib/PSBot/Config.pm6",
+		"PSBot::Connection" : "lib/PSBot/Connection.pm6",
+		"PSBot::Database" : "lib/PSBot/Database.pm6",
+		"PSBot::Exceptions" : "lib/PSBot/Exceptions.pm6",
+		"PSBot::Game" : "lib/PSBot/Game.pm6",
+		"PSBot::LoginServer" : "lib/PSBot/LoginServer.pm6",
+		"PSBot::Parser" : "lib/PSBot/Parser.pm6",
+		"PSBot::Room" : "lib/PSBot/Room.pm6",
+		"PSBot::Rules" : "lib/PSBot/Rules.pm6",
+		"PSBot::StateManager" : "lib/PSBot/StateManager.pm6",
+		"PSBot::Tools" : "lib/PSBot/Tools.pm6",
+		"PSBot::User" : "lib/PSBot/User.pm6",
+		"PSBot::Games::Hangman" : "lib/PSBot/Games/Hangman.pm6",
+		"PSBot::Plugins::Translate" : "lib/PSBot/Plugins/Translate.pm6",
+		"PSBot::Plugins::YouTube" : "lib/PSBot/Plugins/YouTube.pm6"
+	},
+	"resources" : [ "database.sqlite3", "dictionary" ],
+	"source-url" : "https://github.com/Kaiepi/p6-PSBot.git",
+	"tags" : [ ],
+	"test-depends" : [ ],
+	"version" : "0.0.1"
 }
