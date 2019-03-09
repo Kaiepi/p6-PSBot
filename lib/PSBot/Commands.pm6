@@ -458,6 +458,8 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
             $state.database.remove-reminder: $username, $time-ago, $time.Rat, $message, :$userid;
         }
     }, at => $time);
+
+    Nil
 }
 
 our method reminderlist(Str $taret, PSBot::User $user, PSBot::Room $room,

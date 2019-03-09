@@ -3,7 +3,7 @@ use Pastebin::Shadowcat;
 unit module PSBot::Tools;
 
 subset Maybe is export of Mu where Mu | Failure;
-subset Result is export where Str | Awaitable | Iterable;
+subset Result is export where Str | Awaitable | Iterable | Nil;
 
 sub to-id(Str $data! --> Str) is export {
     $data.lc.samemark(' ').subst(/ <-[a..z 0..9]>+ /, '', :g)
