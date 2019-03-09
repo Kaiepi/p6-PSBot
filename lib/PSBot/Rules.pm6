@@ -67,6 +67,7 @@ method new() {
             token { ^ '/invite ' $<roomid>=[<[a..z]>+] $ },
             -> $match, $room, $user, $state, $connection {
                 my Str $roomid = ~$match<roomid>;
+                return if $roomid.starts-with: 'battle-';
                 return "/join $roomid" if $user.group !~~ ' ' | '+';
             }
         )
