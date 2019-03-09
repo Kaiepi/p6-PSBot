@@ -2,7 +2,8 @@ use v6.d;
 use Pastebin::Shadowcat;
 unit module PSBot::Tools;
 
-subset Maybe is export where Mu | Failure;
+subset Maybe is export of Mu where Mu | Failure;
+subset Result is export where Str | Awaitable | Iterable;
 
 sub to-id(Str $data! --> Str) is export {
     $data.lc.samemark(' ').subst(/ <-[a..z 0..9]>+ /, '', :g)
@@ -28,6 +29,6 @@ sub debug(**@data) is export {
 sub paste(Str $data --> Str) is export {
     state Pastebin::Shadowcat $pastebin .= new;
     my $url = $pastebin.paste: $data;
-    return $url unless $url.defined;
+    return $url unless defined $url;
     "$url?tx=on"
 }

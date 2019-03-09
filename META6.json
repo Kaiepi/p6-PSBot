@@ -26,7 +26,6 @@
     "PSBot::Exceptions" : "lib/PSBot/Exceptions.pm6",
     "PSBot::Game" : "lib/PSBot/Game.pm6",
     "PSBot::LoginServer" : "lib/PSBot/LoginServer.pm6",
-    "PSBot::Message" : "lib/PSBot/Message.pm6",
     "PSBot::Room" : "lib/PSBot/Room.pm6",
     "PSBot::Rules" : "lib/PSBot/Rules.pm6",
     "PSBot::StateManager" : "lib/PSBot/StateManager.pm6",

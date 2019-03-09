@@ -13,7 +13,7 @@ submethod BUILD(:$!dbh) {
 }
 
 method new() {
-    given DBIish.install-driver('SQLite') {
+    given DBIish.install-driver: 'SQLite' {
         unless .version {
             note 'SQLite is not installed!';
             exit 1;
