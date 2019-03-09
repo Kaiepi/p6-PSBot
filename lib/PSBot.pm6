@@ -331,20 +331,22 @@ method parse-html(Str $roomid, *@html) {
     my PSBot::Room $room = $!state.rooms ∋ $roomid ?? $!state.rooms{$roomid} !! Nil;
     my PSBot::User $user = Nil;
     for $!state.rules.html -> $rule {
-        my \result = $rule.match: $html, $room, $user, $!state, $!connection;
-        $*SCHEDULER.cue({ $!connection.send-raw: result, :$roomid }) if result;
-        last if result;
+        my Result $output = $rule.match: $html, $room, $user, $!state, $!connection;
+        $output = await $output if $output ~~ Awaitable:D;
+        $*SCHEDULER.cue({ $!connection.send-raw: $output, :$roomid }) if $output && $output ~~ Str:D | Iterable:D;
+        last if $output;
     }
 }
 
 method parse-popup(Str $roomid, *@popup) {
-    my Str $popup = @popup.join: '|';
+    my Str $popup = @popup.join('|').subst('||', "\n", :g);
     my PSBot::Room $room = $!state.rooms ∋ $roomid ?? $!state.rooms{$roomid} !! Nil;
     my PSBot::User $user = Nil;
     for $!state.rules.popup -> $rule {
-        my \result = $rule.match: $popup, $room, $user, $!state, $!connection;
-        $*SCHEDULER.cue({ $!connection.send-raw: result, :$roomid }) if result;
-        last if result;
+        my Result $output = $rule.match: $popup, $room, $user, $!state, $!connection;
+        $output = await $output if $output ~~ Awaitable:D;
+        $*SCHEDULER.cue({ $!connection.send-raw: $output, :$roomid }) if $output;
+        last if $output;
     }
 }
 
@@ -353,9 +355,10 @@ method parse-raw(Str $roomid, *@html) {
     my PSBot::Room $room = $!state.rooms ∋ $roomid ?? $!state.rooms{$roomid} !! Nil;
     my PSBot::User $user = Nil;
     for $!state.rules.raw -> $rule {
-        my \result = $rule.match: $html, $room, $user, $!state, $!connection;
-        $*SCHEDULER.cue({ $!connection.send-raw: result, :$roomid }) if result;
-        last if result;
+        my Result $output = $rule.match: $html, $room, $user, $!state, $!connection;
+        $output = await $output if $output ~~ Awaitable:D;
+        $*SCHEDULER.cue({ $!connection.send-raw: $output, :$roomid }) if $output && $output ~~ Str:D | Iterable:D;
+        last if $output;
     }
 }
 
