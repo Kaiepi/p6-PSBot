@@ -107,6 +107,7 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
             if $!state.users ∋ $userid {
                 my PSBot::User $user = $!state.users{$userid};
                 $user.set-group: $group unless defined($user.group) && $user.group eq $group;
+                $user.set-avatar: %data<avatar>.Str unless defined($user.avatar) && $user.avatar eq %data<avatar>.Str;
             }
         }
         when 'rooms' {

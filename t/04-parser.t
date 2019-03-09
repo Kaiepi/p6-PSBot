@@ -7,6 +7,7 @@ use PSBot::Connection;
 use PSBot::Parser;
 use PSBot::StateManager;
 use PSBot::Tools;
+use PSBot::User;
 use Test;
 
 plan 10;
@@ -85,17 +86,21 @@ subtest '|queryresponse|', {
 
     {
         my Str $type     = 'userdetails';
-        my Str $username = USERNAME || 'PoS-Bot';
+        my Str $username = 'Morfent';
         my Str $userid   = to-id $username;
-        my Str $data     = qs[{"userid":"$userid","group":"*","rooms":{}}];
+        my Str $group    = '@';
+        my Str $avatar   = '#morfent';
+        my Str $data     = qs[{"userid":"$userid","avatar":"$avatar","group":"$group","rooms":{"$roomid":{}}}];
 
         $state.add-room: $roomid, 'chat';
-        $state.add-user: "*$username", $roomid;
+        $state.add-user: "$group$username", $roomid;
         $parser.parse-query-response: $roomid, $type, $data;
-        is $state.group, '*', 'Sets state group attribute on userdetails';
-        is $state.users{$userid}.ranks{$roomid}, '*', 'Sets state user group attribute on userdetails';
-        $state.set-group: Str;
-        $state.delete-user: "*$username", $roomid;
+
+        my PSBot::User $user = $state.users{$userid};
+        is $user.group, $group, 'Sets user group attribute on userdetails';
+        is $user.avatar, $avatar, 'Sets user avatar attribute on userdetails';
+        is $user.ranks{$roomid}, $group, 'Sets user group attribute on userdetails';
+        $state.delete-user: "$group$username", $roomid;
         $state.delete-room: $roomid;
     }
 

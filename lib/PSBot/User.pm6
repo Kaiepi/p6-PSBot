@@ -5,8 +5,10 @@ unit class PSBot::User;
 has Str $.id;
 has Str $.name;
 has Str $.group;
+has Str $.avatar;
 has Str %.ranks;
 
+proto method new(Str, Str $?) {*}
 multi method new(Str $userinfo) {
     my Str $name = $userinfo.substr: 1;
     my Str $id   = to-id $name;
@@ -20,7 +22,8 @@ multi method new(Str $userinfo, Str $roomid) {
     self.bless: :$id, :$name, :%ranks;
 }
 
-method set-group(Str $!group) {}
+method set-group(Str $!group)   {}
+method set-avatar(Str $!avatar) {}
 
 method on-join(Str $userinfo, Str $roomid) {
     my Str $rank = $userinfo.substr: 0, 1;
