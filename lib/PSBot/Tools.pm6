@@ -1,8 +1,17 @@
 use v6.d;
+use nqp;
 use Pastebin::Shadowcat;
 unit module PSBot::Tools;
 
-subset Maybe is export of Mu where Mu | Failure;
+class Maybe is export {
+    method ^parameterize(Mu:U \M, Mu:U \T) {
+        Metamodel::SubsetHOW.new_type:
+            :name("Maybe[{T.^name}]"),
+            :refinee(nqp::if(nqp::istype(T, Junction), Mu, Any)),
+            :refinement(T | Failure)
+    }
+}
+
 subset Result is export where Str | Awaitable | Iterable | Nil;
 
 sub to-id(Str $data! --> Str) is export {

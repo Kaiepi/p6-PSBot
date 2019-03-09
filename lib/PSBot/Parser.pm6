@@ -75,11 +75,11 @@ method parse-challstr(Str $roomid, Str $type, Str $nonce) {
             '/cmd rooms';
 
         if USERNAME {
-            my Maybe $assertion = $!state.authenticate: USERNAME, PASSWORD // '', $challstr;
-            $assertion.throw if $assertion ~~ Failure;
+            my Maybe[Str] $assertion = $!state.authenticate: USERNAME, PASSWORD // '', $challstr;
+            $assertion.throw if $assertion ~~ Failure:D;
             if defined $assertion {
                 $!connection.send-raw: "/trn {USERNAME},0,$assertion";
-                my Maybe $res = await $!state.pending-rename;
+                my Maybe[Str] $res = await $!state.pending-rename;
                 $res.throw if $res ~~ X::PSBot::NameTaken;
             }
         }
