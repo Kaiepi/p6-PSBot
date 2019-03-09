@@ -1,4 +1,5 @@
 use v6.d;
+use PSBot::Config;
 use PSBot::StateManager;
 use Test;
 
@@ -14,7 +15,7 @@ my Str                 $roomid          = 'techcode';
 my Str                 $type            = 'chat';
 my Str                 @users           = ['@Morfent'];
 my Str                 $userinfo        = '+Kpimov';
-my PSBot::StateManager $state          .= new;
+my PSBot::StateManager $state          .= new: SERVERID // 'showdown';
 
 $state.update-user: $guest-username, '0', $avatar;
 is $state.guest-username, $guest-username, 'Can set state guest-usesrname attribute if guest';

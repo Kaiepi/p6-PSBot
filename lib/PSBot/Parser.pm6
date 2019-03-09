@@ -134,7 +134,7 @@ method parse-users(Str $roomid, Str $userlist) {
 
             for $!state.users.keys -> $userid {
                 my @mail = $!state.database.get-mail: $userid;
-                if defined @mail.head {
+                if +@mail && @mail !eqv [Nil] {
                     $!connection.send:
                         "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
                         @mail.map(-> %data { "[%data<source>] %data<message>" }),
@@ -159,7 +159,7 @@ method parse-join(Str $roomid, Str $userinfo) {
     $!state.database.add-seen: $userid, now;
 
     my @mail = $!state.database.get-mail: $userid;
-    if defined @mail.head {
+    if +@mail && @mail !eqv [Nil] {
         $!connection.send:
             "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
             @mail.map(-> %row { "[%row<source>] %row<message>" }),
@@ -187,7 +187,7 @@ method parse-rename(Str $roomid, Str $userinfo, Str $oldid) {
     $!state.database.add-seen: $userid, $time;
 
     my @mail = $!state.database.get-mail: $userid;
-    if defined @mail.head {
+    if +@mail && @mail !eqv [Nil] {
         $!connection.send:
             "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
             @mail.map(-> %row { "[%row<source>] %row<message>" }),

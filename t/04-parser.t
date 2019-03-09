@@ -31,7 +31,7 @@ my $server = Cro::HTTP::Server.new: :$application, :$port;
 $server.start;
 END $server.stop;
 
-my PSBot::StateManager $state      .= new;
+my PSBot::StateManager $state      .= new: SERVERID // 'showdown';
 my PSBot::Connection   $connection .= new: 'localhost', $port;
 my PSBot::Parser       $parser     .= new: :$connection, :$state;
 $connection.connect;
@@ -69,21 +69,15 @@ subtest '|challstr|', {
     my Str     $type      = '4';
     my Str     $nonce     = @challstr.join('').lc;
     my Str     $challstr  = "$type|$nonce";
-    my Promise $p        .= new;
 
     $parser.parse-challstr: $roomid, $type, $nonce;
 
     if USERNAME {
-        $*SCHEDULER.cue({
-            is $state.challstr, $challstr, 'Sets state challstr attribute';
-            $p.keep;
-        }, at => now + 1);
+        sleep 1;
+        is $state.challstr, $challstr, 'Sets state challstr attribute';
     } else {
         skip 'Cannot check if state challstr attribute was updated without a configured username', 1;
-        $p.keep;
     }
-
-    await $p;
 };
 
 subtest '|queryresponse|', {
