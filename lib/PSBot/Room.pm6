@@ -23,6 +23,14 @@ method new(Str $id) {
     self.bless: :$id
 }
 
+method set-visibility(Str $visibility) {
+    $!visibility = Visibility($visibility);
+}
+
+method set-modchat(Str $!modchat) {}
+
+method set-modjoin(Modjoin $!modjoin) {}
+
 method on-room-info(%data) {
     $!title      = %data<title>;
     $!visibility = Visibility(%data<visibility>);
