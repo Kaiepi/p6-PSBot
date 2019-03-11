@@ -3,21 +3,19 @@ use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Room;
 use PSBot::StateManager;
+use PSBot::Tools;
 use PSBot::User;
 unit class PSBot::CommandContext;
 
-enum Rank «' ' '+' '%' '@' '*' "☆" '#' '&' '~'»;
-
-method can(Str $required, Str $target --> Bool) {
-    my Map $ranks = Rank.enums;
-    $ranks{$target} >= $ranks{$required}
+method can(Rank $required, Rank $target --> Bool) {
+    $target >= $required
 }
 
-method is-rank($rank --> Bool) {
+method is-rank(Str $rank --> Bool) {
     Rank.enums{$rank}:exists
 }
 
-method send(Str $message, Str $rank, PSBot::User $user,
+method send(Str $message, Rank $rank, PSBot::User $user,
     PSBot::Room $room, PSBot::Connection $connection, Bool :$raw = False) {
     if $raw {
         return $connection.send-raw: $message, roomid => $room.id if $room && ADMINS ∋ $user.id;
@@ -30,13 +28,13 @@ method send(Str $message, Str $rank, PSBot::User $user,
     }
 }
 
-method get-permission(Str $command, Str $default-rank, PSBot::User $user,
-        PSBot::Room $room, PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    return '~' if ADMINS ∋ $user.id;
+method get-permission(Str $command, Rank $default-rank, PSBot::User $user,
+        PSBot::Room $room, PSBot::StateManager $state, PSBot::Connection $connection --> Rank) {
+    return Rank(Rank.enums{'~'}) if ADMINS ∋ $user.id;
     my      $row         = $room ?? $state.database.get-command($room.id, $command) !! Nil;
     my Bool $enabled     = $room ?? (defined($row) ?? $row<enabled>.Int.Bool !! True) !! True;
-    my Str  $target-rank = $room ?? (defined($row) ?? ($row<rank> || ' ') !! $default-rank) !! ' ';
-    my Str  $source-rank = $room ?? $user.ranks{$room.id} !! $user.group;
+    my Rank $target-rank = Rank(Rank.enums{$room ?? (defined($row) ?? ($row<rank> // ' ') !! $default-rank) !! ' '});
+    my Rank $source-rank = $room ?? (Rank(Rank.enums{$user.ranks{$room.id}}) // Rank(Rank.enums{' '})) !! Rank(Rank.enums{$user.group});
     fail "{COMMAND}$command is disabled in {$room.title}." unless $enabled;
     fail "Permission denied. {COMMAND}$command requires at least rank '$target-rank'." unless self.can: $target-rank, $source-rank;
     $target-rank
