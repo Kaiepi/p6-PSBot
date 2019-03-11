@@ -14,6 +14,14 @@ class Maybe is export {
 
 subset Result is export where Str | Awaitable | Iterable | Nil;
 
+enum Rank is export «'‽' '!' ' ' '+' '%' '@' '*' "☆" '#' '&' '~'»;
+
+enum Visibility is export (
+    Public  => 'public',
+    Hidden  => 'hidden',
+    Private => 'private'
+);
+
 sub to-id(Str $data! --> Str) is export {
     $data.lc.samemark(' ').subst(/ <-[a..z 0..9]>+ /, '', :g)
 }

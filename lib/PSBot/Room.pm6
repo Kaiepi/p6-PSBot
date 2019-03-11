@@ -3,21 +3,35 @@ use PSBot::Game;
 use PSBot::Tools;
 unit class PSBot::Room;
 
+subset Modjoin where Str | True;
+
 has Str         $.id;
 has Str         $.type;
 has Str         $.title;
-has Bool        $.is-private;
-has Str         %.ranks;
+has Visibility  $.visibility;
+has Str         $.modchat;
+has Modjoin     $.modjoin;
+has Array[Str]  %.auth{Str};
+has Str         %.ranks{Str};
 has PSBot::Game $.game;
 
-method new(Str $id, Str $type, Bool $is-private) {
-    self.bless: :$id, :$type, :$is-private;
+method modjoin(--> Str) {
+    ?$!modjoin ?? $!modchat !! $!modjoin
 }
 
-method set-title(Str $!title)   {}
+method new(Str $id) {
+    self.bless: :$id
+}
 
-method set-ranks(Str @userlist) {
-    %!ranks = @userlist.map(-> $userinfo {
+method on-room-info(%data) {
+    $!title      = %data<title>;
+    $!visibility = Visibility(%data<visibility>);
+    $!modchat    = %data<modchat> || ' ';
+    $!modjoin    = %data<modjoin> // ' ';
+    %!auth       = %data<auth>.kv.map(-> $rank, @userids {
+        $rank => Array[Str].new: @userids
+    });
+    %!ranks      = %data<users>.map(-> $userinfo {
         my Str $rank   = $userinfo.substr: 0, 1;
         my Str $userid = to-id $userinfo.substr: 1;
         $userid => $rank

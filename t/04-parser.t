@@ -10,7 +10,7 @@ use PSBot::Tools;
 use PSBot::User;
 use Test;
 
-plan 10;
+plan 8;
 
 BEGIN %*ENV<TESTING> = 1;
 
@@ -81,6 +81,14 @@ subtest '|challstr|', {
     }
 };
 
+subtest '|init|', {
+    my Str $roomid = 'lobby';
+    my Str $type   = 'chat';
+
+    $parser.parse-init: $roomid, $type;
+    ok $state.rooms ∋ $roomid, 'Adds room to state';
+};
+
 subtest '|queryresponse|', {
     my Str $roomid = 'lobby';
 
@@ -92,7 +100,7 @@ subtest '|queryresponse|', {
         my Str $avatar   = '#morfent';
         my Str $data     = qs[{"userid":"$userid","avatar":"$avatar","group":"$group","rooms":{"$roomid":{}}}];
 
-        $state.add-room: $roomid, 'chat';
+        $state.add-room: $roomid;
         $state.add-user: "$group$username", $roomid;
         $parser.parse-query-response: $roomid, $type, $data;
 
@@ -101,44 +109,24 @@ subtest '|queryresponse|', {
         is $user.avatar, $avatar, 'Sets user avatar attribute on userdetails';
         is $user.ranks{$roomid}, $group, 'Sets user group attribute on userdetails';
         $state.delete-user: "$group$username", $roomid;
-        $state.delete-room: $roomid;
     }
 
     {
-        my Str $type = 'rooms';
-        my Str $data = '{"official":[{"title":"Lobby","desc":"","userCount":0}],"pspl":[],"chat":[],"userCount":0,"battleCount":0}';
+        my Str $type = 'roominfo';
+        my Str $data = '{"title":"Lobby","visibility":"public","modchat":"autoconfirmed","modjoin":true,"auth":{"#":["zarel"]},"users":["@Morfent"]}';
 
         $parser.parse-query-response: $roomid, $type, $data;
-        cmp-ok $state.public-rooms, 'eqv', set('lobby'), 'Sets state public-rooms set on rooms';
-        $state.set-public-rooms: [];
+        cmp-ok $state.users, '∋', 'morfent', 'Adds users to state on roominfo';
+
+        my PSBot::Room $room = $state.rooms{$roomid};
+        is $room.title, 'Lobby', 'Sets room title attribute on roominfo';
+        is $room.visibility, Public, 'Sets room visibility attribute on roominfo';
+        is $room.modchat, 'autoconfirmed', 'Sets room modchat attribute on roominfo';
+        is $room.modjoin, 'autoconfirmed', 'Sets room modjoin attribute on roominfo';
+        is $room.auth<#>, ['zarel'], 'Sets room auth attribute on roominfo';
+        is $room.ranks<morfent>, '@', 'Sets room ranks attribute on roominfo';
+        $state.delete-user: "@Morfent", $roomid;
     }
-};
-
-subtest '|init|', {
-    my Str $roomid = 'lobby';
-    my Str $type   = 'chat';
-
-    $parser.parse-init: $roomid, $type;
-    ok $state.rooms ∋ $roomid, 'Adds room to state';
-};
-
-subtest '|title|', {
-    my Str $roomid = 'lobby';
-    my Str $title  = 'Lobby';
-
-    $parser.parse-title: $roomid, $title;
-    is $state.rooms{$roomid}.title, $title, 'Sets room title attribute';
-};
-
-subtest '|users|', {
-    my Str $roomid    = 'lobby';
-    my Str $userid    = 'a' x 19; # Ensure it's invalid.
-    my Str $userlist  = "1, $userid";
-
-    $parser.parse-users: $roomid, $userlist;;
-    ok $state.users ∋ $userid, 'Adds user to user state';
-    is +$state.users, 1, 'Adds correct amount of users';
-    ok $state.rooms{$roomid}.ranks ∋ $userid, 'Adds user to room state';
 };
 
 subtest '|J| and |j|', {

@@ -24,6 +24,12 @@ method parse(Str $text) {
         next unless $line && $line.starts-with: '|';
 
         my (Str $protocol, Str @parts) = $line.split('|')[1..*];
+        # The users message gets sent after initially joining a room.
+        # Afterwards, the room chat logs, infobox, roomintro, staffintro, and
+        # poll are sent in the same message block. We don't handle these yet,
+        # so we skip them entirely.
+        last if $protocol eq 'users';
+
         my Str $method-name = do given $protocol {
             when 'updateuser'    { 'parse-user-update'    }
             when 'challstr'      { 'parse-challstr'       }
@@ -31,8 +37,6 @@ method parse(Str $text) {
             when 'queryresponse' { 'parse-query-response' }
             when 'init'          { 'parse-init'           }
             when 'deinit'        { 'parse-deinit'         }
-            when 'title'         { 'parse-title'          }
-            when 'users'         { 'parse-users'          }
             when 'j' | 'J'       { 'parse-join'           }
             when 'l' | 'L'       { 'parse-leave'          }
             when 'n' | 'N'       { 'parse-rename'         }
@@ -42,18 +46,12 @@ method parse(Str $text) {
             when 'popup'         { 'parse-popup'          }
             when 'raw'           { 'parse-raw'            }
             default              { ''                     }
-        }
+        };
 
         next unless $method-name;
 
         my &parser = self.^lookup: $method-name;
         &parser(self, $roomid, |@parts);
-
-        # The users message gets sent after initially joining a room.
-        # Afterwards, the room chat logs, infobox, roomintro, staffintro, and
-        # poll are sent in the same message block. We don't handle these yet,
-        # so we skip them entirely.
-        last if $protocol eq 'users';
     }
 }
 
@@ -70,9 +68,7 @@ method parse-challstr(Str $roomid, Str $type, Str $nonce) {
     $*SCHEDULER.cue({
         my Str $challstr = "$type|$nonce";
         my Str @autojoin  = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
-        $!connection.send-raw:
-            "/autojoin {@autojoin.join: ','}",
-            '/cmd rooms';
+        $!connection.send-raw: "/autojoin {@autojoin.join: ','}";
 
         if USERNAME {
             my Maybe[Str] $assertion = $!state.authenticate: USERNAME, PASSWORD // '', $challstr;
@@ -92,9 +88,9 @@ method parse-name-taken(Str $roomid, Str $username, Str $reason) {
 }
 
 method parse-query-response(Str $roomid, Str $type, Str $data) {
-    my %data = from-json $data;
     given $type {
         when 'userdetails' {
+            my     %data   = from-json $data;
             my Str $userid = %data<userid>;
             my Str $group  = %data<group> // Nil;
             return unless $group;
@@ -110,24 +106,21 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
                 $user.set-avatar: %data<avatar>.Str unless defined($user.avatar) && $user.avatar eq %data<avatar>.Str;
             }
         }
-        when 'rooms' {
-            my Str @rooms = flat %data.values.grep(* ~~ Array).map({ .map({ to-id $_<title> }) });
-            $!state.set-public-rooms: @rooms;
+        when 'roominfo' {
+            if $data eq 'null' && $!state.rooms ∋ $roomid {
+                note "The server must support /cmd roominfo in order for {USERNAME} to run properly! Contact a server administrator and ask them to update the server.";
+                exit 1;
+            }
+
+            my %data = from-json $data;
+            $!state.add-room-info: %data;
         }
     }
 }
 
 method parse-init(Str $roomid, Str $type) {
-    $!state.add-room: $roomid, $type;
-}
-
-method parse-title(Str $roomid, Str $title) {
-    $!state.rooms{$roomid}.set-title: $title;
-}
-
-method parse-users(Str $roomid, Str $userlist) {
-    my Str @userlist = $userlist.split(',')[1..*];
-    $!state.add-room-users: $roomid, @userlist;
+    $!state.add-room: $roomid;
+    $!connection.send-raw: "/cmd roominfo $roomid";
 
     if $!state.rooms-joined == +ROOMS {
         $*SCHEDULER.cue({
@@ -144,7 +137,7 @@ method parse-users(Str $roomid, Str $userlist) {
                 }
             }
 
-            $!connection.inited.keep if $!connection.inited.status ~~ Planned;
+            $!connection.inited.keep;
         });
     }
 }

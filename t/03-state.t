@@ -3,7 +3,7 @@ use PSBot::Config;
 use PSBot::StateManager;
 use Test;
 
-plan 15;
+plan 13;
 
 my Str                 $username        = 'PoS-Bot';
 my Str                 $userid          = 'posbot';
@@ -33,15 +33,9 @@ is $state.avatar, $avatar, 'Can set state avatar attribute';
 $state.set-group: $group;
 is $state.group, $group, 'Can set state group attribute';
 
-$state.set-public-rooms: @public-rooms;
-cmp-ok $state.public-rooms, '~~', $state.public-rooms.WHAT.new('lobby'), 'Can get state public-rooms attribute';
-
-$state.add-room: $roomid, $type;
+$state.add-room: $roomid;
 ok $state.rooms ∋ $roomid, 'Can update state rooms attribute on room add';
 is $state.rooms-joined, 1, 'Can update state rooms-joined attribute on room add';
-
-$state.add-room-users: $roomid, @users;
-ok $state.users ∋ 'morfent', 'Can update state users attribute on room add users';
 
 $state.add-user: $userinfo, $roomid;
 ok $state.users ∋ 'kpimov', 'Can update state users attribute on user add';

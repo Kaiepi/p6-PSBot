@@ -2,25 +2,12 @@ use v6.d;
 use PSBot::Room;
 use Test;
 
-plan 12;
+plan 7;
 
 my Str         $roomid      = 'lobby';
-my Str         $type        = 'chat';
-my Bool        $is-private  = False;
-my Str         $title       = 'Lobby';
-my Str         @userlist    = [' Morfent'];
-my PSBot::Room $room       .= new: $roomid, $type, $is-private;
+my PSBot::Room $room       .= new: $roomid;
 
 is $room.id, $roomid, 'Can set room id attribute';
-is $room.type, $type, 'Can set room type attribute';
-is $room.is-private, $is-private, 'Can set room is-private attribute';
-
-$room.set-title: $title;
-is $room.title, $title, 'Can set room title attribute';
-
-$room.set-ranks: @userlist;
-ok $room.ranks ∋ 'morfent', 'Can get room ranks userid';
-is $room.ranks<morfent>, ' ', 'Can get room ranks rank';
 
 $room.join: '+Kpimov';
 ok $room.ranks ∋ 'kpimov', 'Can get room ranks userid on join';

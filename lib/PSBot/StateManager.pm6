@@ -15,7 +15,6 @@ has Str  $.userid;
 has Bool $.is-guest;
 has Str  $.avatar;
 has Str  $.group;
-has Set  $.public-rooms;
 
 has Channel   $.pending-rename .= new;
 has atomicint $.rooms-joined    = 0;
@@ -28,7 +27,7 @@ has PSBot::Database    $.database;
 has PSBot::LoginServer $.login-server;
 has PSBot::Rules       $.rules;
 
-method new(Str $serverid) {
+method new(Str $serverid!) {
     my PSBot::Database    $database     .= new;
     my PSBot::LoginServer $login-server .= new: :$serverid;
     my PSBot::Rules       $rules        .= new;
@@ -52,36 +51,30 @@ method update-user(Str $username, Str $is-named, Str $avatar) {
 
 method set-avatar(Str $!avatar) {}
 method set-group(Str $!group)   {}
-method set-public-rooms(@rooms) {
-    $!public-rooms = set(@rooms);
-}
 
-method add-room(Str $roomid, Str $type) {
+method add-room(Str $roomid) {
     $!chat-mux.protect({
         return if %!rooms ∋ $roomid;
-
-        my Bool        $is-private  = $!public-rooms ∌ $roomid;
-        my PSBot::Room $room       .= new: $roomid, $type, $is-private;
+        my PSBot::Room $room .= new: $roomid;
         %!rooms{$roomid} = $room;
         $!rooms-joined⚛++;
     })
 }
 
-method add-room-users(Str $roomid, Str @userlist) {
+method add-room-info(%data) {
     $!chat-mux.protect({
-        my PSBot::Room $room = %!rooms{$roomid};
-        $room.set-ranks: @userlist;
+        my Str         $roomid = to-id %data<title>;
+        my PSBot::Room $room   = %!rooms{$roomid};
+        $room.on-room-info: %data;
 
-        for @userlist -> $userinfo {
+        for %data<users>.flat -> $userinfo {
             my Str $userid = to-id $userinfo.substr: 1;
             if %!users ∋ $userid {
                 my PSBot::User $user = %!users{$userid};
-                $room.join: $userinfo;
                 $user.on-join: $userinfo, $roomid;
             } else {
                 my PSBot::User $user .= new: $userinfo, $roomid;
                 %!users{$userid} = $user;
-                $room.join: $userinfo;
                 $user.on-join: $userinfo, $roomid;
             }
         }
@@ -119,7 +112,7 @@ method delete-user(Str $userinfo, Str $roomid) {
 
         %!rooms{$roomid}.leave: $userinfo;
         %!users{$userid}.on-leave: $roomid;
-        %!users{$userid}:delete unless %!rooms.values.first(-> $room { $room.ranks ∋ $roomid });
+        %!users{$userid}:delete unless %!rooms.values.first(-> $room { $room.ranks ∋ $userid });
     })
 }
 

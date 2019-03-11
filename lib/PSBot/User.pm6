@@ -6,7 +6,7 @@ has Str $.id;
 has Str $.name;
 has Str $.group;
 has Str $.avatar;
-has Str %.ranks;
+has Str %.ranks{Str};
 
 proto method new(Str, Str $?) {*}
 multi method new(Str $userinfo) {
@@ -15,10 +15,10 @@ multi method new(Str $userinfo) {
     self.bless: :$id, :$name;
 }
 multi method new(Str $userinfo, Str $roomid) {
-    my Str $rank  = $userinfo.substr: 0, 1;
-    my Str $name  = $userinfo.substr: 1;
-    my Str $id    = to-id $name;
-    my Str %ranks = ($roomid => $rank);
+    my Str $rank       = $userinfo.substr: 0, 1;
+    my Str $name       = $userinfo.substr: 1;
+    my Str $id         = to-id $name;
+    my Str %ranks{Str} = ($roomid => $rank);
     self.bless: :$id, :$name, :%ranks;
 }
 
