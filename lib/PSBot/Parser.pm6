@@ -58,10 +58,7 @@ method parse(Str $text) {
 method parse-user-update(Str $roomid, Str $username, Str $is-named, Str $avatar) {
     $!state.update-user: $username, $is-named, $avatar;
     $!state.pending-rename.send: $username unless $username.starts-with: 'Guest ';
-    if USERNAME && $username eq USERNAME {
-        $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
-        $!connection.send-raw: "/avatar {AVATAR}" if AVATAR;
-    }
+    $!connection.logged-in.send: True if USERNAME && $username eq USERNAME;
 }
 
 method parse-challstr(Str $roomid, Str $type, Str $nonce) {
@@ -121,25 +118,10 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
 method parse-init(Str $roomid, Str $type) {
     $!state.add-room: $roomid;
     $!connection.send-raw: "/cmd roominfo $roomid";
-
-    if $!state.rooms-joined == +ROOMS {
-        $*SCHEDULER.cue({
-            $!connection.send-raw: $!state.users.keys.map(-> $userid { "/cmd userdetails $userid" });
-
-            for $!state.users.keys -> $userid {
-                my @mail = $!state.database.get-mail: $userid;
-                if +@mail && @mail !eqv [Nil] {
-                    $!connection.send:
-                        "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-                        @mail.map(-> %data { "[%data<source>] %data<message>" }),
-                        :$userid;
-                    $!state.database.remove-mail: $userid;
-                }
-            }
-
-            $!connection.inited.keep;
-        });
-    }
+    # XXX: the Channel refuses to send anything if it's not in this Promise
+    # and the if statement is not within the block. $*SCHEDULER.cue doesn't
+    # work. Possible Rakudo bug?
+    Promise.in(1).then({ $!connection.inited.send: True }) if $!state.rooms-joined == +ROOMS;
 }
 
 method parse-deinit(Str $roomid) {
@@ -154,18 +136,16 @@ method parse-join(Str $roomid, Str $userinfo) {
 
     my @mail = $!state.database.get-mail: $userid;
     if +@mail && @mail !eqv [Nil] {
-        $!connection.send:
-            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-            @mail.map(-> %row { "[%row<source>] %row<message>" }),
-            :$userid;
-        $!state.database.remove-mail: $userid;
+        $*SCHEDULER.cue({
+            $!connection.send:
+                "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
+                @mail.map(-> %row { "[%row<source>] %row<message>" }),
+                :$userid;
+            $!state.database.remove-mail: $userid;
+        });
     }
 
-    $*SCHEDULER.cue({
-        my PSBot::User $user = $!state.users{$userid};
-        await $!connection.inited;
-        $!connection.send-raw: "/cmd userdetails $userid";
-    });
+    $*SCHEDULER.cue({ $!connection.send-raw: "/cmd userdetails $userid" });
 }
 
 method parse-leave(Str $roomid, Str $userinfo) {
@@ -182,17 +162,16 @@ method parse-rename(Str $roomid, Str $userinfo, Str $oldid) {
 
     my @mail = $!state.database.get-mail: $userid;
     if +@mail && @mail !eqv [Nil] {
-        $!connection.send:
-            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-            @mail.map(-> %row { "[%row<source>] %row<message>" }),
-            :$userid;
-        $!state.database.remove-mail: $userid;
+        $*SCHEDULER.cue({
+            $!connection.send:
+                "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
+                @mail.map(-> %row { "[%row<source>] %row<message>" }),
+                :$userid;
+            $!state.database.remove-mail: $userid;
+        });
     }
 
-    $*SCHEDULER.cue({
-        await $!connection.inited;
-        $!connection.send-raw: "/cmd userdetails $userid";
-    });
+    $*SCHEDULER.cue({ $!connection.send-raw: "/cmd userdetails $userid" });
 }
 
 method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {

@@ -19,24 +19,56 @@ method start() {
             self.parse: $message;
             QUIT { $_.rethrow }
         }
+        whenever $!connection.logged-in {
+            $*SCHEDULER.cue({
+                $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
+                $!connection.send-raw: "/avatar {AVATAR}" if AVATAR;
+            });
+        }
+        whenever $!connection.inited {
+            # We need to send the /cmd roominfo messages for our configured
+            # rooms again, despite them already being sent after receiving the
+            # |init| message, because we may not have logged in yet at the time
+            # we send them, meaning we will never receive a response.
+            # XXX: /cmd userdetails doesn't work for every single userid. Why?
+            $*SCHEDULER.cue({
+                $!connection.send-raw:
+                    $!state.users.keys.map(-> $userid { "/cmd userdetails $userid" }),
+                    $!state.rooms.keys.map(-> $roomid { "/cmd roominfo $roomid" });
+            });
+
+            for $!state.users.keys -> $userid {
+                my @mail = $!state.database.get-mail: $userid;
+                if +@mail && @mail !eqv [Nil] {
+                    $*SCHEDULER.cue({
+                        $!connection.send:
+                            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
+                            @mail.map(-> %data { "[%data<source>] %data<message>" }),
+                            :$userid;
+                        $!state.database.remove-mail: $userid;
+                    });
+                }
+            }
+
+            with $!state.database.get-reminders -> @reminders {
+                if @reminders !eqv [Nil] {
+                    for @reminders -> %row {
+                        $*SCHEDULER.cue({
+                            if %row<roomid> {
+                                $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
+                                $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>.Rat, %row<reminder>, roomid => %row<roomid>;
+                            } else {
+                                $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
+                                $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>.Rat, %row<reminder>, userid => %row<userid>;
+                            }
+                        }, at => %row<time>.Rat);
+                    }
+                }
+            }
+        }
         whenever $!connection.disconnects {
             # State needs to be reset on reconnect.
             $!state .= new;
-        }
-        whenever $!connection.inited {
-            with $!state.database.get-reminders -> \reminders {
-                for reminders -> %row {
-                    $*SCHEDULER.cue({
-                        if %row<roomid> {
-                            $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
-                            $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>.Rat, %row<reminder>, roomid => %row<roomid>;
-                        } else {
-                            $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
-                            $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>.Rat, %row<reminder>, userid => %row<userid>;
-                        }
-                    }, at => %row<time>.Rat);
-                }
-            }
         }
         whenever signal(SIGINT) {
             $!connection.close: :force;

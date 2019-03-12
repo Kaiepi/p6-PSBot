@@ -8,12 +8,13 @@ unit class PSBot::Connection;
 
 has Cro::WebSocket::Client             $!client;
 has Cro::WebSocket::Client::Connection $.connection;
-has Int                                $.timeout      = 1;
-has Promise                            $.inited;
-has Bool                               $.force-closed = False;
-has Supplier::Preserving               $.receiver    .= new;
-has Supplier::Preserving               $.sender      .= new;
-has Channel                            $.disconnects .= new;
+has Int                                $.timeout       = 1;
+has Channel                            $.logged-in    .= new;
+has Channel                            $.inited       .= new;
+has Bool                               $.force-closed  = False;
+has Supplier::Preserving               $.receiver     .= new;
+has Supplier::Preserving               $.sender       .= new;
+has Channel                            $.disconnects  .= new;
 has Tap                                $.tap;
 
 submethod TWEAK(Cro::WebSocket::Client :$!client) { }
@@ -47,7 +48,6 @@ method connect() {
     debug '[DEBUG]', "Connected to {self.uri}";
 
     # Reset state that needs to be reset on reconnect.
-    $!inited  .= new;
     $!timeout  = 1;
 
     # Throttle outgoing messages.
