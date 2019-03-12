@@ -50,12 +50,7 @@ method update-user(Str $username, Str $is-named, Str $avatar) {
     $!avatar         = $avatar;
 }
 
-method set-avatar(Str $!avatar) {
-    # /avatar is the last message sent during the initialization process that
-    # propagates our state. After receiving it, we resend /cmd userdetails for
-    # each user that didn't get a response the first time it was sent.
-    $!propagated.keep if $!propagated.status ~~ Planned;
-}
+method set-avatar(Str $!avatar) {}
 
 method set-group(Str $!group) {}
 
@@ -85,6 +80,10 @@ method add-room-info(%data) {
                 $user.on-join: $userinfo, $roomid;
             }
         }
+
+        $!propagated.keep if $!propagated.status ~~ Planned
+            && %!rooms.keys ⊇ ROOMS
+            && not defined %!rooms.values.first({ not defined .visibility });
     })
 }
 

@@ -29,24 +29,21 @@ method start() {
 
             $*SCHEDULER.cue({
                 # Get user metadata.
-                $!connection.send-raw: $!state.users.keys.map(-> $userid { "/cmd userdetails $userid" });
+                $!connection.send-raw: $!state.users.keys
+                    .grep({ not .starts-with: 'guest' })
+                    .map({ "/cmd userdetails $_" });
 
                 # We need to send the /cmd roominfo messages for our configured
                 # rooms again, despite them already being sent after receiving
                 # the |init| message, because we may not have logged in yet at
                 # the time we send them, meaning we will never receive a
                 # response.
-                $!connection.send-raw: $!state.rooms.keys.map(-> $roomid { "/cmd roominfo $roomid" });
+                $!connection.send-raw: $!state.rooms.values
+                    .grep({ not defined .visibility })
+                    .map({ "/cmd roominfo {$_.id}" });
 
-                # Finish joining any rooms that wouldn't fit in /autojoin and
-                # set our avatar. If there is no configured avatar, we reset it
-                # to the one the server gave us anyways so we can know when
-                # we've received a response for our last message.
-                $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
-                $!connection.send-raw: "/avatar {AVATAR // $!state.avatar}";
-
-                # Wait until we receive a response for our last message before
-                # continuing.
+                # Wait until we finish receiving responses for our /cmd
+                # messages before continuing.
                 await $!state.propagated;
 
                 # Faye is buggy and won't send a response for each /cmd userdetails
@@ -55,6 +52,11 @@ method start() {
                 $!connection.send-raw: $!state.users.values
                     .grep({ !.group && !.id.starts-with: 'guest' })
                     .map({ "/cmd userdetails {$_.id}" });
+
+                # Finish joining any rooms that wouldn't fit in /autojoin and
+                # set our avatar.
+                $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
+                $!connection.send-raw: "/avatar {AVATAR}" if AVATAR;
             });
 
             # Send user mail, if the recipient is online. If not, wait until
