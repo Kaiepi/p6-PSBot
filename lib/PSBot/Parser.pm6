@@ -118,9 +118,8 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
 method parse-init(Str $roomid, Str $type) {
     $!state.add-room: $roomid;
     $!connection.send-raw: "/cmd roominfo $roomid";
-    # XXX: the Channel refuses to send anything if it's not in this Promise
-    # and the if statement is not within the block. $*SCHEDULER.cue doesn't
-    # work. Possible Rakudo bug?
+    # XXX: the Channel refuses to send anything if it's not in this Promise.
+    # $*SCHEDULER.cue doesn't work. Possible Rakudo bug?
     Promise.in(1).then({ $!connection.inited.send: True }) if $!state.rooms-joined == +ROOMS;
 }
 
