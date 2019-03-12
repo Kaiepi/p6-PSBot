@@ -17,9 +17,9 @@ subset Result is export where Str | Awaitable | Iterable | Nil;
 enum Rank is export «'‽' '!' ' ' '+' '%' '@' '*' "☆" '#' '&' '~'»;
 
 enum Visibility is export (
-    Public  => 'public',
-    Hidden  => 'hidden',
-    Private => 'private'
+    Public => 'public',
+    Hidden => 'hidden',
+    Secret => 'secret'
 );
 
 sub to-id(Str $data! --> Str) is export {
