@@ -19,37 +19,58 @@ method start() {
             self.parse: $message;
             QUIT { $_.rethrow }
         }
-        whenever $!connection.logged-in {
-            $*SCHEDULER.cue({
-                $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
-                $!connection.send-raw: "/avatar {AVATAR}" if AVATAR;
-            });
-        }
         whenever $!connection.inited {
-            # We need to send the /cmd roominfo messages for our configured
-            # rooms again, despite them already being sent after receiving the
-            # |init| message, because we may not have logged in yet at the time
-            # we send them, meaning we will never receive a response.
-            # XXX: /cmd userdetails doesn't work for every single userid. Why?
+            # We need to be logged in before we can start the initialization
+            # process. Sometimes we log in after we finish joining all the
+            # configured rooms, which leaves us missing some user/room metadata
+            # and prevents us from joining modjoined rooms that don't fit in
+            # /autojoin.
+            await $!connection.logged-in;
+
             $*SCHEDULER.cue({
-                $!connection.send-raw:
-                    $!state.users.keys.map(-> $userid { "/cmd userdetails $userid" }),
-                    $!state.rooms.keys.map(-> $roomid { "/cmd roominfo $roomid" });
+                # Get user metadata.
+                $!connection.send-raw: $!state.users.keys.map(-> $userid { "/cmd userdetails $userid" });
+
+                # We need to send the /cmd roominfo messages for our configured
+                # rooms again, despite them already being sent after receiving
+                # the |init| message, because we may not have logged in yet at
+                # the time we send them, meaning we will never receive a
+                # response.
+                $!connection.send-raw: $!state.rooms.keys.map(-> $roomid { "/cmd roominfo $roomid" });
+
+                # Finish joining any rooms that wouldn't fit in /autojoin and
+                # set our avatar. If there is no configured avatar, we reset it
+                # to the one the server gave us anyways so we can know when
+                # we've received a response for our last message.
+                $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
+                $!connection.send-raw: "/avatar {AVATAR // $!state.avatar}";
+
+                # Wait until we receive a response for our last message before
+                # continuing.
+                await $!state.propagated;
+
+                # Faye is buggy and won't send a response for each /cmd userdetails
+                # message sent since we send so many so quickly, so let's resend
+                # them so we can complete our user metadata.
+                $!connection.send-raw: $!state.users.values
+                    .grep({ !.group && !.id.starts-with: 'guest' })
+                    .map({ "/cmd userdetails {$_.id}" });
             });
 
+            # Send user mail, if the recipient is online. If not, wait until
+            # they join a room the bot's in.
             for $!state.users.keys -> $userid {
                 my @mail = $!state.database.get-mail: $userid;
-                if +@mail && @mail !eqv [Nil] {
-                    $*SCHEDULER.cue({
-                        $!connection.send:
-                            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-                            @mail.map(-> %data { "[%data<source>] %data<message>" }),
-                            :$userid;
-                        $!state.database.remove-mail: $userid;
-                    });
-                }
+                $*SCHEDULER.cue({
+                    $!connection.send:
+                        "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
+                        @mail.map(-> %data { "[%data<source>] %data<message>" }),
+                        :$userid;
+                    $!state.database.remove-mail: $userid;
+                }) if +@mail && @mail !eqv [Nil];
             }
 
+            # Schedule user reminders.
             with $!state.database.get-reminders -> @reminders {
                 if @reminders !eqv [Nil] {
                     for @reminders -> %row {

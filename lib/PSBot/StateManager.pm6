@@ -16,6 +16,7 @@ has Bool $.is-guest;
 has Str  $.avatar;
 has Str  $.group;
 
+has Promise   $.propagated     .= new;
 has Channel   $.pending-rename .= new;
 has atomicint $.rooms-joined    = 0;
 
@@ -49,8 +50,14 @@ method update-user(Str $username, Str $is-named, Str $avatar) {
     $!avatar         = $avatar;
 }
 
-method set-avatar(Str $!avatar) {}
-method set-group(Str $!group)   {}
+method set-avatar(Str $!avatar) {
+    # /avatar is the last message sent during the initialization process that
+    # propagates our state. After receiving it, we resend /cmd userdetails for
+    # each user that didn't get a response the first time it was sent.
+    $!propagated.keep if $!propagated.status ~~ Planned;
+}
+
+method set-group(Str $!group) {}
 
 method add-room(Str $roomid) {
     $!chat-mux.protect({
