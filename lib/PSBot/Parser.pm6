@@ -106,7 +106,6 @@ method parse-init(Str $roomid, Str $type) {
 
     $*SCHEDULER.cue({
         $!connection.send-raw: "/cmd roominfo $roomid";
-        await $!state.propagated;
         $!connection.inited.send: True if ⚛$!state.rooms-joined == +ROOMS;
     });
 }
