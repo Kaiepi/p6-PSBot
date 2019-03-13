@@ -15,9 +15,8 @@ method start() {
     $!connection.connect;
 
     react {
-        whenever $!connection.receiver.Supply -> $message {
+        whenever $!connection.receiver -> $message {
             self.parse: $message;
-            QUIT { $_.rethrow }
         }
         whenever $!connection.inited {
             # We need to be logged in before we can start the initialization

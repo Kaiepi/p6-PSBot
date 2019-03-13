@@ -26,9 +26,9 @@ method new(Str $host, Int $port) {
     self.bless: :$client;
 }
 
-method uri(--> Str) {
-    $!client.uri.Str
-}
+method receiver(--> Supply) { $!receiver.Supply }
+
+method uri(--> Str) { $!client.uri.Str }
 
 method closed(--> Bool) {
     return True unless defined $!connection;
@@ -48,7 +48,7 @@ method connect() {
     debug '[DEBUG]', "Connected to {self.uri}";
 
     # Reset state that needs to be reset on reconnect.
-    $!timeout  = 1;
+    $!timeout = 1;
 
     # Throttle outgoing messages.
     $!tap = $!sender.Supply.throttle(1, 0.6).tap(-> $data {
