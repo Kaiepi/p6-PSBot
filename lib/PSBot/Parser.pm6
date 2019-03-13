@@ -68,20 +68,18 @@ method parse-challstr(Str $roomid, Str $type, Str $nonce) {
         $!connection.send-raw: "/autojoin {@autojoin.join: ','}";
 
         if USERNAME {
-            my Maybe[Str] $assertion = $!state.authenticate: USERNAME, PASSWORD // '', $challstr;
+            my Maybe[Str] $assertion = $!state.authenticate: USERNAME, PASSWORD, $challstr;
             $assertion.throw if $assertion ~~ Failure:D;
             if defined $assertion {
                 $!connection.send-raw: "/trn {USERNAME},0,$assertion";
-                my Maybe[Str] $res = await $!state.pending-rename;
-                $res.throw if $res ~~ X::PSBot::NameTaken;
+                await $!state.pending-rename;
             }
         }
     });
 }
 
 method parse-name-taken(Str $roomid, Str $username, Str $reason) {
-    $!state.pending-rename.send:
-        X::PSBot::NameTaken.new: :$username, :$reason;
+    die X::PSBot::NameTaken.new: :$username, :$reason;
 }
 
 method parse-query-response(Str $roomid, Str $type, Str $data) {

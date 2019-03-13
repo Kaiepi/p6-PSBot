@@ -8,7 +8,9 @@ submethod BUILD(:$!dbh) {
     if %*ENV<TESTING> {
         $_.wrap(anon method (|) {
             return;
-        }) for self.^methods;
+        }) for self.^methods.grep({
+            .name ne any self.^attributes.map({ .name.substr: 2 })
+        });
     }
 }
 

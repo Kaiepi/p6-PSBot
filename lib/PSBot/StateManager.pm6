@@ -8,15 +8,15 @@ use PSBot::Tools;
 use PSBot::User;
 unit class PSBot::StateManager;
 
-has Str     $.challstr;
+has Str     $.challstr         = '';
 has Str     $.guest-username;
 has Str     $.username;
 has Str     $.userid;
 has Bool    $.is-guest;
 has Str     $.avatar;
 has Str     $.group;
-has Bool    $.inited      = False;
-has Promise $.propagated .= new;
+has Bool    $.inited           = False;
+has Promise $.propagated      .= new;
 
 has Promise   $.propagation-mitigation .= new;
 has Channel   $.pending-rename         .= new;
@@ -39,10 +39,10 @@ method new(Str $serverid!) {
 
 method set-avatar(Str $!avatar) {}
 
-method authenticate(Str $username!, Str $password?, Str $challstr? --> Str) {
-    $!challstr = $challstr if defined $challstr;
+method authenticate(Str $username, Str $password?, Str $challstr? --> Str) {
+    $!challstr = $challstr if $challstr;
     return $!login-server.get-assertion: $username, $!challstr unless defined $password;
-    return $!login-server.upkeep: $!challstr if $!login-server.logged-in;
+    return $!login-server.upkeep: $!challstr if $!login-server.account eq $username;
     $!login-server.log-in: $username, $password, $!challstr
 }
 
@@ -53,8 +53,8 @@ method on-update-user(Str $username, Str $is-named, Str $avatar) {
     $!is-guest       = $is-named eq '0';
     $!avatar         = $avatar;
 
-    $!inited = True unless $!inited || (USERNAME && $!is-guest);
-    $!pending-rename.send: $username if $!inited;
+    $!pending-rename.send: True if $!inited;
+    $!inited = True unless $!inited;
 }
 
 method on-user-details(%data) {

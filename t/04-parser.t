@@ -39,30 +39,23 @@ my PSBot::Parser       $parser     .= new: :$connection, :$state;
 $connection.connect;
 
 subtest '|updateuser|', {
-    plan 9;
+    plan 8;
 
     my Str $roomid         = 'lobby';
     my Str $guest-username = 'Guest 1';
-    my Str $is-named       = '0';
     my Str $avatar         = AVATAR // '1';
 
-    $parser.parse-update-user: $roomid, $guest-username, $is-named, $avatar;
+    $parser.parse-update-user: $roomid, $guest-username, '0', $avatar;
     is $state.username, $guest-username, 'Sets state username attribute';
     is $state.guest-username, $guest-username, 'Sets state guest-username attribute if guest username was provided';
     ok $state.is-guest, 'Sets state is-guest attribute properly if guest';
     is $state.avatar, $avatar, 'Sets state avatar attribute';
-    if USERNAME {
-        nok $state.inited, 'Does not set state inited attribute if guest';
-        nok $state.pending-rename.poll, 'Does not send username to state pending-rename channel if guest';
-    } else {
-        skip 'State initialization tests require a configured username', 2;
-    }
+    nok $state.pending-rename.poll, 'Does not send username to state pending-rename channel if guest';
+    ok $state.inited, 'Sets state inited attribute on first |userupdate|';
 
-    $is-named = '1';
-    $parser.parse-update-user: $roomid, USERNAME // '', $is-named, $avatar;
+    $parser.parse-update-user: $roomid, USERNAME // 'PoS-Bot', '1', $avatar;
     nok $state.is-guest, 'Sets state is-guest attribute properly if named';
-    ok $state.inited, 'Sets state inited attribute when the username matches the configured username';
-    is $state.pending-rename.poll, USERNAME // $guest-username, 'Sends username to state pending-rename channel when inited';
+    ok $state.pending-rename.poll, 'Sends to state pending-rename channel when inited';
 };
 
 subtest '|challstr|', {

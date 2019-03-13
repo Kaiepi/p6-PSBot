@@ -8,14 +8,16 @@ unit class PSBot::LoginServer;
 
 has Cro::HTTP::Client $.client            .= new: :cookie-jar;
 has Str               $.serverid;
-has Bool              $.logged-in          = False;
+has Str               $.account            = '';
 has Cancellation      $!login-expiration;
 
-submethod BUILD() {
+submethod BUILD(Str :$!serverid) {
     if %*ENV<TESTING> {
         $_.wrap(anon method (|) {
             return;
-        }) for self.^methods;
+        }) for self.^methods.grep({
+            .name ne any self.^attributes.map({ .name.substr: 2 })
+        });
     }
 }
 
@@ -26,7 +28,7 @@ method get-assertion(Str $username!, Str $challstr! --> Str) {
         "https://play.pokemonshowdown.com/~~$!serverid/action.php?$query",
         http => '1.1';
     my Str                 $assertion = await $response.body-text;
-    fail 'this username is registered' if $assertion eq ';';
+    fail 'This username is registered' if $assertion eq ';';
     fail $assertion.substr: 2 if $assertion.starts-with: ';;';
 
     $assertion
@@ -41,7 +43,7 @@ method log-in(Str $username!, Str $password!, Str $challstr! --> Str) {
 
     my Str $data = await $response.body-text;
     my     %data = from-json $data.substr: 1;
-    fail "invalid username, password, or challstr" unless %data<curuser><loggedin>;
+    fail 'Invalid username, password, or challstr' unless %data<curuser><loggedin>;
     fail %data<assertion>.substr: 2 if %data<assertion>.starts-with: ';;';
 
     # The login session times out 2 weeks and 30 minutes after logging in.
@@ -49,9 +51,9 @@ method log-in(Str $username!, Str $password!, Str $challstr! --> Str) {
     # %data<curuser><logintime>, which could be up to a day off instead of
     # a few hundred milliseconds.
     my Instant $at = now + (14 * 24 * 60 + 30) * 60;
-    $!logged-in = True;
+    $!account = $username;
     $!login-expiration.cancel if $!login-expiration;
-    $!login-expiration = $*SCHEDULER.cue({ $!logged-in = False }, :$at);
+    $!login-expiration = $*SCHEDULER.cue({ $!account = '' }, :$at);
 
     %data<assertion>
 }
@@ -66,7 +68,7 @@ method log-out(Str $username --> Bool) {
     my Str                 $data     = await $response.body-text;
     return False unless $data;
 
-    $!logged-in = False;
+    $!account = '';
     $!login-expiration.cancel;
 
     my %data = from-json $data.substr: 1;

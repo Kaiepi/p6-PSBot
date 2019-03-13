@@ -133,26 +133,28 @@ our method say(Str $target, PSBot::User $user, PSBot::Room $room,
 our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
-    return 'A nick and optionally a password must be provided.' unless $target;
+    return 'A username and optionally a password must be provided.' unless $target;
 
     my (Str $username, Str $password) = $target.split(',').map({ .trim });
-    return 'Nick must be under 19 characters.' if $username.chars > 18;
+    return 'No username was given.' unless $username;
+    return 'Username must be under 19 characters.' if $username.chars > 18;
     return "Only use passwords with this command in PMs." if $room && $password;
 
-    my Str $userid = to-id $username;
-    if $userid eq $state.userid {
-        $connection.send-raw: "/trn $username";
-        await $state.pending-rename;
-        return "Successfully renamed to $username!";
+    with to-id $username -> $userid {
+        when $userid eq $state.userid || $userid eq to-id $state.guest-username {
+            $connection.send-raw: "/trn $username";
+            await $state.pending-rename;
+            "Successfully renamed to $username!";
+        }
     }
 
     my Maybe[Str] $assertion = $state.authenticate: $username, $password;
-    return "Failed to rename to $username: {$assertion.exception.message}" if $assertion ~~ Failure;
-    return unless defined $assertion; # Unit tests in progress.
+    return "Failed to rename to $username: {$assertion.exception.message}" if $assertion ~~ Failure:D;
+    return unless defined $assertion;
 
     $connection.send-raw: "/trn $username,0,$assertion";
-    my $res = await $state.pending-rename;
-    $res ~~ X::PSBot::NameTaken ?? $res.message !! "Successfully renamed to $res!"
+    await $state.pending-rename;
+    "Successfully renamed to $username!"
 }
 
 our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
