@@ -146,7 +146,7 @@ multi method send-raw(*@data, Str :$roomid!) {
     for @data -> $data {
         if $data.starts-with: '>> ' {
             # This command is not throttled.
-            $!connection.send: "|$data";
+            $!connection.send: "$roomid|$data";
         } else {
             $!sender.emit: "$roomid|$data";
         }
