@@ -28,10 +28,11 @@ method start() {
             await $!connection.logged-in;
 
             $*SCHEDULER.cue({
-                # Get user metadata.
-                $!connection.send-raw: $!state.users.keys
-                    .grep({ not .starts-with: 'guest' })
-                    .map({ "/cmd userdetails $_" });
+                # Get user metadata. We don't get metadata for guest users
+                # since the server gives us none.
+                $!connection.send-raw: $!state.users.values
+                    .grep({ !.propagated && !.is-guest })
+                    .map({ "/cmd userdetails {$_.id}" });
 
                 # We need to send the /cmd roominfo messages for our configured
                 # rooms again, despite them already being sent after receiving
@@ -39,7 +40,7 @@ method start() {
                 # the time we send them, meaning we will never receive a
                 # response.
                 $!connection.send-raw: $!state.rooms.values
-                    .grep({ not defined .visibility })
+                    .grep({ !.propagated })
                     .map({ "/cmd roominfo {$_.id}" });
 
                 # Wait until we finish receiving responses for our /cmd
@@ -50,7 +51,7 @@ method start() {
                 # message sent since we send so many so quickly, so let's resend
                 # them so we can complete our user metadata.
                 $!connection.send-raw: $!state.users.values
-                    .grep({ !.group && !.id.starts-with: 'guest' })
+                    .grep({ !.propagated && !.is-guest })
                     .map({ "/cmd userdetails {$_.id}" });
 
                 # Finish joining any rooms that wouldn't fit in /autojoin and

@@ -8,15 +8,16 @@ use PSBot::Tools;
 use PSBot::User;
 unit class PSBot::StateManager;
 
-has Str  $.challstr;
-has Str  $.guest-username;
-has Str  $.username;
-has Str  $.userid;
-has Bool $.is-guest;
-has Str  $.avatar;
-has Str  $.group;
+has Str     $.challstr;
+has Str     $.guest-username;
+has Str     $.username;
+has Str     $.userid;
+has Bool    $.is-guest;
+has Str     $.avatar;
+has Str     $.group;
+has Bool    $.inited      = False;
+has Promise $.propagated .= new;
 
-has Promise   $.propagated     .= new;
 has Channel   $.pending-rename .= new;
 has atomicint $.rooms-joined    = 0;
 
@@ -35,6 +36,8 @@ method new(Str $serverid!) {
     self.bless: :$database, :$login-server, :$rules;
 }
 
+method set-avatar(Str $!avatar) {}
+
 method authenticate(Str $username!, Str $password?, Str $challstr? --> Str) {
     $!challstr = $challstr if defined $challstr;
     return $!login-server.get-assertion: $username, $!challstr unless defined $password;
@@ -42,17 +45,21 @@ method authenticate(Str $username!, Str $password?, Str $challstr? --> Str) {
     $!login-server.log-in: $username, $password, $!challstr
 }
 
-method update-user(Str $username, Str $is-named, Str $avatar) {
+method on-update-user(Str $username, Str $is-named, Str $avatar) {
     $!username       = $username;
     $!userid         = to-id $username;
     $!guest-username = $username if $username.starts-with: 'Guest ';
     $!is-guest       = $is-named eq '0';
     $!avatar         = $avatar;
+
+    $!inited = True if !$!inited && (!USERNAME || !$!is-guest);
+    $!pending-rename.send: $username if $!inited;
 }
 
-method set-avatar(Str $!avatar) {}
-
-method set-group(Str $!group) {}
+method on-user-details(%data) {
+    $!group  = %data<group>;
+    $!avatar = ~%data<avatar>;
+}
 
 method add-room(Str $roomid) {
     $!chat-mux.protect({

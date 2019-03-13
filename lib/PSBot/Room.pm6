@@ -6,13 +6,14 @@ unit class PSBot::Room;
 subset Modjoin where Str | True;
 
 has Str         $.id;
-has Str         $.type;
 has Str         $.title;
+has Str         $.type;
 has Visibility  $.visibility;
 has Str         $.modchat;
 has Modjoin     $.modjoin;
 has Array[Str]  %.auth{Str};
 has Str         %.ranks{Str};
+has Bool        $.propagated = False;
 has PSBot::Game $.game;
 
 method modjoin(--> Str) {
@@ -44,6 +45,7 @@ method on-room-info(%data) {
         my Str $userid = to-id $userinfo.substr: 1;
         $userid => $rank
     });
+    $!propagated = True;
 }
 
 method join(Str $userinfo) {

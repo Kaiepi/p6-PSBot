@@ -2,11 +2,12 @@ use v6.d;
 use PSBot::Tools;
 unit class PSBot::User;
 
-has Str $.id;
-has Str $.name;
-has Str $.group;
-has Str $.avatar;
-has Str %.ranks{Str};
+has Str  $.id;
+has Str  $.name;
+has Str  $.group;
+has Str  $.avatar;
+has Str  %.ranks{Str};
+has Bool $.propagated = False;
 
 proto method new(Str, Str $?) {*}
 multi method new(Str $userinfo) {
@@ -22,8 +23,15 @@ multi method new(Str $userinfo, Str $roomid) {
     self.bless: :$id, :$name, :%ranks;
 }
 
-method set-group(Str $!group)   {}
-method set-avatar(Str $!avatar) {}
+method is-guest(--> Bool) {
+    $!id.starts-with: 'guest'
+}
+
+method on-user-details(%data) {
+    $!group      = %data<group>;
+    $!avatar     = ~%data<avatar>;
+    $!propagated = True;
+}
 
 method on-join(Str $userinfo, Str $roomid) {
     my Str $rank = $userinfo.substr: 0, 1;

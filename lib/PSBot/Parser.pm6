@@ -31,7 +31,7 @@ method parse(Str $text) {
         last if $protocol eq 'users';
 
         my Str $method-name = do given $protocol {
-            when 'updateuser'    { 'parse-user-update'    }
+            when 'updateuser'    { 'parse-update-user'    }
             when 'challstr'      { 'parse-challstr'       }
             when 'nametaken'     { 'parse-name-taken'     }
             when 'queryresponse' { 'parse-query-response' }
@@ -55,10 +55,9 @@ method parse(Str $text) {
     }
 }
 
-method parse-user-update(Str $roomid, Str $username, Str $is-named, Str $avatar) {
-    $!state.update-user: $username, $is-named, $avatar;
-    $!state.pending-rename.send: $username unless $username.starts-with: 'Guest ';
-    $!connection.logged-in.send: True if USERNAME && $username eq USERNAME;
+method parse-update-user(Str $roomid, Str $username, Str $is-named, Str $avatar) {
+    $!state.on-update-user: $username, $is-named, $avatar;
+    $!connection.logged-in.send: True if !USERNAME || $username eq USERNAME;
 }
 
 method parse-challstr(Str $roomid, Str $type, Str $nonce) {
@@ -89,18 +88,15 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
         when 'userdetails' {
             my     %data   = from-json $data;
             my Str $userid = %data<userid>;
-            my Str $group  = %data<group> // Nil;
-            return unless $group;
 
-            if $userid eq to-id($!state.username) && (!defined($!state.group) || $!state.group ne $group) {
-                $!state.set-group: $group;
-                $!connection.lower-throttle if $group ne ' ';
+            if $userid eq $!state.userid {
+                $!state.on-user-details: %data;
+                $!connection.lower-throttle if %data<group> ne ' ';
             }
 
             if $!state.users ∋ $userid {
                 my PSBot::User $user = $!state.users{$userid};
-                $user.set-group: $group unless defined($user.group) && $user.group eq $group;
-                $user.set-avatar: %data<avatar>.Str unless defined($user.avatar) && $user.avatar eq %data<avatar>.Str;
+                $user.on-user-details: %data;
             }
         }
         when 'roominfo' {
@@ -144,7 +140,9 @@ method parse-join(Str $roomid, Str $userinfo) {
         });
     }
 
-    $*SCHEDULER.cue({ $!connection.send-raw: "/cmd userdetails $userid" });
+    $*SCHEDULER.cue({
+        $!connection.send-raw: "/cmd userdetails $userid";
+    }) unless $userid.starts-with: 'guest';
 }
 
 method parse-leave(Str $roomid, Str $userinfo) {
@@ -170,7 +168,9 @@ method parse-rename(Str $roomid, Str $userinfo, Str $oldid) {
         });
     }
 
-    $*SCHEDULER.cue({ $!connection.send-raw: "/cmd userdetails $userid" });
+    $*SCHEDULER.cue({
+        $!connection.send-raw: "/cmd userdetails $userid";
+    }) unless $userid.starts-with: 'guest';
 }
 
 method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
