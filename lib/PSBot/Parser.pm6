@@ -177,10 +177,10 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
 
         if $username ne $!state.username {
             for $!state.rules.chat -> $rule {
-                my Result $output = $rule.match: $message, $room, $user, $!state, $!connection;
-                $output = await $output if $output ~~ Awaitable:D;
-                $!connection.send-raw: $output, :$roomid if $output ~~ Str:D | Iterable:D;
-                last if $output;
+                my Result \output = $rule.match: $message, $room, $user, $!state, $!connection;
+                output = await output if output ~~ Awaitable:D;
+                $!connection.send-raw: output, :$roomid if output ~~ Str:D | Iterable:D;
+                last if output;
             }
         }
 
@@ -192,9 +192,9 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
                 my Str $userid  = to-id $username;
                 my &command = try &PSBot::Commands::($command);
                 if &command {
-                    my Result $output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
-                    $output = await $output if $output ~~ Awaitable:D;
-                    $!connection.send: $output, :$roomid if $output && $output ~~ Str:D | Iterable:D;
+                    my Result \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
+                    output = await output if output ~~ Awaitable:D;
+                    $!connection.send: output, :$roomid if output && output ~~ Str:D | Iterable:D;
                 }
             }
         }
@@ -224,10 +224,10 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
 
         if $username ne $!state.username {
             for $!state.rules.pm -> $rule {
-                my Result $output = $rule.match: $message, $room, $user, $!state, $!connection;
-                $output = await $output if $output ~~ Awaitable:D;
-                $!connection.send-raw: $output, :$userid if $output ~~ Str:D | Iterable:D;
-                last if $output;
+                my Result \output = $rule.match: $message, $room, $user, $!state, $!connection;
+                output = await output if output ~~ Awaitable:D;
+                $!connection.send-raw: output, :$userid if output ~~ Str:D | Iterable:D;
+                last if output;
             }
         }
 
@@ -239,9 +239,9 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
                 my Str $userid  = to-id $username;
                 my &command = try &PSBot::Commands::($command);
                 if &command {
-                    my Result $output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
-                    $output = await $output if $output ~~ Awaitable:D;
-                    $!connection.send: $output, :$userid if $output && $output ~~ Str:D | Iterable:D;
+                    my Result \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
+                    output = await output if output ~~ Awaitable:D;
+                    $!connection.send: output, :$userid if output && output ~~ Str:D | Iterable:D;
                 }
             }
         }
