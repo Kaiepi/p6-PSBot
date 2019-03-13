@@ -168,3 +168,24 @@ method rename-user(Str $userinfo, Str $oldid, Str $roomid) {
         }
     })
 }
+
+method reset() {
+    $!challstr        = Nil;
+    $!guest-username  = Nil;
+    $!username        = Nil;
+    $!userid          = Nil;
+    $!is-guest        = Nil;
+    $!avatar          = Nil;
+    $!group           = Nil;
+    $!inited          = False;
+    $!propagated     .= new;
+
+    $!propagation-mitigation .= new;
+    $!pending-rename         .= new;
+    $!rooms-joined           ⚛= 0;
+
+    $!chat-mux.protect({
+        %!users .= new;
+        %!rooms .= new;
+    });
+}

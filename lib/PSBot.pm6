@@ -90,8 +90,7 @@ method start() {
             }
         }
         whenever $!connection.disconnects {
-            # State needs to be reset on reconnect.
-            $!state .= new;
+            $!state.reset;
         }
         whenever signal(SIGINT) {
             $!connection.close: :force;
