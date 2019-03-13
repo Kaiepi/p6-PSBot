@@ -39,35 +39,38 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
 
-    my Str @res;
+    my Promise $p .= new;
     await Promise.anyof(
         Promise.in(30).then({
-            @res = 'Evaluation timed out after 30 seconds.';
+            $p.keep: 'Evaluation timed out after 30 seconds.';
         }),
         Promise.start({
             use MONKEY-SEE-NO-EVAL;
 
             my \output = try EVAL $target;
-            @res = (output // $!).gist.split: "\n";
+            $p.keep: (output // $!).gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g;
         })
     );
 
-    my Str $res = @res.join: "\n";
-    if $room && $state.users ∋ $state.userid && $state.users{$state.userid}.ranks{$room.id} ne ' ' {
-        return $connection.send-raw: "!code $res", roomid => $room.id if $res.contains: "\n";
+    my Str $res = await $p;
+    if $room {
+        return $connection.send-raw: "!code $res", roomid => $room.id if $res.contains("\n")
+            && $res.codes < 8192
+            && $state.users{$state.userid}.ranks{$room.id} ne ' ';
 
         if $res.codes > 296 {
             my Maybe[Str] $url = paste $res;
-            return "Failed to upload eval output to Pastebin: {$url.exception.message}" unless $url.defined;
-            return "``$res``";
+            return "Failed to upload {COMMAND}{&?ROUTINE.name} output to Pastebin: {$url.exception.message}" unless defined $url;
+            return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
         }
 
         return "``$res``";
     }
 
+    my Str @res = $res.split: "\n";
     if @res.first({ .codes > 296 }) {
         my Maybe[Str] $url = paste $res;
-        return "Failed to output eval output to Pastebin: {$url.exception.message}" unless $url.defined;
+        return "Failed to upload {COMMAND}{&?ROUTINE.name} output to Pastebin: {$url.exception.message}" unless defined $url;
         return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
     }
 
@@ -78,7 +81,7 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
 
-    my Str @parts = $target.split(',');
+    my Str @parts = $target.split: ',';
     return 'No command, target, user, and room were given.' unless +@parts >= 4;
 
     my Str $command = to-id @parts.head;
@@ -94,30 +97,39 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
     return 'No user was given.'unless $userid;
     return "$userid is not a known user." unless $state.users ∋ $userid;
 
-    my Str $roomid = to-id @parts[*-1];
-    my Str @res;
+    my Str     $roomid  = to-id @parts[*-1];
+    my Promise $p      .= new;
     await Promise.anyof(
         Promise.in(30).then({
-            @res = "Evaluating ``{COMMAND}$command $command-target`` in room $roomid with user $userid timed out after 30 seconds."
+            $p.keep: 'Evaluation timed out after 30 seconds.';
         }),
         Promise.start({
             use MONKEY-SEE-NO-EVAL;
 
             my \output = try EVAL &command(self, $command-target, $state.users{$userid}, $state.rooms{$roomid}, $state, $connection);
-            output = await output if output ~~ Awaitable:D;
-            @res = (output // $!).gist.split: "\n";
+            $p.keep: (output // $!).gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g;
         })
     );
 
-    my Str $res = @res.join: "\n";
-    if $room && $state.users ∋ $state.userid && $state.users{$state.userid}.ranks{$room.id} ne ' ' {
-        return $connection.send-raw: "!code $res", roomid => $room.id if $res.contains: "\n";
+    my Str $res = await $p;
+    if $room {
+        return $connection.send-raw: "!code $res", roomid => $room.id if $res.contains("\n")
+            && $res.codes < 8192
+            && $state.users{$state.userid}.ranks{$room.id} ne ' ';
+
+        if $res.codes > 296 {
+            my Maybe[Str] $url = paste $res;
+            return "Failed to upload {COMMAND}{&?ROUTINE.name} output to Pastebin: {$url.exception.message}" unless defined $url;
+            return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
+        }
+
         return "``$res``";
     }
 
+    my Str @res = $res.split: "\n";
     if @res.first({ .codes > 296 }) {
         my Maybe[Str] $url = paste $res;
-        return "Failed to upload evalcommand output to Pastebin: {$url.exception.message}" unless $url.defined;
+        return "Failed to upload {COMMAND}{&?ROUTINE.name} output to Pastebin: {$url.exception.message}" unless defined $url;
         return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
     }
 
