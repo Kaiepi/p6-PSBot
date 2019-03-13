@@ -41,25 +41,28 @@ $connection.connect;
 subtest '|updateuser|', {
     plan 9;
 
-    my Str $roomid   = 'lobby';
-    my Str $username = 'Guest 1';
-    my Str $is-named = '0';
-    my Str $avatar   = AVATAR // '1';
+    my Str $roomid         = 'lobby';
+    my Str $guest-username = 'Guest 1';
+    my Str $is-named       = '0';
+    my Str $avatar         = AVATAR // '1';
 
-    $parser.parse-update-user: $roomid, $username, $is-named, $avatar;
-    is $state.username, $username, 'Sets state username attribute';
-    is $state.guest-username, $username, 'Sets state guest-username attribute if guest username was provided';
+    $parser.parse-update-user: $roomid, $guest-username, $is-named, $avatar;
+    is $state.username, $guest-username, 'Sets state username attribute';
+    is $state.guest-username, $guest-username, 'Sets state guest-username attribute if guest username was provided';
     ok $state.is-guest, 'Sets state is-guest attribute properly if guest';
     is $state.avatar, $avatar, 'Sets state avatar attribute';
-    nok $state.inited, 'Does not set state inited attribute if guest';
-    nok $state.pending-rename.poll, 'Does not send username to state pending-rename channel if guest';
+    if USERNAME {
+        nok $state.inited, 'Does not set state inited attribute if guest';
+        nok $state.pending-rename.poll, 'Does not send username to state pending-rename channel if guest';
+    } else {
+        skip 'State initialization tests require a configured username', 2;
+    }
 
-    $username = USERNAME // '';
     $is-named = '1';
-    $parser.parse-update-user: $roomid, $username, $is-named, $avatar;
+    $parser.parse-update-user: $roomid, USERNAME // '', $is-named, $avatar;
     nok $state.is-guest, 'Sets state is-guest attribute properly if named';
     ok $state.inited, 'Sets state inited attribute when the username matches the configured username';
-    is $state.pending-rename.poll, $username, 'Sends username to state pending-rename channel when inited';
+    is $state.pending-rename.poll, USERNAME // $guest-username, 'Sends username to state pending-rename channel when inited';
 };
 
 subtest '|challstr|', {
