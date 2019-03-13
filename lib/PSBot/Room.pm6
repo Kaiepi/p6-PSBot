@@ -62,11 +62,14 @@ method leave(Str $userinfo) {
 method on-rename(Str $oldid, Str $userinfo) {
     my Str $rank   = $userinfo.substr: 0, 1;
     my Str $userid = to-id $userinfo.substr: 1;
-    %!ranks{$userid} = $rank when $userid eq $oldid; # User was promoted/demoted.
-    return if $oldid eq $userid && %!ranks{$oldid} eq $rank;
-
-    %!ranks{$oldid}:delete;
-    %!ranks{$userid} = $rank;
+    when $userid eq $oldid {
+        # User was promoted/demoted.
+        %!ranks{$userid} = $rank;
+    }
+    when $oldid ne $userid || %!ranks{$oldid} ne $rank {
+        %!ranks{$oldid}:delete;
+        %!ranks{$userid} = $rank;
+    }
 }
 
 method add-game(PSBot::Game $game) {
