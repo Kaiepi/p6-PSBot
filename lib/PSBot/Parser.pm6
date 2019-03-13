@@ -121,12 +121,12 @@ method parse-join(Str $roomid, Str $userinfo) {
 
     my @mail = $!state.database.get-mail: $userid;
     if +@mail && @mail !eqv [Nil] {
+        $!state.database.remove-mail: $userid;
         $*SCHEDULER.cue({
             $!connection.send:
                 "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
                 @mail.map(-> %row { "[%row<source>] %row<message>" }),
                 :$userid;
-            $!state.database.remove-mail: $userid;
         });
     }
 
@@ -149,12 +149,12 @@ method parse-rename(Str $roomid, Str $userinfo, Str $oldid) {
 
     my @mail = $!state.database.get-mail: $userid;
     if +@mail && @mail !eqv [Nil] {
+        $!state.database.remove-mail: $userid;
         $*SCHEDULER.cue({
             $!connection.send:
                 "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
                 @mail.map(-> %row { "[%row<source>] %row<message>" }),
                 :$userid;
-            $!state.database.remove-mail: $userid;
         });
     }
 
