@@ -58,6 +58,7 @@ method parse(Str $text) {
 method parse-update-user(Str $roomid, Str $username, Str $is-named, Str $avatar) {
     $!state.on-update-user: $username, $is-named, $avatar;
     $!connection.logged-in.send: True if !USERNAME || $username eq USERNAME;
+    $!connection.inited.send: True unless +ROOMS;
 }
 
 method parse-challstr(Str $roomid, Str $type, Str $nonce) {
