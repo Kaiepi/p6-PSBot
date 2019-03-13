@@ -86,22 +86,12 @@ method parse-name-taken(Str $roomid, Str $username, Str $reason) {
 method parse-query-response(Str $roomid, Str $type, Str $data) {
     given $type {
         when 'userdetails' {
-            my     %data   = from-json $data;
-            my Str $userid = %data<userid>;
-
-            if $userid eq $!state.userid {
-                $!state.on-user-details: %data;
-                $!connection.lower-throttle if %data<group> ne ' ';
-            }
-
-            if $!state.users ∋ $userid {
-                my PSBot::User $user = $!state.users{$userid};
-                $user.on-user-details: %data;
-            }
+            my %data = from-json $data;
+            $!state.on-user-details: %data;
         }
         when 'roominfo' {
             if $data eq 'null' && $!state.rooms ∋ $roomid {
-                note "The server must support /cmd roominfo in order for {USERNAME} to run properly! Contact a server administrator and ask them to update the server.";
+                note "This server must support /cmd roominfo in order for {USERNAME} to run properly! Contact a server administrator and ask them to update the server.";
                 exit 1;
             }
 
@@ -116,7 +106,7 @@ method parse-init(Str $roomid, Str $type) {
     $!connection.send-raw: "/cmd roominfo $roomid";
     # XXX: the Channel refuses to send anything if it's not in this Promise.
     # $*SCHEDULER.cue doesn't work. Possible Rakudo bug?
-    Promise.in(1).then({ $!connection.inited.send: True }) if $!state.rooms-joined == +ROOMS;
+    Promise.in(1).then({ $!connection.inited.send: True }) if ⚛$!state.rooms-joined == +ROOMS;
 }
 
 method parse-deinit(Str $roomid) {
@@ -174,119 +164,134 @@ method parse-rename(Str $roomid, Str $userinfo, Str $oldid) {
 }
 
 method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
-    my Str $message = @message.join: '|';
-    my Str $username = $userinfo.substr: 1;
-    my Str $userid   = to-id $username;
+    $*SCHEDULER.cue({
+        my Str $message = @message.join: '|';
+        my Str $username = $userinfo.substr: 1;
+        my Str $userid   = to-id $username;
 
-    $!state.database.add-seen: $userid, now;
+        $!state.database.add-seen: $userid, now;
 
-    my PSBot::User $user     = $!state.users{$userid};
-    my PSBot::Room $room     = $!state.rooms{$roomid};
-    if $username ne $!state.username {
-        for $!state.rules.chat -> $rule {
-            my Result $output = $rule.match: $message, $room, $user, $!state, $!connection;
-            $output = await $output if $output ~~ Awaitable:D;
-            $*SCHEDULER.cue({ $!connection.send-raw: $output, :$roomid }) if $output && $output ~~ Str:D | Iterable:D;
-            last if $output;
+        my PSBot::User $user = $!state.users{$userid};
+        my PSBot::Room $room = $!state.rooms{$roomid};
+        await $!state.propagated;
+
+        if $username ne $!state.username {
+            for $!state.rules.chat -> $rule {
+                my Result $output = $rule.match: $message, $room, $user, $!state, $!connection;
+                $output = await $output if $output ~~ Awaitable:D;
+                $!connection.send-raw: $output, :$roomid if $output ~~ Str:D | Iterable:D;
+                last if $output;
+            }
         }
-    }
 
-    if $message.starts-with(COMMAND) && $username ne $!state.username {
-        return unless $message ~~ / ^ $(COMMAND) $<command>=[\w+] [ <.ws> $<target>=[.+] ]? $ /;
-        my Str $command = ~$<command>;
-        my Str $target  = defined($<target>) ?? ~$<target> !! '';
-        my Str $userid  = to-id $username;
-        return unless $command;
+        if $message.starts-with(COMMAND) && $username ne $!state.username {
+            return unless $message ~~ / ^ $(COMMAND) $<command>=[\w+] [ <.ws> $<target>=[.+] ]? $ /;
+            my Str $command = ~$<command>;
+            my Str $target  = defined($<target>) ?? ~$<target> !! '';
+            my Str $userid  = to-id $username;
+            return unless $command;
 
-        my &command = try &PSBot::Commands::($command);
-        return unless &command;
+            my &command = try &PSBot::Commands::($command);
+            return unless &command;
 
-        $*SCHEDULER.cue({
             my Result $output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
             $output = await $output if $output ~~ Awaitable:D;
             $!connection.send: $output, :$roomid if $output && $output ~~ Str:D | Iterable:D;
-        });
-    }
+        }
+    });
 }
 
 method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
-    my Str $message = @message.join: '|';
-    my Str $group    = $from.substr: 0, 1;
-    my Str $username = $from.substr: 1;
-    my Str $userid   = to-id $username;
-    if $!state.users ∋ $userid {
-        my PSBot::User $user = $!state.users{$userid};
-        $user.set-group: $group unless defined($user.group) && $user.group eq $group;
-    }
-
-    my PSBot::User $user;
-    my PSBot::Room $room = Nil;
-    if $!state.users ∋ $userid {
-        $user = $!state.users{$userid};
-    } else {
-        $user .= new: $from;
-        $user.set-group: $group;
-    }
-
-    if $username ne $!state.username {
-        for $!state.rules.pm -> $rule {
-            my Result $output = $rule.match: $message, $room, $user, $!state, $!connection;
-            $output = await $output if $output ~~ Awaitable:D;
-            $*SCHEDULER.cue({ $!connection.send-raw: $output, :$userid }) if $output && $output ~~ Str:D | Iterable:D;
-            last if $output;
+    $*SCHEDULER.cue({
+        my Str $message = @message.join: '|';
+        my Str $group    = $from.substr: 0, 1;
+        my Str $username = $from.substr: 1;
+        my Str $userid   = to-id $username;
+        if $!state.users ∋ $userid {
+            my PSBot::User $user = $!state.users{$userid};
+            $user.set-group: $group unless defined($user.group) && $user.group eq $group;
         }
-    }
 
-    if $message.starts-with(COMMAND) && $username ne $!state.username {
-        return unless $message ~~ / ^ $(COMMAND) $<command>=[\w+] [ <.ws> $<target>=[.+] ]? $ /;
-        my Str $command = ~$<command>;
-        my Str $target  = defined($<target>) ?? ~$<target> !! '';
-        my Str $userid  = to-id $username;
-        return unless $command;
+        my PSBot::User $user;
+        my PSBot::Room $room;
+        if $!state.users ∋ $userid {
+            $user = $!state.users{$userid};
+        } else {
+            $user .= new: $from;
+            $user.set-group: $group;
+        }
+        await $!state.propagated;
 
-        my &command = try &PSBot::Commands::($command);
-        return unless &command;
+        if $username ne $!state.username {
+            for $!state.rules.pm -> $rule {
+                my Result $output = $rule.match: $message, $room, $user, $!state, $!connection;
+                $output = await $output if $output ~~ Awaitable:D;
+                $!connection.send-raw: $output, :$userid if $output ~~ Str:D | Iterable:D;
+                last if $output;
+            }
+        }
 
-        $*SCHEDULER.cue({
+        if $message.starts-with(COMMAND) && $username ne $!state.username {
+            return unless $message ~~ / ^ $(COMMAND) $<command>=[\w+] [ <.ws> $<target>=[.+] ]? $ /;
+            my Str $command = ~$<command>;
+            my Str $target  = defined($<target>) ?? ~$<target> !! '';
+            my Str $userid  = to-id $username;
+            return unless $command;
+
+            my &command = try &PSBot::Commands::($command);
+            return unless &command;
+
             my Result $output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
             $output = await $output if $output ~~ Awaitable:D;
             $!connection.send: $output, :$userid if $output && $output ~~ Str:D | Iterable:D;
-        });
-    }
+        }
+    });
 }
 
 method parse-html(Str $roomid, *@html) {
-    my Str $html = @html.join: '|';
-    my PSBot::Room $room = $!state.rooms ∋ $roomid ?? $!state.rooms{$roomid} !! Nil;
-    my PSBot::User $user = Nil;
-    for $!state.rules.html -> $rule {
-        my Result $output = $rule.match: $html, $room, $user, $!state, $!connection;
-        $output = await $output if $output ~~ Awaitable:D;
-        $*SCHEDULER.cue({ $!connection.send-raw: $output, :$roomid }) if $output && $output ~~ Str:D | Iterable:D;
-        last if $output;
-    }
+    $*SCHEDULER.cue({
+        my Str $html = @html.join: '|';
+        my PSBot::Room $room = $!state.rooms ∋ $roomid ?? $!state.rooms{$roomid} !! Nil;
+        my PSBot::User $user = Nil;
+        await $!state.propagated;
+
+        for $!state.rules.html -> $rule {
+            my Result $output = $rule.match: $html, $room, $user, $!state, $!connection;
+            $output = await $output if $output ~~ Awaitable:D;
+            $!connection.send-raw: $output, :$roomid if $output ~~ Str:D | Iterable:D;
+            last if $output;
+        }
+    });
 }
 
 method parse-popup(Str $roomid, *@popup) {
-    my Str $popup = @popup.join('|').subst('||', "\n", :g);
-    my PSBot::Room $room = $!state.rooms ∋ $roomid ?? $!state.rooms{$roomid} !! Nil;
-    my PSBot::User $user = Nil;
-    for $!state.rules.popup -> $rule {
-        my Result $output = $rule.match: $popup, $room, $user, $!state, $!connection;
-        $output = await $output if $output ~~ Awaitable:D;
-        $*SCHEDULER.cue({ $!connection.send-raw: $output, :$roomid }) if $output;
-        last if $output;
-    }
+    $*SCHEDULER.cue({
+        my Str $popup = @popup.join('|').subst('||', "\n", :g);
+        my PSBot::Room $room = $!state.rooms ∋ $roomid ?? $!state.rooms{$roomid} !! Nil;
+        my PSBot::User $user = Nil;
+        await $!state.propagated;
+
+        for $!state.rules.popup -> $rule {
+            my Result $output = $rule.match: $popup, $room, $user, $!state, $!connection;
+            $output = await $output if $output ~~ Awaitable:D;
+            $!connection.send-raw: $output, :$roomid if $output ~~ Str:D | Iterable:D;
+            last if $output;
+        }
+    });
 }
 
 method parse-raw(Str $roomid, *@html) {
-    my Str $html = @html.join: '|';
-    my PSBot::Room $room = $!state.rooms ∋ $roomid ?? $!state.rooms{$roomid} !! Nil;
-    my PSBot::User $user = Nil;
-    for $!state.rules.raw -> $rule {
-        my Result $output = $rule.match: $html, $room, $user, $!state, $!connection;
-        $output = await $output if $output ~~ Awaitable:D;
-        $*SCHEDULER.cue({ $!connection.send-raw: $output, :$roomid }) if $output && $output ~~ Str:D | Iterable:D;
-        last if $output;
-    }
+    $*SCHEDULER.cue({
+        my Str $html = @html.join: '|';
+        my PSBot::Room $room = $!state.rooms ∋ $roomid ?? $!state.rooms{$roomid} !! Nil;
+        my PSBot::User $user = Nil;
+        await $!state.propagated;
+
+        for $!state.rules.raw -> $rule {
+            my Result $output = $rule.match: $html, $room, $user, $!state, $!connection;
+            $output = await $output if $output ~~ Awaitable:D;
+            $!connection.send-raw: $output, :$roomid if $output ~~ Str:D | Iterable:D;
+            last if $output;
+        }
+    });
 }

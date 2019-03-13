@@ -18,8 +18,9 @@ has Str     $.group;
 has Bool    $.inited      = False;
 has Promise $.propagated .= new;
 
-has Channel   $.pending-rename .= new;
-has atomicint $.rooms-joined    = 0;
+has Promise   $.propagation-mitigation .= new;
+has Channel   $.pending-rename         .= new;
+has atomicint $.rooms-joined is rw      = 0;
 
 has Lock::Async $!chat-mux .= new;
 has PSBot::User %.users;
@@ -57,8 +58,22 @@ method on-update-user(Str $username, Str $is-named, Str $avatar) {
 }
 
 method on-user-details(%data) {
-    $!group  = %data<group>;
-    $!avatar = ~%data<avatar>;
+    $!chat-mux.protect({
+        my Str $userid = %data<userid>;
+
+        if %!users ∋ $userid {
+            my PSBot::User $user = %!users{$userid};
+            $user.on-user-details: %data;
+        }
+
+        if $userid eq $!userid {
+            $!group  = %data<group>;
+            $!avatar = ~%data<avatar>;
+        }
+
+        $!propagated.keep if $!propagated.status ~~ Planned
+            && !(%!users.values.first({ !.propagated && !.is-guest }) || %!rooms.values.first({ !.propagated }));
+    })
 }
 
 method add-room(Str $roomid) {
@@ -88,9 +103,14 @@ method add-room-info(%data) {
             }
         }
 
+        # Awaited by the whenever block for PSBot::Connection.inited so it can
+        # get any missing user metadata.
+        $!propagation-mitigation.keep if $!propagation-mitigation.status ~~ Planned
+            && ⚛$!rooms-joined == +ROOMS
+            && not defined %!rooms.values.first({ !.propagated });
+
         $!propagated.keep if $!propagated.status ~~ Planned
-            && %!rooms.keys ⊇ ROOMS
-            && not defined %!rooms.values.first({ not defined .visibility });
+            && !(%!users.values.first({ !.propagated && !.is-guest }) || %!rooms.values.first({ !.propagated }));
     })
 }
 

@@ -45,7 +45,7 @@ method start() {
 
                 # Wait until we finish receiving responses for our /cmd
                 # messages before continuing.
-                await $!state.propagated;
+                await $!state.propagation-mitigation;
 
                 # Faye is buggy and won't send a response for each /cmd userdetails
                 # message sent since we send so many so quickly, so let's resend
