@@ -43,33 +43,34 @@ subtest '|userupdate|', {
     my Str $is-named = '0';
     my Str $avatar   = AVATAR || '1';
 
-    $parser.parse-user-update: $roomid, $username, $is-named, $avatar;
+    $parser.parse-update-user: $roomid, $username, $is-named, $avatar;
     is $state.username, $username, 'Sets state username attribute';
     is $state.guest-username, $username, 'Sets state guest-username attribute if guest username was provided';
     is $state.is-guest, True, 'Sets state is-guest attribute properly if guest';
     is $state.avatar, $avatar, 'Sets state avatar attribute';
 
-    my $res = $state.pending-rename.poll;
-    nok $res, 'Does not send username to state pending-rename channel if guest';
+    if USERNAME {
+        nok $state.pending-rename.poll, 'Does not send username to state pending-rename channel if guest';
+    } else {
+        skip 'State pending-rename test requires a configured username', 1;
+    }
 
-    $username  = USERNAME || 'PoS-Bot';
+    $username  = USERNAME // 'PoS-Bot';
     $is-named  = '1';
-    $parser.parse-user-update: $roomid, $username, $is-named, $avatar;
+    $parser.parse-update-user: $roomid, $username, $is-named, $avatar;
     is $state.is-guest, False, 'Sets state is-guest attribute properly if named';
-
-    $res = $state.pending-rename.poll;
-    is $res, $username, 'Sends username to state pending-rename channel if named';
+    is $state.pending-rename.poll, $username, 'Sends username to state pending-rename channel if named';
 };
 
 subtest '|challstr|', {
     my Str $roomid   = 'lobby';
-    my Str @challstr = eager gather for 0..^128 {
+    my Str @nonce    = eager gather for 0..^128 {
         my Int $byte = floor rand * 256;
         take $byte.base: 16;
     };
-    my Str     $type      = '4';
-    my Str     $nonce     = @challstr.join('').lc;
-    my Str     $challstr  = "$type|$nonce";
+    my Str $type     = '4';
+    my Str $nonce    = @nonce.join('').lc;
+    my Str $challstr = "$type|$nonce";
 
     $parser.parse-challstr: $roomid, $type, $nonce;
 

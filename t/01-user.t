@@ -2,7 +2,7 @@ use v6.d;
 use PSBot::User;
 use Test;
 
-plan 4;
+plan 3;
 
 subtest 'Constructing with userinfo', {
     my Str         $userinfo  = ' Morfent';
@@ -21,15 +21,6 @@ subtest 'Constructing with userinfo and roomid', {
     is $user.name, 'Morfent', 'Can set user name attribute';
     ok $user.ranks ∋ $roomid, 'Can set user ranks roomid';
     is $user.ranks{$roomid}, ' ', 'Can set user ranks rank';
-};
-
-subtest 'Setting ranks', {
-    my Str $userinfo = ' Morfent';
-    my Str $roomid   = 'lobby';
-    my PSBot::User $user .= new: $userinfo, $roomid;
-
-    $user.set-group: '@';
-    is $user.group, '@', 'Can set user rank attribute';
 };
 
 subtest 'Join/leave/rename', {
