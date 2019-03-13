@@ -189,16 +189,16 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
         if $message.starts-with(COMMAND) && $username ne $!state.username {
             return unless $message ~~ / ^ $(COMMAND) $<command>=[\w+] [ <.ws> $<target>=[.+] ]? $ /;
             my Str $command = ~$<command>;
-            my Str $target  = defined($<target>) ?? ~$<target> !! '';
-            my Str $userid  = to-id $username;
-            return unless $command;
-
-            my &command = try &PSBot::Commands::($command);
-            return unless &command;
-
-            my Result $output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
-            $output = await $output if $output ~~ Awaitable:D;
-            $!connection.send: $output, :$roomid if $output && $output ~~ Str:D | Iterable:D;
+            if $command {
+                my Str $target  = defined($<target>) ?? ~$<target> !! '';
+                my Str $userid  = to-id $username;
+                my &command = try &PSBot::Commands::($command);
+                if &command {
+                    my Result $output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
+                    $output = await $output if $output ~~ Awaitable:D;
+                    $!connection.send: $output, :$roomid if $output && $output ~~ Str:D | Iterable:D;
+                }
+            }
         }
     });
 }
@@ -236,16 +236,16 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
         if $message.starts-with(COMMAND) && $username ne $!state.username {
             return unless $message ~~ / ^ $(COMMAND) $<command>=[\w+] [ <.ws> $<target>=[.+] ]? $ /;
             my Str $command = ~$<command>;
-            my Str $target  = defined($<target>) ?? ~$<target> !! '';
-            my Str $userid  = to-id $username;
-            return unless $command;
-
-            my &command = try &PSBot::Commands::($command);
-            return unless &command;
-
-            my Result $output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
-            $output = await $output if $output ~~ Awaitable:D;
-            $!connection.send: $output, :$userid if $output && $output ~~ Str:D | Iterable:D;
+            if $command {
+                my Str $target  = defined($<target>) ?? ~$<target> !! '';
+                my Str $userid  = to-id $username;
+                my &command = try &PSBot::Commands::($command);
+                if &command {
+                    my Result $output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
+                    $output = await $output if $output ~~ Awaitable:D;
+                    $!connection.send: $output, :$userid if $output && $output ~~ Str:D | Iterable:D;
+                }
+            }
         }
     });
 }
