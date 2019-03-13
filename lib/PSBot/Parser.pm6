@@ -96,17 +96,19 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
             }
 
             my %data = from-json $data;
-            $!state.add-room-info: %data;
+            $!state.on-room-info: %data;
         }
     }
 }
 
 method parse-init(Str $roomid, Str $type) {
     $!state.add-room: $roomid;
-    $!connection.send-raw: "/cmd roominfo $roomid";
-    # XXX: the Channel refuses to send anything if it's not in this Promise.
-    # $*SCHEDULER.cue doesn't work. Possible Rakudo bug?
-    Promise.in(1).then({ $!connection.inited.send: True }) if ⚛$!state.rooms-joined == +ROOMS;
+
+    $*SCHEDULER.cue({
+        $!connection.send-raw: "/cmd roominfo $roomid";
+        await $!state.propagated;
+        $!connection.inited.send: True if ⚛$!state.rooms-joined == +ROOMS;
+    });
 }
 
 method parse-deinit(Str $roomid) {

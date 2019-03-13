@@ -14,7 +14,7 @@ class Maybe is export {
 
 subset Result is export where Str | Awaitable | Iterable | Nil;
 
-enum Rank is export «'‽' '!' ' ' '+' '%' '@' '*' "☆" '#' '&' '~'»;
+enum Rank is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
 
 enum Visibility is export (
     Public => 'public',

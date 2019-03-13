@@ -17,7 +17,7 @@ has Bool        $.propagated = False;
 has PSBot::Game $.game;
 
 method modjoin(--> Str) {
-    ?$!modjoin ?? $!modchat !! $!modjoin
+    $!modjoin ~~ Bool ?? $!modchat !! $!modjoin
 }
 
 method new(Str $id) {

@@ -53,7 +53,7 @@ method on-update-user(Str $username, Str $is-named, Str $avatar) {
     $!is-guest       = $is-named eq '0';
     $!avatar         = $avatar;
 
-    $!inited = True if !$!inited && (!USERNAME || !$!is-guest);
+    $!inited = True unless $!inited || (USERNAME && $!is-guest);
     $!pending-rename.send: $username if $!inited;
 }
 
@@ -72,20 +72,12 @@ method on-user-details(%data) {
         }
 
         $!propagated.keep if $!propagated.status ~~ Planned
+            && ⚛$!rooms-joined >= +ROOMS
             && !(%!users.values.first({ !.propagated && !.is-guest }) || %!rooms.values.first({ !.propagated }));
     })
 }
 
-method add-room(Str $roomid) {
-    $!chat-mux.protect({
-        return if %!rooms ∋ $roomid;
-        my PSBot::Room $room .= new: $roomid;
-        %!rooms{$roomid} = $room;
-        $!rooms-joined⚛++;
-    })
-}
-
-method add-room-info(%data) {
+method on-room-info(%data) {
     $!chat-mux.protect({
         my Str         $roomid = to-id %data<title>;
         my PSBot::Room $room   = %!rooms{$roomid};
@@ -106,11 +98,21 @@ method add-room-info(%data) {
         # Awaited by the whenever block for PSBot::Connection.inited so it can
         # get any missing user metadata.
         $!propagation-mitigation.keep if $!propagation-mitigation.status ~~ Planned
-            && ⚛$!rooms-joined == +ROOMS
+            && ⚛$!rooms-joined >= +ROOMS
             && not defined %!rooms.values.first({ !.propagated });
 
         $!propagated.keep if $!propagated.status ~~ Planned
+            && ⚛$!rooms-joined >= +ROOMS
             && !(%!users.values.first({ !.propagated && !.is-guest }) || %!rooms.values.first({ !.propagated }));
+    })
+}
+
+method add-room(Str $roomid) {
+    $!chat-mux.protect({
+        return if %!rooms ∋ $roomid;
+        my PSBot::Room $room .= new: $roomid;
+        %!rooms{$roomid} = $room;
+        $!rooms-joined⚛++;
     })
 }
 
@@ -118,8 +120,9 @@ method delete-room(Str $roomid) {
     $!chat-mux.protect({
         return if %!rooms ∌ $roomid;
 
-        %!rooms{$roomid}:delete;
-        for %!users.kv -> $userid, $user {
+        my PSBot::Room $room = %!rooms{$roomid}:delete;
+        for $room.ranks.kv -> $userid, $rank {
+            my PSBot::User $user = %!users{$userid};
             $user.on-leave: $roomid;
             %!users{$userid}:delete unless +$user.ranks;
         }
