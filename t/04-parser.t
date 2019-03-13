@@ -41,7 +41,7 @@ subtest '|userupdate|', {
     my Str $roomid   = 'lobby';
     my Str $username = 'Guest 1';
     my Str $is-named = '0';
-    my Str $avatar   = AVATAR || '1';
+    my Str $avatar   = AVATAR // '1';
 
     $parser.parse-update-user: $roomid, $username, $is-named, $avatar;
     is $state.username, $username, 'Sets state username attribute';
@@ -55,11 +55,10 @@ subtest '|userupdate|', {
         skip 'State pending-rename test requires a configured username', 1;
     }
 
-    $username  = USERNAME // 'PoS-Bot';
     $is-named  = '1';
-    $parser.parse-update-user: $roomid, $username, $is-named, $avatar;
+    $parser.parse-update-user: $roomid, USERNAME, $is-named, $avatar;
     is $state.is-guest, False, 'Sets state is-guest attribute properly if named';
-    is $state.pending-rename.poll, $username, 'Sends username to state pending-rename channel if named';
+    is $state.pending-rename.poll, USERNAME, 'Sends username to state pending-rename channel if named';
 };
 
 subtest '|challstr|', {
