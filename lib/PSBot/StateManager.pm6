@@ -98,11 +98,11 @@ method on-room-info(%data) {
         # Awaited by the whenever block for PSBot::Connection.inited so it can
         # get any missing user metadata.
         $!propagation-mitigation.keep if $!propagation-mitigation.status ~~ Planned
-            && ⚛$!rooms-joined >= +ROOMS
+            && ⚛$!rooms-joined == +ROOMS
             && not defined %!rooms.values.first({ !.propagated });
 
         $!propagated.keep if $!propagated.status ~~ Planned
-            && ⚛$!rooms-joined >= +ROOMS
+            && ⚛$!rooms-joined == +ROOMS
             && !(%!users.values.first({ !.propagated && !.is-guest }) || %!rooms.values.first({ !.propagated }));
     })
 }

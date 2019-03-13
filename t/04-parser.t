@@ -84,8 +84,13 @@ subtest '|challstr|', {
     }
 };
 
-subtest '|queryresponse|', {
+subtest '|queryresponse|', sub {
     plan 2;
+
+    unless +ROOMS {
+        skip-rest 'There must be at least one configured room in order to test this';
+        return;
+    }
 
     subtest '|queryresponse|userdetails|', {
         plan 4;
@@ -110,6 +115,7 @@ subtest '|queryresponse|', {
         is $state.propagated.status, Planned, 'State propagated attribute is not kept before finishing fetching metadata';
 
         $parser.parse-deinit: $roomid;
+        $state.rooms-joined⚛--;
     }
 
     subtest '|queryresponse|roominfo|', {
