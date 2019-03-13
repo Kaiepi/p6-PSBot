@@ -95,7 +95,7 @@ multi method send(*@data) {
     return if self.closed;
 
     for @data -> $data {
-        if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '~~~ ' ] / {
+        if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
             $!sender.emit: "| $data";
         } else {
             $!sender.emit: "|$data";
@@ -106,7 +106,7 @@ multi method send(*@data, Str :$roomid!) {
     return if self.closed;
 
     for @data -> $data {
-        if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '~~~ ' ] / {
+        if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
             $!sender.emit: "$roomid| $data";
         } else {
             $!sender.emit: "$roomid|$data";
@@ -118,11 +118,10 @@ multi method send(*@data, Str :$userid!) {
 
     for @data -> $data {
         given $data {
-            when / ^ '/' <!before '/'> / { $!sender.emit: "|/w $userid, /$data" }
-            when / ^ '!' <!before '!'> / { $!sender.emit: "|/w $userid, !$data" }
-            when .starts-with: '~~ '     { $!sender.emit: "|/w $userid,  $data" }
-            when .starts-with: '~~~ '    { $!sender.emit: "|/w $userid,  $data" }
-            default                      { $!sender.emit: "|/w $userid, $data"  }
+            when / ^ '/' <!before '/'> /          { $!sender.emit: "|/w $userid, /$data" }
+            when / ^ '!' <!before '!'> /          { $!sender.emit: "|/w $userid, !$data" }
+            when / ^ [ '~~ ' | '>> ' | '>>> ' ] / { $!sender.emit: "|/w $userid,  $data" }
+            default                               { $!sender.emit: "|/w $userid, $data"  }
         }
     }
 }
@@ -146,6 +145,7 @@ multi method send-raw(*@data, Str :$roomid!) {
     for @data -> $data {
         if $data.starts-with: '>> ' {
             # This command is not throttled.
+            debug '[SEND]', "|$data";
             $!connection.send: "$roomid|$data";
         } else {
             $!sender.emit: "$roomid|$data";
