@@ -64,7 +64,7 @@ method log-out(Str $username --> Bool) {
         "https://play.pokemonshowdown.com/~~$!serverid/action.php",
         http         => '1.1',
         content-type => 'application/x-www-form-urlencoded; charset=UTF-8',
-        body         => $(act => 'logout', userid => $userid);
+        body         => %(act => 'logout', userid => $userid);
     my Str                 $data     = await $response.body-text;
     return False unless $data;
 

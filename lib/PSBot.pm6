@@ -12,85 +12,79 @@ method new(Str $host = HOST, Int $port = PORT, Str $serverid = SERVERID) {
 }
 
 method start() {
-    $!connection.connect;
-
     react {
         whenever $!connection.receiver -> $message {
             self.parse: $message;
         }
-        whenever $!connection.inited {
-            # We need to be logged in before we can start the initialization
-            # process. Sometimes we log in after we finish joining all the
-            # configured rooms, which leaves us missing some user/room metadata
-            # and prevents us from joining modjoined rooms that don't fit in
-            # /autojoin.
-            await $!connection.logged-in;
+        whenever $!connection.disconnected {
+            $!state.reset;
+        }
+        whenever $!state.logged-in {
+            # Finish joining any rooms that wouldn't fit in /autojoin and
+            # set our avatar.
+            $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
+            $!connection.send-raw: "/avatar {AVATAR}" if AVATAR;
+        }
+        whenever $!state.autojoined {
+            # Get user metadata. We don't get metadata for guest users
+            # since the server gives us none.
+            $!connection.send-raw: $!state.users.values
+                .grep({ !.propagated && !.is-guest })
+                .map({ "/cmd userdetails {$_.id}" });
 
-            $*SCHEDULER.cue({
-                # Get user metadata. We don't get metadata for guest users
-                # since the server gives us none.
+            # We need to send the /cmd roominfo messages for our configured
+            # rooms again, despite them already being sent after receiving
+            # the |init| message, because we may not have logged in yet at
+            # the time we send them, meaning we will never receive a
+            # response.
+            $!connection.send-raw: $!state.rooms.values
+                .grep({ !.propagated })
+                .map({ "/cmd roominfo {$_.id}" });
+
+            # Faye is buggy and doesn't always send a response to the slew of
+            # /cmd userdetails messages we send, preventing our state from
+            # fully getting propagated. Wait until we have all our room
+            # metadata before continuing.
+            whenever $!state.propagation-mitigation {
+                # Collect the rest of the user metadata the server never bothered
+                # to send us.
                 $!connection.send-raw: $!state.users.values
                     .grep({ !.propagated && !.is-guest })
                     .map({ "/cmd userdetails {$_.id}" });
-
-                # We need to send the /cmd roominfo messages for our configured
-                # rooms again, despite them already being sent after receiving
-                # the |init| message, because we may not have logged in yet at
-                # the time we send them, meaning we will never receive a
-                # response.
-                $!connection.send-raw: $!state.rooms.values
-                    .grep({ !.propagated })
-                    .map({ "/cmd roominfo {$_.id}" });
-
-                # Wait until we finish receiving responses for our /cmd
-                # messages before continuing.
-                await $!state.propagation-mitigation;
-
-                # Faye is buggy and won't send a response for each /cmd userdetails
-                # message sent since we send so many so quickly, so let's resend
-                # them so we can complete our user metadata.
-                $!connection.send-raw: $!state.users.values
-                    .grep({ !.propagated && !.is-guest })
-                    .map({ "/cmd userdetails {$_.id}" });
-
-                # Finish joining any rooms that wouldn't fit in /autojoin and
-                # set our avatar.
-                $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
-                $!connection.send-raw: "/avatar {AVATAR}" if AVATAR;
-            });
-
-            # Send user mail, if the recipient is online. If not, wait until
-            # they join a room the bot's in.
-            for $!state.users.keys -> $userid {
-                my @mail = $!state.database.get-mail: $userid;
-                $*SCHEDULER.cue({
-                    $!connection.send:
-                        "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-                        @mail.map(-> %data { "[%data<source>] %data<message>" }),
-                        :$userid;
-                    $!state.database.remove-mail: $userid;
-                }) if +@mail && @mail !eqv [Nil];
             }
 
-            # Schedule user reminders.
-            with $!state.database.get-reminders -> @reminders {
-                if @reminders !eqv [Nil] {
-                    for @reminders -> %row {
-                        $*SCHEDULER.cue({
-                            if %row<roomid> {
-                                $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
-                                $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>.Rat, %row<reminder>, roomid => %row<roomid>;
-                            } else {
-                                $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
-                                $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>.Rat, %row<reminder>, userid => %row<userid>;
-                            }
-                        }, at => %row<time>.Rat);
+            # Wait until our state is fully propagated before continuing.
+            whenever $!state.propagated {
+                # Send user mail, if the recipient is online. If not, wait until
+                # they join a room the bot's in.
+                for $!state.users.keys -> $userid {
+                    my @mail = $!state.database.get-mail: $userid;
+                    if +@mail && @mail !eqv [Nil] {
+                        $!state.database.remove-mail: $userid;
+                        $!connection.send:
+                            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
+                            @mail.map(-> %data { "[%data<source>] %data<message>" }),
+                            :$userid;
+                    }
+                }
+
+                # Schedule user reminders.
+                with $!state.database.get-reminders -> @reminders {
+                    if @reminders !eqv [Nil] {
+                        for @reminders -> %row {
+                            $*SCHEDULER.cue({
+                                if %row<roomid> {
+                                    $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>.Rat, %row<reminder>, roomid => %row<roomid>;
+                                    $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
+                                } else {
+                                    $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>.Rat, %row<reminder>, userid => %row<userid>;
+                                    $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
+                                }
+                            }, at => %row<time>.Rat);
+                        }
                     }
                 }
             }
-        }
-        whenever $!connection.disconnects {
-            $!state.reset;
         }
         whenever signal(SIGINT) {
             $!connection.close: :force;
@@ -98,6 +92,12 @@ method start() {
             $!state.database.dbh.dispose;
             exit 0;
         }
+
+        # PSBot::Connection.receiver is not a Supplier::Preserving instance, so
+        # we need to ensure the connection only starts after the whenever block
+        # that handles it is defined so we don't miss any messages (especially
+        # the first |userupdate|).
+        LEAVE $!connection.connect;
     }
 }
 

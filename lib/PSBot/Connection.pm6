@@ -9,13 +9,12 @@ unit class PSBot::Connection;
 has Cro::WebSocket::Client             $!client;
 has Cro::WebSocket::Client::Connection $.connection;
 has Int                                $.timeout       = 1;
-has Channel                            $.logged-in    .= new;
-has Channel                            $.inited       .= new;
 has Bool                               $.force-closed  = False;
-has Supplier::Preserving               $.receiver     .= new;
-has Supplier::Preserving               $.sender       .= new;
-has Channel                            $.disconnects  .= new;
-has Tap                                $.tap;
+has Supplier                           $.receiver     .= new;
+has Tap                                $.receiver-tap;
+has Supplier                           $.sender       .= new;
+has Tap                                $.sender-tap;;
+has Channel                            $.disconnected .= new;
 
 submethod TWEAK(Cro::WebSocket::Client :$!client) { }
 
@@ -26,9 +25,13 @@ method new(Str $host, Int $port) {
     self.bless: :$client;
 }
 
-method receiver(--> Supply) { $!receiver.Supply }
+method receiver(--> Supply) {
+    $!receiver.Supply.serialize.schedule-on($*SCHEDULER)
+}
 
-method uri(--> Str) { $!client.uri.Str }
+method uri(--> Str) {
+    $!client.uri.Str
+}
 
 method closed(--> Bool) {
     return True unless defined $!connection;
@@ -37,58 +40,55 @@ method closed(--> Bool) {
 
 method connect() {
     debug '[DEBUG]', 'Connecting...';
-
     $!connection = try await $!client.connect;
-
-    when $! ~~ Exception {
+    when $! ~~ Exception:D {
         debug '[DEBUG]', "Connection to {self.uri} failed: {$!.message}";
-        self.reconnect;
+        $*SCHEDULER.cue({ self.reconnect });
     }
-
     debug '[DEBUG]', "Connected to {self.uri}";
 
-    # Reset state that needs to be reset on reconnect.
-    $!timeout = 1;
+    # Reset the reconnect timeout now that we've successfully connected.
+    $!timeout      = 1;
+    $!force-closed = False;
 
     # Throttle outgoing messages.
-    $!tap = $!sender.Supply.throttle(1, 0.6).tap(-> $data {
+    $!sender.Supply.throttle(1, 0.6).serialize.schedule-on($*SCHEDULER).tap(-> $data {
         debug '[SEND]', $data;
         $!connection.send: $data;
+    }, tap => -> $tap {
+        $!sender-tap = $tap;
     });
 
     # Pass any received messages back to PSBot to pass to the parser.
     $!connection.messages.tap(-> $data {
-        my Str $text = await $data.body-text;
-        if $text {
+        when $data.is-text {
+            my Str $text = await $data.body-text;
             debug '[RECV]', $text;
             $!receiver.emit: $text;
         }
     }, done => {
-        $!tap.close;
-        $!disconnects.send: True;
+        $!receiver-tap.close;
+        $!disconnected.send: True;
         self.reconnect unless $!force-closed;
+    }, tap => -> $tap {
+        $!receiver-tap = $tap;
     });
+
+    my Str @autojoin  = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
+    self.send-raw: "/autojoin {@autojoin.join: ','}";
 }
 
 method reconnect() {
     debug '[DEBUG]', "Reconnecting in $!timeout seconds...";
 
-    die X::PSBot::ReconnectFailure.new(
+    X::PSBot::ReconnectFailure.new(
         attempts => MAX_RECONNECT_ATTEMPTS,
         uri      => self.uri
-    ) if $!timeout == 2 ** MAX_RECONNECT_ATTEMPTS;
+    ).throw if $!timeout == 2 ** MAX_RECONNECT_ATTEMPTS;
 
     $*SCHEDULER.cue({ self.connect }, at => now + $!timeout);
 
     $!timeout *= 2;
-}
-
-method lower-throttle() {
-    $!tap.close;
-    $!tap = $!sender.Supply.throttle(1, 0.3).tap(-> $data {
-        debug '[SEND]', $data;
-        $!connection.send: $data;
-    });
 }
 
 multi method send(*@data) {
@@ -160,7 +160,12 @@ multi method send-raw(*@data, Str :$userid!) {
     }
 }
 
-method close(Int :$timeout = 0, Bool :$force = False) {
+method close(Int :$timeout = 0, Bool :$force = False --> Promise) {
+    my Promise $ret = $!connection ?? $!connection.close(:$timeout) !! Promise.start({ Nil });
     $!force-closed = $force;
-    sink $!connection.close: :$timeout if $!connection;
+    $!receiver-tap.close;
+    $!receiver.done if $force;
+    $!sender-tap.close;
+    $!sender.done if $force;
+    $ret
 }

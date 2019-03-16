@@ -8,19 +8,21 @@ use PSBot::Tools;
 use PSBot::User;
 unit class PSBot::StateManager;
 
-has Str     $.challstr         = '';
-has Str     $.guest-username;
-has Str     $.username;
-has Str     $.userid;
-has Bool    $.is-guest;
-has Str     $.avatar;
-has Str     $.group;
-has Bool    $.inited           = False;
-has Promise $.propagated      .= new;
+has Str  $.challstr;
+has Str  $.guest-username;
+has Str  $.username;
+has Str  $.userid;
+has Bool $.is-guest;
+has Str  $.avatar;
+has Str  $.group;
 
-has Promise   $.propagation-mitigation .= new;
-has Channel   $.pending-rename         .= new;
-has atomicint $.rooms-joined is rw      = 0;
+has Bool      $.inited                        = False;
+has Channel   $.pending-rename               .= new;
+has Channel   $.logged-in                    .= new;
+has atomicint $.rooms-joined           is rw  = 0;
+has Channel   $.autojoined                   .= new;
+has Promise   $.propagation-mitigation       .= new;
+has Promise   $.propagated                   .= new;
 
 has Lock::Async $!chat-mux .= new;
 has PSBot::User %.users;
@@ -49,12 +51,17 @@ method authenticate(Str $username, Str $password?, Str $challstr? --> Str) {
 method on-update-user(Str $username, Str $is-named, Str $avatar) {
     $!username       = $username;
     $!userid         = to-id $username;
-    $!guest-username = $username if $username.starts-with: 'Guest ';
+    $!guest-username = $username if $!userid.starts-with: 'guest';
     $!is-guest       = $is-named eq '0';
     $!avatar         = $avatar;
 
-    $!pending-rename.send: True if $!inited;
-    $!inited = True unless $!inited;
+    if $!inited {
+        $!pending-rename.send: True;
+    } elsif !USERNAME || $username eq USERNAME {
+        $!inited = True;
+        $!pending-rename.send: True;
+        $!logged-in.send: True;
+    }
 }
 
 method on-user-details(%data) {
@@ -71,15 +78,19 @@ method on-user-details(%data) {
             $!avatar = ~%data<avatar>;
         }
 
+        $!propagation-mitigation.keep if $!propagation-mitigation.status ~~ Planned
+            && ⚛$!rooms-joined >= +ROOMS
+            && not %!rooms.values.first({ !.propagated });
+
         $!propagated.keep if $!propagated.status ~~ Planned
             && ⚛$!rooms-joined >= +ROOMS
-            && !(%!users.values.first({ !.propagated && !.is-guest }) || %!rooms.values.first({ !.propagated }));
+            && not %!users.values.first({ !.propagated && !.is-guest }) || %!rooms.values.first({ !.propagated });
     })
 }
 
 method on-room-info(%data) {
     $!chat-mux.protect({
-        my Str         $roomid = to-id %data<title>;
+        my Str         $roomid = to-roomid %data<title>;
         my PSBot::Room $room   = %!rooms{$roomid};
         $room.on-room-info: %data;
 
@@ -95,24 +106,23 @@ method on-room-info(%data) {
             }
         }
 
-        # Awaited by the whenever block for PSBot::Connection.inited so it can
-        # get any missing user metadata.
         $!propagation-mitigation.keep if $!propagation-mitigation.status ~~ Planned
-            && ⚛$!rooms-joined == +ROOMS
-            && not defined %!rooms.values.first({ !.propagated });
+            && ⚛$!rooms-joined >= +ROOMS
+            && not %!rooms.values.first({ !.propagated });
 
         $!propagated.keep if $!propagated.status ~~ Planned
-            && ⚛$!rooms-joined == +ROOMS
-            && !(%!users.values.first({ !.propagated && !.is-guest }) || %!rooms.values.first({ !.propagated }));
+            && ⚛$!rooms-joined >= +ROOMS
+            && not %!users.values.first({ !.propagated && !.is-guest }) || %!rooms.values.first({ !.propagated });
     })
 }
 
 method add-room(Str $roomid) {
     $!chat-mux.protect({
         return if %!rooms ∋ $roomid;
+
         my PSBot::Room $room .= new: $roomid;
         %!rooms{$roomid} = $room;
-        $!rooms-joined⚛++;
+        $!autojoined.send: True if ++⚛$!rooms-joined == +ROOMS;
     })
 }
 
@@ -177,12 +187,11 @@ method reset() {
     $!is-guest        = Nil;
     $!avatar          = Nil;
     $!group           = Nil;
-    $!inited          = False;
-    $!propagated     .= new;
 
-    $!propagation-mitigation .= new;
-    $!pending-rename         .= new;
+    $!inited                  = False;
     $!rooms-joined           ⚛= 0;
+    $!propagation-mitigation .= new;
+    $!propagated             .= new;
 
     $!chat-mux.protect({
         %!users .= new;

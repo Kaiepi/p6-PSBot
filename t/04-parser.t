@@ -39,7 +39,7 @@ my PSBot::Parser       $parser     .= new: :$connection, :$state;
 $connection.connect;
 
 subtest '|updateuser|', {
-    plan 8;
+    plan 10;
 
     my Str $roomid         = 'lobby';
     my Str $guest-username = 'Guest 1';
@@ -47,15 +47,28 @@ subtest '|updateuser|', {
 
     $parser.parse-update-user: $roomid, $guest-username, '0', $avatar;
     is $state.username, $guest-username, 'Sets state username attribute';
-    is $state.guest-username, $guest-username, 'Sets state guest-username attribute if guest username was provided';
-    ok $state.is-guest, 'Sets state is-guest attribute properly if guest';
+    is $state.guest-username, $guest-username, 'Sets state guest-username attribute as a guest';
+    ok $state.is-guest, 'Sets state is-guest attribute properly as a guest';
     is $state.avatar, $avatar, 'Sets state avatar attribute';
-    nok $state.pending-rename.poll, 'Does not send username to state pending-rename channel if guest';
-    ok $state.inited, 'Sets state inited attribute on first |userupdate|';
+
+    if USERNAME {
+        nok $state.inited, 'Waits until the second user update to set the state inited attribute if there is a configured username';
+        nok $state.pending-rename.poll, 'Does not send to state pending-rename channel when state is first initialilzed if there is a configured username';
+        nok $state.logged-in.poll, 'Does not send to state logged-in channel if there is a configured usernamed';
+    } else {
+        ok $state.inited, 'Does not wait until the second user update to set the state inited attribute as a guest';
+        ok $state.pending-rename.poll, 'Sends to state pending-rename channel when state is first initialilzed as a guest';
+        ok $state.logged-in.poll, 'Sends to state logged-in channel if there is no configured username as a guest';
+    }
 
     $parser.parse-update-user: $roomid, USERNAME // 'PoS-Bot', '1', $avatar;
     nok $state.is-guest, 'Sets state is-guest attribute properly if named';
     ok $state.pending-rename.poll, 'Sends to state pending-rename channel when inited';
+    if USERNAME {
+        ok $state.logged-in.poll, 'Sends to state logged-in channel when inited if there is a configured username';
+    } else {
+        nok $state.logged-in.poll, 'Does not send to state logged-in channel again when inited as a guest';
+    }
 };
 
 subtest '|challstr|', {
@@ -73,7 +86,6 @@ subtest '|challstr|', {
     $parser.parse-challstr: $roomid, $type, $nonce;
 
     if USERNAME {
-        sleep 1;
         is $state.challstr, $challstr, 'Sets state challstr attribute';
     } else {
         skip 'Cannot check if state challstr attribute was updated without a configured username', 1;
