@@ -8,15 +8,25 @@ unit class PSBot::Connection;
 
 has Cro::WebSocket::Client             $!client;
 has Cro::WebSocket::Client::Connection $.connection;
-has Int                                $.timeout       = 1;
-has Bool                               $.force-closed  = False;
-has Supplier                           $.receiver     .= new;
-has Tap                                $.receiver-tap;
-has Supplier                           $.sender       .= new;
-has Tap                                $.sender-tap;;
-has Channel                            $.disconnected .= new;
 
-submethod TWEAK(Cro::WebSocket::Client :$!client) { }
+has Int     $.timeout       = 1;
+has Bool    $.force-closed  = False;
+has Channel $.disconnected .= new;
+
+has Supplier $!receiver;
+has Supply   $!receiver-supply;
+has Tap      $!receiver-tap;
+
+has Supplier $!sender;
+has Supply   $!sender-supply;
+has Tap      $!sender-tap;
+
+submethod TWEAK(Cro::WebSocket::Client :$!client) {
+    $!receiver .= new;
+    $!receiver-supply = $!receiver.Supply.schedule-on($*SCHEDULER);
+    $!sender .= new;
+    $!sender-supply = $!sender.Supply.throttle(1, 0.6).schedule-on($*SCHEDULER);
+}
 
 method new(Str $host, Int $port) {
     my Str                    $protocol  = $port == 443 ?? 'wss' !! 'ws';
@@ -25,13 +35,9 @@ method new(Str $host, Int $port) {
     self.bless: :$client;
 }
 
-method receiver(--> Supply) {
-    $!receiver.Supply.serialize.schedule-on($*SCHEDULER)
-}
+method receiver(--> Supply) { $!receiver-supply }
 
-method uri(--> Str) {
-    $!client.uri.Str
-}
+method uri(--> Str) { $!client.uri.Str }
 
 method closed(--> Bool) {
     return True unless defined $!connection;
@@ -52,7 +58,7 @@ method connect() {
     $!force-closed = False;
 
     # Throttle outgoing messages.
-    $!sender.Supply.throttle(1, 0.6).serialize.schedule-on($*SCHEDULER).tap(-> $data {
+    $!sender-supply.tap(-> $data {
         debug '[SEND]', $data;
         $!connection.send: $data;
     }, tap => -> $tap {
@@ -67,13 +73,13 @@ method connect() {
             $!receiver.emit: $text;
         }
     }, done => {
-        $!receiver-tap.close;
         $!disconnected.send: True;
-        self.reconnect unless $!force-closed;
+        $*SCHEDULER.cue({ self.reconnect }) unless $!force-closed;
     }, tap => -> $tap {
         $!receiver-tap = $tap;
     });
 
+    # Handle what needs to be done on connect.
     my Str @autojoin  = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
     self.send-raw: "/autojoin {@autojoin.join: ','}";
 }
