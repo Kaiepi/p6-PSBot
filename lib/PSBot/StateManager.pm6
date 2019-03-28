@@ -14,6 +14,7 @@ has Str  $.username;
 has Str  $.userid;
 has Bool $.is-guest;
 has Str  $.avatar;
+has Bool $.autoconfirmed;
 has Str  $.group;
 
 has Bool      $.inited                        = False;
@@ -74,8 +75,9 @@ method on-user-details(%data) {
         }
 
         if $userid eq $!userid {
-            $!group  = %data<group>;
-            $!avatar = ~%data<avatar>;
+            $!group         = %data<group>;
+            $!avatar        = ~%data<avatar>;
+            $!autoconfirmed = %data<autoconfirmed>;
         }
 
         $!propagation-mitigation.keep if $!propagation-mitigation.status ~~ Planned

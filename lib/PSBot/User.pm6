@@ -6,6 +6,7 @@ has Str  $.id;
 has Str  $.name;
 has Str  $.group;
 has Str  $.avatar;
+has Bool $.autoconfirmed;
 has Str  %.ranks{Str};
 has Bool $.propagated = False;
 
@@ -19,7 +20,7 @@ multi method new(Str $userinfo, Str $roomid) {
     my Str $rank       = $userinfo.substr: 0, 1;
     my Str $name       = $userinfo.substr: 1;
     my Str $id         = to-id $name;
-    my Str %ranks{Str} = ($roomid => $rank);
+    my Str %ranks{Str} = %($roomid => $rank);
     self.bless: :$id, :$name, :%ranks;
 }
 
@@ -28,9 +29,10 @@ method is-guest(--> Bool) {
 }
 
 method on-user-details(%data) {
-    $!group      = %data<group>;
-    $!avatar     = ~%data<avatar>;
-    $!propagated = True;
+    $!group         = %data<group>;
+    $!avatar        = ~%data<avatar>;
+    $!autoconfirmed = %data<autoconfirmed>;
+    $!propagated    = True;
 }
 
 method on-join(Str $userinfo, Str $roomid) {

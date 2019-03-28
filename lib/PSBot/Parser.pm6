@@ -82,6 +82,10 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
     given $type {
         when 'userdetails' {
             my %data = from-json $data;
+            if %data<autoconfirmed> ~~ Nil {
+                note "This server must support user autoconfirmed metadata in /cmd userdetails in order for {USERNAME} to run properly! Contact a server administrator and ask them to update the server.";
+                exit 1;
+            }
             $!state.on-user-details: %data;
         }
         when 'roominfo' {
@@ -98,6 +102,7 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
 
 method parse-init(Str $roomid, Str $type) {
     $!state.add-room: $roomid;
+    await $!state.logged-in;
     $!connection.send-raw: "/cmd roominfo $roomid";
 }
 
