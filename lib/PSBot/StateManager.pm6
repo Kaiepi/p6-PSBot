@@ -118,6 +118,18 @@ method on-room-info(%data) {
     })
 }
 
+method has-room(Str $roomid --> Bool) {
+    $!chat-mux.protect({
+        %!rooms ∋ $roomid
+    })
+}
+
+method get-room(Str $roomid --> PSBot::Room) {
+    $!chat-mux.protect({
+        %!rooms{$roomid}
+    })
+}
+
 method add-room(Str $roomid) {
     $!chat-mux.protect({
         return if %!rooms ∋ $roomid;
@@ -138,6 +150,18 @@ method delete-room(Str $roomid) {
             $user.on-leave: $roomid;
             %!users{$userid}:delete unless +$user.ranks;
         }
+    })
+}
+
+method has-user(Str $userid --> Bool) {
+    $!chat-mux.protect({
+        %!users ∋ $userid
+    })
+}
+
+method get-user(Str $userid --> PSBot::User) {
+    $!chat-mux.protect({
+        %!users{$userid}
     })
 }
 

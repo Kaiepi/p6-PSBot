@@ -15,7 +15,7 @@ has PSBot::StateManager $.state;
 method parse(Str $text) {
     my Str @lines = $text.lines;
     my Str $roomid;
-    $roomid = @lines.shift.substr(1) if @lines.head.starts-with: '>';
+    $roomid = @lines.shift.substr: 1 if @lines.head.starts-with: '>';
     $roomid //= 'lobby';
 
     for @lines -> $line {
@@ -161,8 +161,8 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
 
     await $!state.propagated;
 
-    my PSBot::User $user = $!state.users{$userid};
-    my PSBot::Room $room = $!state.rooms{$roomid};
+    my PSBot::User $user = $!state.get-user: $userid;
+    my PSBot::Room $room = $!state.get-room: $roomid;
     for $!state.rules.chat -> $rule {
         my Result \output = $rule.match: $message, $room, $user, $!state, $!connection;
         output = await output if output ~~ Awaitable:D;
@@ -187,25 +187,23 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
 }
 
 method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
-    my Str $message = @message.join: '|';
-    my Str $group    = $from.substr: 0, 1;
-    my Str $username = $from.substr: 1;
-    my Str $userid   = to-id $username;
-    if $!state.users ∋ $userid {
-        my PSBot::User $user = $!state.users{$userid};
-        $user.set-group: $group unless defined($user.group) && $user.group eq $group;
+    my Str         $message  = @message.join: '|';
+    my Str         $group    = $from.substr: 0, 1;
+    my Str         $username = $from.substr: 1;
+    my Str         $userid   = to-id $username;
+    my PSBot::User $user;
+
+    if $!state.has-user: $userid {
+        $user = $!state.get-user: $userid;
+        $user.set-group: $group unless $user.group === $group;
     }
     return if $username === $!state.username;
 
     await $!state.propagated;
 
-    my PSBot::User $user;
     my PSBot::Room $room;
-    if $!state.users ∋ $userid {
-        $user = $!state.users{$userid};
-    } else {
-        $user .= new: $from;
-    }
+    $user = $!state.has-user($userid) ?? $!state.get-user($userid) !! PSBot::User.new($from)
+        unless $user;
 
     for $!state.rules.pm -> $rule {
         my Result \output = $rule.match: $message, $room, $user, $!state, $!connection;
@@ -234,8 +232,8 @@ method parse-html(Str $roomid, *@html) {
     await $!state.propagated;
 
     my Str $html = @html.join: '|';
-    my PSBot::Room $room = $!state.rooms ∋ $roomid ?? $!state.rooms{$roomid} !! Nil;
-    my PSBot::User $user = Nil;
+    my PSBot::Room $room = $!state.get-room: $roomid;
+    my PSBot::User $user;
     for $!state.rules.html -> $rule {
         my Result $output = $rule.match: $html, $room, $user, $!state, $!connection;
         $output = await $output if $output ~~ Awaitable:D;
@@ -248,8 +246,8 @@ method parse-popup(Str $roomid, *@popup) {
     await $!state.propagated;
 
     my Str $popup = @popup.join('|').subst('||', "\n", :g);
-    my PSBot::Room $room = $!state.rooms ∋ $roomid ?? $!state.rooms{$roomid} !! Nil;
-    my PSBot::User $user = Nil;
+    my PSBot::Room $room = $!state.get-room: $roomid;
+    my PSBot::User $user;
     for $!state.rules.popup -> $rule {
         my Result $output = $rule.match: $popup, $room, $user, $!state, $!connection;
         $output = await $output if $output ~~ Awaitable:D;
@@ -262,8 +260,8 @@ method parse-raw(Str $roomid, *@html) {
     await $!state.propagated;
 
     my Str $html = @html.join: '|';
-    my PSBot::Room $room = $!state.rooms ∋ $roomid ?? $!state.rooms{$roomid} !! Nil;
-    my PSBot::User $user = Nil;
+    my PSBot::Room $room = $!state.get-room: $roomid;
+    my PSBot::User $user;
     for $!state.rules.raw -> $rule {
         my Result $output = $rule.match: $html, $room, $user, $!state, $!connection;
         $output = await $output if $output ~~ Awaitable:D;

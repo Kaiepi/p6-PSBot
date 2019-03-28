@@ -36,6 +36,7 @@ sub request-video(Str $field --> Video) {
     fail "No video was found." unless +%body<items>;
 
     my %data = %body<items>.pick;
+    say %body;
     Video.new: %data;
 }
 
