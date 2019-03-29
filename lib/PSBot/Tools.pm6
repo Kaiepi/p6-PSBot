@@ -12,7 +12,7 @@ class Maybe is export {
     }
 }
 
-subset Result is export where Str | Awaitable | Iterable | Nil;
+subset Result is export where Str | Positional | Sequence | Awaitable | Nil;
 
 enum Rank is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
 

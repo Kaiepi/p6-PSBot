@@ -174,8 +174,8 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
         my PSBot::User $user   = $!state.get-user: $userid;
         my PSBot::Room $room   = $!state.get-room: $roomid;
         my Result      \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
-        output = await output if output ~~ Awaitable:D;
-        $!connection.send: output, :$roomid if output && output ~~ Str:D | Positional:D;
+        output = await output while output ~~ Awaitable:D;
+        $!connection.send: output, :$roomid if output;
         return;
     }
 
@@ -185,8 +185,8 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
     my PSBot::Room $room = $!state.get-room: $roomid;
     for $!state.rules.chat -> $rule {
         my Result \output = $rule.match: $message, $room, $user, $!state, $!connection;
-        output = await output if output ~~ Awaitable:D;
-        $!connection.send-raw: output, :$roomid if output ~~ Str:D | Iterable:D;
+        output = await output while output ~~ Awaitable:D;
+        $!connection.send-raw: output, :$roomid if output;
         last if output;
     }
 }
@@ -220,8 +220,8 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
         }
 
         my Result \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
-        output = await output if output ~~ Awaitable:D;
-        $!connection.send: output, :$userid if output && output ~~ Str:D | Positional:D;
+        output = await output while output ~~ Awaitable:D;
+        $!connection.send: output, :$userid if output;
         return;
     }
 
@@ -238,8 +238,8 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
 
     for $!state.rules.pm -> $rule {
         my Result \output = $rule.match: $message, $room, $user, $!state, $!connection;
-        output = await output if output ~~ Awaitable:D;
-        $!connection.send-raw: output, :$userid if output ~~ Str:D | Iterable:D;
+        output = await output while output ~~ Awaitable:D;
+        $!connection.send-raw: output, :$userid if output;
         last if output;
     }
 }
@@ -251,10 +251,10 @@ method parse-html(Str $roomid, *@html) {
     my PSBot::Room $room  = $!state.get-room: $roomid;
     my PSBot::User $user;
     for $!state.rules.html -> $rule {
-        my Result $output = $rule.match: $html, $room, $user, $!state, $!connection;
-        $output = await $output if $output ~~ Awaitable:D;
-        $!connection.send-raw: $output, :$roomid if $output ~~ Str:D | Iterable:D;
-        last if $output;
+        my Result \output = $rule.match: $html, $room, $user, $!state, $!connection;
+        output = await output while output ~~ Awaitable:D;
+        $!connection.send-raw: output, :$roomid if output;
+        last if output;
     }
 }
 
@@ -265,10 +265,10 @@ method parse-popup(Str $roomid, *@popup) {
     my PSBot::Room $room  = $!state.get-room: $roomid;
     my PSBot::User $user;
     for $!state.rules.popup -> $rule {
-        my Result $output = $rule.match: $popup, $room, $user, $!state, $!connection;
-        $output = await $output if $output ~~ Awaitable:D;
-        $!connection.send-raw: $output, :$roomid if $output ~~ Str:D | Iterable:D;
-        last if $output;
+        my Result \output = $rule.match: $popup, $room, $user, $!state, $!connection;
+        output = await output while output ~~ Awaitable:D;
+        $!connection.send-raw: output, :$roomid if output;
+        last if output;
     }
 }
 
@@ -279,9 +279,9 @@ method parse-raw(Str $roomid, *@html) {
     my PSBot::Room $room  = $!state.get-room: $roomid;
     my PSBot::User $user;
     for $!state.rules.raw -> $rule {
-        my Result $output = $rule.match: $html, $room, $user, $!state, $!connection;
-        $output = await $output if $output ~~ Awaitable:D;
-        $!connection.send-raw: $output, :$roomid if $output ~~ Str:D | Iterable:D;
-        last if $output;
+        my Result \output = $rule.match: $html, $room, $user, $!state, $!connection;
+        output = await output while output ~~ Awaitable:D;
+        $!connection.send-raw: output, :$roomid if output;
+        last if output;
     }
 }
