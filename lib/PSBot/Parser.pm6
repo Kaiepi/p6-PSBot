@@ -211,7 +211,7 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
 
         my Str         $target = defined($<target>) ?? ~$<target> !! '';
         my PSBot::User $user;
-        my PSBot::Room $room   = $!state.get-room: $roomid;
+        my PSBot::Room $room;
         if $!state.has-user: $userid {
             $user = $!state.get-user: $userid;
             $user.set-group: $group unless $user.group === $group;
