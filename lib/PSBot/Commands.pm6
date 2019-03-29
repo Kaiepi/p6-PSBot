@@ -14,8 +14,13 @@ use PSBot::User;
 use URI::Encode;
 unit module PSBot::Commands;
 
-my Set constant ADMINISTRATIVE .= new: <eval evalcommand say nick suicide>;
-my Map constant DEFAULT_RANKS  .= new: (
+# TODO: all the commands have boilerplate at the beginning of the routine that
+# depends on whether or not the command is administrative. This is also the
+# only place where PSBot::CommandContext is really needed. This should be
+# handled from the parser to remove the need for the class entirely.
+
+my Set constant ADMINISTRATIVE_COMMANDS is export .= new: <eval evalcommand say nick suicide>;
+my Map constant DEFAULT_COMMAND_RANKS   is export .= new: (
     git          => '+',
     eightball    => '+',
     urban        => '+',
@@ -181,7 +186,7 @@ our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method git(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -191,7 +196,7 @@ our method git(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -223,7 +228,7 @@ our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -247,7 +252,7 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -297,7 +302,7 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -320,7 +325,7 @@ our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -343,7 +348,7 @@ our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -361,7 +366,7 @@ our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method translate(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -411,7 +416,7 @@ our method translate(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -452,7 +457,7 @@ our method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -513,7 +518,7 @@ our method reminderlist(Str $taret, PSBot::User $user, PSBot::Room $room,
 
 our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -542,7 +547,7 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -563,7 +568,7 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
 
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -572,7 +577,7 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
     return 'No rank was given.' unless $target-rank;
 
     $command = to-id $command;
-    return "{COMMAND}$command is an administrative command and thus can't have its rank set." if ADMINISTRATIVE ∋ $command;
+    return "{COMMAND}$command is an administrative command and thus can't have its rank set." if ADMINISTRATIVE_COMMANDS ∋ $command;
 
     $target-rank = ' ' unless $target-rank && $target-rank ne 'regular user';
     return "'$target-rank' is not a rank." unless self.is-rank: $target-rank;
@@ -588,13 +593,13 @@ our method toggle(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
 
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $command = to-id $target;
     return 'No command was given.' unless $command;
-    return "{COMMAND}$command is an administrative command and thus can't be disabled." if ADMINISTRATIVE ∋ $command;
+    return "{COMMAND}$command is an administrative command and thus can't be disabled." if ADMINISTRATIVE_COMMANDS ∋ $command;
     return "{COMMAND}{&?ROUTINE.name} can't be disabled." if $command eq &?ROUTINE.name;
 
     my &command = try &::("OUR::$command");
@@ -608,12 +613,12 @@ our method settings(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
 
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my @rows = $state.database.get-commands: $room.id;
-    my @requirements = eager gather for DEFAULT_RANKS.pairs.sort {
+    my @requirements = eager gather for DEFAULT_COMMAND_RANKS.pairs.sort {
         my Str $command = .key;
         my Str $rank    = .value eq ' ' ?? 'regular user' !! .value;
         my     $row     = @rows.first({ $_<command> eq $command });
@@ -641,7 +646,7 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         when 'new' {
             return "There is already a game of {$room.game.name} in progress!" if $room.game;
 
-            my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+            my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
             my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
             return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
@@ -687,7 +692,7 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
     state Maybe[Str] $url;
 
-    my Str        $default-rank = DEFAULT_RANKS{&?ROUTINE.name};
+    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 

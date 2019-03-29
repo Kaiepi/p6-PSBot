@@ -153,11 +153,32 @@ method parse-rename(Str $roomid, Str $userinfo, Str $oldid) {
 }
 
 method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
-    my Str $message = @message.join: '|';
     my Str $username = $userinfo.substr: 1;
+    return if $username === $!state.username;
+
     my Str $userid   = to-id $username;
     $!state.database.add-seen: $userid, now;
-    return if $username === $!state.username;
+
+    my Str $message = @message.join: '|';
+    if $message.starts-with: COMMAND {
+        return unless $message ~~ / ^ $(COMMAND) $<command>=[\w+] [ <.ws> $<target>=[.+] ]? $ /;
+
+        my Str $command = ~$<command>;
+        return unless $command;
+
+        my &command = try &PSBot::Commands::($command);
+        return unless &command;
+
+        await $!state.propagated unless ADMINISTRATIVE_COMMANDS ∋ $command;
+
+        my Str         $target = $<target>.defined ?? ~$<target> !! '';
+        my PSBot::User $user   = $!state.get-user: $userid;
+        my PSBot::Room $room   = $!state.get-room: $roomid;
+        my Result      \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
+        output = await output if output ~~ Awaitable:D;
+        $!connection.send: output, :$roomid if output && output ~~ Str:D | Positional:D;
+        return;
+    }
 
     await $!state.propagated;
 
@@ -169,41 +190,52 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
         $!connection.send-raw: output, :$roomid if output ~~ Str:D | Iterable:D;
         last if output;
     }
-
-    if $message.starts-with: COMMAND {
-        return unless $message ~~ / ^ $(COMMAND) $<command>=[\w+] [ <.ws> $<target>=[.+] ]? $ /;
-        my Str $command = ~$<command>;
-        if $command {
-            my Str $target  = defined($<target>) ?? ~$<target> !! '';
-            my Str $userid  = to-id $username;
-            my &command = try &PSBot::Commands::($command);
-            if &command {
-                my Result \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
-                output = await output if output ~~ Awaitable:D;
-                $!connection.send: output, :$roomid if output && output ~~ Str:D | Iterable:D;
-            }
-        }
-    }
 }
 
 method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
-    my Str         $message  = @message.join: '|';
-    my Str         $group    = $from.substr: 0, 1;
-    my Str         $username = $from.substr: 1;
-    my Str         $userid   = to-id $username;
-    my PSBot::User $user;
-
-    if $!state.has-user: $userid {
-        $user = $!state.get-user: $userid;
-        $user.set-group: $group unless $user.group === $group;
-    }
+    my Str $username = $from.substr: 1;
     return if $username === $!state.username;
+
+    my Str $group    = $from.substr: 0, 1;
+    my Str $userid   = to-id $username;
+    my Str $message  = @message.join: '|';
+    if $message.starts-with: COMMAND {
+        return unless $message ~~ / ^ $(COMMAND) $<command>=[\w+] [ <.ws> $<target>=[.+] ]? $ /;
+
+        my Str $command = ~$<command>;
+        return unless $command;
+
+        my &command = try &PSBot::Commands::($command);
+        return unless &command;
+
+        await $!state.propagated unless ADMINISTRATIVE_COMMANDS ∋ $command;
+
+        my Str         $target = defined($<target>) ?? ~$<target> !! '';
+        my PSBot::User $user;
+        my PSBot::Room $room   = $!state.get-room: $roomid;
+        if $!state.has-user: $userid {
+            $user = $!state.get-user: $userid;
+            $user.set-group: $group unless $user.group === $group;
+        } else {
+            $user .= new: $from;
+        }
+
+        my Result \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
+        output = await output if output ~~ Awaitable:D;
+        $!connection.send: output, :$userid if output && output ~~ Str:D | Positional:D;
+        return;
+    }
 
     await $!state.propagated;
 
+    my PSBot::User $user;
     my PSBot::Room $room;
-    $user = $!state.has-user($userid) ?? $!state.get-user($userid) !! PSBot::User.new($from)
-        unless $user;
+    if $!state.has-user: $userid {
+        $user = $!state.get-user: $userid;
+        $user.set-group: $group unless $user.group === $group;
+    } else {
+        $user .= new: $from;
+    }
 
     for $!state.rules.pm -> $rule {
         my Result \output = $rule.match: $message, $room, $user, $!state, $!connection;
@@ -211,28 +243,13 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
         $!connection.send-raw: output, :$userid if output ~~ Str:D | Iterable:D;
         last if output;
     }
-
-    if $message.starts-with: COMMAND {
-        return unless $message ~~ / ^ $(COMMAND) $<command>=[\w+] [ <.ws> $<target>=[.+] ]? $ /;
-        my Str $command = ~$<command>;
-        if $command {
-            my Str $target  = defined($<target>) ?? ~$<target> !! '';
-            my Str $userid  = to-id $username;
-            my &command = try &PSBot::Commands::($command);
-            if &command {
-                my Result \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
-                output = await output if output ~~ Awaitable:D;
-                $!connection.send: output, :$userid if output && output ~~ Str:D | Iterable:D;
-            }
-        }
-    }
 }
 
 method parse-html(Str $roomid, *@html) {
     await $!state.propagated;
 
-    my Str $html = @html.join: '|';
-    my PSBot::Room $room = $!state.get-room: $roomid;
+    my Str         $html  = @html.join: '|';
+    my PSBot::Room $room  = $!state.get-room: $roomid;
     my PSBot::User $user;
     for $!state.rules.html -> $rule {
         my Result $output = $rule.match: $html, $room, $user, $!state, $!connection;
@@ -245,8 +262,8 @@ method parse-html(Str $roomid, *@html) {
 method parse-popup(Str $roomid, *@popup) {
     await $!state.propagated;
 
-    my Str $popup = @popup.join('|').subst('||', "\n", :g);
-    my PSBot::Room $room = $!state.get-room: $roomid;
+    my Str         $popup = @popup.join('|').subst('||', "\n", :g);
+    my PSBot::Room $room  = $!state.get-room: $roomid;
     my PSBot::User $user;
     for $!state.rules.popup -> $rule {
         my Result $output = $rule.match: $popup, $room, $user, $!state, $!connection;
@@ -259,8 +276,8 @@ method parse-popup(Str $roomid, *@popup) {
 method parse-raw(Str $roomid, *@html) {
     await $!state.propagated;
 
-    my Str $html = @html.join: '|';
-    my PSBot::Room $room = $!state.get-room: $roomid;
+    my Str         $html  = @html.join: '|';
+    my PSBot::Room $room  = $!state.get-room: $roomid;
     my PSBot::User $user;
     for $!state.rules.raw -> $rule {
         my Result $output = $rule.match: $html, $room, $user, $!state, $!connection;
