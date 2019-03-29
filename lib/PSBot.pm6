@@ -81,6 +81,7 @@ method start() {
         }
         whenever signal(SIGINT) {
             await $!connection.close: :force;
+            sleep 1;
             $!state.database.dbh.dispose;
             exit 0;
         }
