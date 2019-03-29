@@ -9,9 +9,10 @@ unit class PSBot::Connection;
 has Cro::WebSocket::Client             $!client;
 has Cro::WebSocket::Client::Connection $.connection;
 
-has Int     $.timeout       = 1;
-has Bool    $.force-closed  = False;
-has Channel $.disconnected .= new;
+has Int     $.timeout        = 1;
+has Bool    $.force-closed   = False;
+has Channel $.on-connect    .= new;
+has Channel $.on-disconnect .= new;
 
 has Supplier $!receiver;
 has Supply   $!receiver-supply;
@@ -22,10 +23,10 @@ has Supply   $!sender-supply;
 has Tap      $!sender-tap;
 
 submethod TWEAK(Cro::WebSocket::Client :$!client) {
-    $!receiver .= new;
-    $!receiver-supply = $!receiver.Supply.schedule-on($*SCHEDULER);
-    $!sender .= new;
-    $!sender-supply = $!sender.Supply.throttle(1, 0.6).schedule-on($*SCHEDULER);
+    $!receiver        .= new;
+    $!receiver-supply  = $!receiver.Supply.schedule-on($*SCHEDULER).serialize;
+    $!sender          .= new;
+    $!sender-supply    = $!sender.Supply.throttle(1, 0.6).schedule-on($*SCHEDULER);
 }
 
 method new(Str $host, Int $port) {
@@ -58,30 +59,24 @@ method connect() {
     $!force-closed = False;
 
     # Throttle outgoing messages.
-    $!sender-supply.tap(-> $data {
+    $!sender-tap = $!sender-supply.tap(-> $data {
         debug '[SEND]', $data;
         $!connection.send: $data;
-    }, tap => -> $tap {
-        $!sender-tap = $tap;
     });
 
     # Pass any received messages back to PSBot to pass to the parser.
-    $!connection.messages.tap(-> $data {
+    $!receiver-tap = $!connection.messages.tap(-> $data {
         when $data.is-text {
             my Str $text = await $data.body-text;
             debug '[RECV]', $text;
             $!receiver.emit: $text;
         }
     }, done => {
-        $!disconnected.send: True;
+        $!on-disconnect.send: True;
         $*SCHEDULER.cue({ self.reconnect }) unless $!force-closed;
-    }, tap => -> $tap {
-        $!receiver-tap = $tap;
     });
 
-    # Handle what needs to be done on connect.
-    my Str @autojoin  = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
-    self.send-raw: "/autojoin {@autojoin.join: ','}";
+    $!on-connect.send: True;
 }
 
 method reconnect() {
@@ -92,7 +87,7 @@ method reconnect() {
         uri      => self.uri
     ).throw if $!timeout == 2 ** MAX_RECONNECT_ATTEMPTS;
 
-    $*SCHEDULER.cue({ self.connect }, at => now + $!timeout);
+    $*SCHEDULER.cue({ self.connect }, in => $!timeout);
 
     $!timeout *= 2;
 }
@@ -166,12 +161,16 @@ multi method send-raw(*@data, Str :$userid!) {
     }
 }
 
-method close(Int :$timeout = 0, Bool :$force = False --> Promise) {
-    my Promise $ret = $!connection ?? $!connection.close(:$timeout) !! Promise.start({ Nil });
+method close(Bool :$force = False --> Promise) {
+    return Promise.start({ Nil }) if self.closed;
+
     $!force-closed = $force;
-    $!receiver-tap.close;
+
     $!receiver.done if $force;
-    $!sender-tap.close;
+    $!receiver-tap.close;
+
     $!sender.done if $force;
-    $ret
+    $!sender-tap.close;
+
+    $!connection.close;
 }

@@ -102,7 +102,6 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
 
 method parse-init(Str $roomid, Str $type) {
     $!state.add-room: $roomid;
-    await $!state.logged-in;
     $!connection.send-raw: "/cmd roominfo $roomid";
 }
 

@@ -13,33 +13,26 @@ method new(Str $host = HOST, Int $port = PORT, Str $serverid = SERVERID) {
 
 method start() {
     react {
+        whenever $!connection.on-connect {
+            my Str @autojoin  = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
+            $!connection.send-raw: "/autojoin {@autojoin.join: ','}";
+        }
         whenever $!connection.receiver -> $message {
             self.parse: $message;
         }
-        whenever $!connection.disconnected {
-            $!state.reset;
+        whenever $!connection.on-disconnect {
+            $!state.reset unless $!connection.force-closed;
         }
         whenever $!state.logged-in {
-            # Finish joining any rooms that wouldn't fit in /autojoin and
-            # set our avatar.
             $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
             $!connection.send-raw: "/avatar {AVATAR}" if AVATAR;
         }
         whenever $!state.autojoined {
             # Get user metadata. We don't get metadata for guest users
-            # since the server gives us none.
+            # since the server gives us nothing of use in response.
             $!connection.send-raw: $!state.users.values
                 .grep({ !.propagated && !.is-guest })
                 .map({ "/cmd userdetails {$_.id}" });
-
-            # We need to send the /cmd roominfo messages for our configured
-            # rooms again, despite them already being sent after receiving
-            # the |init| message, because we may not have logged in yet at
-            # the time we send them, meaning we will never receive a
-            # response.
-            $!connection.send-raw: $!state.rooms.values
-                .grep({ !.propagated })
-                .map({ "/cmd roominfo {$_.id}" });
 
             # Faye is buggy and doesn't always send a response to the slew of
             # /cmd userdetails messages we send, preventing our state from
@@ -47,7 +40,7 @@ method start() {
             # metadata before continuing.
             whenever $!state.propagation-mitigation {
                 # Collect the rest of the user metadata the server never bothered
-                # to send us.
+                # to send us earlier.
                 $!connection.send-raw: $!state.users.values
                     .grep({ !.propagated && !.is-guest })
                     .map({ "/cmd userdetails {$_.id}" });
@@ -55,7 +48,7 @@ method start() {
 
             # Wait until our state is fully propagated before continuing.
             whenever $!state.propagated {
-                # Send user mail, if the recipient is online. If not, wait until
+                # Send user mail if the recipient is online. If not, wait until
                 # they join a room the bot's in.
                 for $!state.users.keys -> $userid {
                     my @mail = $!state.database.get-mail: $userid;
@@ -87,8 +80,7 @@ method start() {
             }
         }
         whenever signal(SIGINT) {
-            $!connection.close: :force;
-            sleep 1;
+            await $!connection.close: :force;
             $!state.database.dbh.dispose;
             exit 0;
         }
