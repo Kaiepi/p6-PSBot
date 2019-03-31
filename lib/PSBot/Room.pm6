@@ -16,12 +16,16 @@ has Str         %.ranks{Str};
 has Bool        $.propagated = False;
 has PSBot::Game $.game;
 
+method new(Str $id) {
+    self.bless: :$id
+}
+
 method modjoin(--> Str) {
     $!modjoin ~~ Bool ?? $!modchat !! $!modjoin
 }
 
-method new(Str $id) {
-    self.bless: :$id
+method set-rank(Str $userid, Str $rank) {
+    %!ranks{$userid} = $rank;
 }
 
 method set-visibility(Str $visibility) {

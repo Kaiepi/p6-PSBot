@@ -108,6 +108,16 @@ method on-room-info(%data) {
             }
         }
 
+        for %data<auth>.kv -> $rank, @userids {
+            for @userids -> $userid {
+                if %!users ∋ $userid {
+                    my PSBot::User $user = %!users{$userid};
+                    $user.set-rank: $roomid, $rank;
+                    $room.set-rank: $userid, $rank;
+                }
+            }
+        }
+
         $!propagation-mitigation.keep if $!propagation-mitigation.status ~~ Planned
             && ⚛$!rooms-joined >= +ROOMS
             && not %!rooms.values.first({ !.propagated });

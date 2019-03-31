@@ -7,7 +7,7 @@ has Str  $.name;
 has Str  $.group;
 has Str  $.avatar;
 has Bool $.autoconfirmed;
-has Str  %.ranks{Str};
+has Str  %.ranks;
 has Bool $.propagated = False;
 
 proto method new(Str, Str $?) {*}
@@ -22,6 +22,10 @@ multi method new(Str $userinfo, Str $roomid) {
     my Str $id         = to-id $name;
     my Str %ranks{Str} = %($roomid => $rank);
     self.bless: :$id, :$name, :%ranks;
+}
+
+method set-rank(Str $roomid, Str $rank) {
+    %!ranks{$roomid} = $rank;
 }
 
 method is-guest(--> Bool) {
