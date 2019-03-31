@@ -10,7 +10,7 @@ class Failable is export {
         return %cache{$name} if %cache{$name}:exists;
 
         my $type := Metamodel::SubsetHOW.new_type:
-            :name«Failable[$name]»,
+            :name("Failable[$name]"),
             :refinee(T =:= Junction ?? Mu !! Any),
             :refinement(T | Failure);
         %cache{$name} := $type;
