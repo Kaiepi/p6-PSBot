@@ -14,11 +14,6 @@ use PSBot::User;
 use URI::Encode;
 unit module PSBot::Commands;
 
-# TODO: all the commands have boilerplate at the beginning of the routine that
-# depends on whether or not the command is administrative. This is also the
-# only place where PSBot::CommandContext is really needed. This should be
-# handled from the parser to remove the need for the class entirely.
-
 my Set constant ADMINISTRATIVE_COMMANDS is export .= new: <eval evalcommand echo nick suicide>;
 my Map constant DEFAULT_COMMAND_RANKS   is export .= new: (
     git          => '+',
@@ -357,7 +352,7 @@ our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my Failable[Video] $video = search-video $target;
     return self.send:
-        "Failed to get YouTube video for '$target': {$video.exception.message}",
+        qq[Failed to get YouTube video for "$target": {$video.exception.message}],
         $rank, $user, $room, $connection unless $video.defined;
 
     $res = "{$video.title} - {$video.url}";
