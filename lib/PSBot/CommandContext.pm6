@@ -3,17 +3,16 @@ use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Room;
 use PSBot::StateManager;
+use PSBot::Tools;
 use PSBot::User;
 unit class PSBot::CommandContext;
 
-enum Rank «' ' '+' '%' '@' '*' "☆" '#' '&' '~'»;
-
-method can(Str $required, Str $target --> Bool) {
+method can(Str $required, Str $target --> Bool) is pure {
     my Map $ranks = Rank.enums;
     $ranks{$target} >= $ranks{$required}
 }
 
-method is-rank($rank --> Bool) {
+method is-rank($rank --> Bool) is pure {
     Rank.enums{$rank}:exists
 }
 
