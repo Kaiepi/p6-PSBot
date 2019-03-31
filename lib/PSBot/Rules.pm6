@@ -45,13 +45,14 @@ method new() {
         Rule.new(
             [],
             [],
-            token {
+            regex {
+                <<
                 [ https? '://' ]?
                 [
-                | 'www.'? 'youtube.com/watch?v='
-                | 'youtu.be/'
+                | 'www.'? 'youtube.com/watch?v=' $<id>=<-[&]>+? [ '&' <-[=]>+? '=' <-[&]>+? ]*?
+                | 'youtu.be/' $<id>=.+?
                 ]
-                $<id>=<-[&]>+
+                >>
             },
             -> $/, $room, $user, $state, $connection {
                 if YOUTUBE_API_KEY && $user.name ne $state.username {
