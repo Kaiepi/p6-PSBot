@@ -1,4 +1,5 @@
 use v6.d;
+use PSBot::Config;
 use PSBot::Plugins::YouTube;
 use PSBot::Room;
 use PSBot::Tools;
@@ -53,13 +54,13 @@ method new() {
                 $<id>=<-[&]>+
             },
             -> $/, $room, $user, $state, $connection {
-                return if $user.name eq $state.username;
-
-                my Str             $id    = ~$<id>;
-                my Failable[Video] $video = get-video $id;
-                return unless defined $video;
-
-                qq[{$user.name} posted a video: "{$video.title}"]
+                if YOUTUBE_API_KEY && $user.name ne $state.username {
+                    my Str             $id    = ~$<id>;
+                    my Failable[Video] $video = get-video $id;
+                    $video.defined
+                        ?? qq[{$user.name} posted a video: "{$video.title}"]
+                        !! "Failed to get the video {$user.name} posted: {$video.exception.message}"
+                }
             }
         ),
         Rule.new(
