@@ -19,7 +19,7 @@ unit module PSBot::Commands;
 # only place where PSBot::CommandContext is really needed. This should be
 # handled from the parser to remove the need for the class entirely.
 
-my Set constant ADMINISTRATIVE_COMMANDS is export .= new: <eval evalcommand say nick suicide>;
+my Set constant ADMINISTRATIVE_COMMANDS is export .= new: <eval evalcommand echo nick suicide>;
 my Map constant DEFAULT_COMMAND_RANKS   is export .= new: (
     git          => '+',
     eightball    => '+',
@@ -61,7 +61,7 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
     if $room {
         return $connection.send-raw: "!code $res", roomid => $room.id if $res.contains("\n")
             && $res.codes < 8192
-            && $state.users{$state.userid}.ranks{$room.id} ne ' ';
+            && $state.get-user($state.userid).ranks{$room.id} ne ' ';
 
         if $res.codes > 296 {
             my Maybe[Str] $url = paste $res;
@@ -73,7 +73,7 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
     }
 
     my Str @res = $res.split: "\n";
-    if @res.first({ .codes > 296 }) {
+    if @res.first(*.codes > 296) {
         my Maybe[Str] $url = paste $res;
         return "Failed to upload {COMMAND}{&?ROUTINE.name} output to Pastebin: {$url.exception.message}" unless defined $url;
         return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
@@ -120,7 +120,7 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
     if $room {
         return $connection.send-raw: "!code $res", roomid => $room.id if $res.contains("\n")
             && $res.codes < 8192
-            && $state.users{$state.userid}.ranks{$room.id} ne ' ';
+            && $state.get-user($state.userid).ranks{$room.id} ne ' ';
 
         if $res.codes > 296 {
             my Maybe[Str] $url = paste $res;
@@ -132,7 +132,7 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
     }
 
     my Str @res = $res.split: "\n";
-    if @res.first({ .codes > 296 }) {
+    if @res.first(*.codes > 296) {
         my Maybe[Str] $url = paste $res;
         return "Failed to upload {COMMAND}{&?ROUTINE.name} output to Pastebin: {$url.exception.message}" unless defined $url;
         return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
@@ -141,7 +141,7 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
     @res.map({ "``$_``" })
 }
 
-our method say(Str $target, PSBot::User $user, PSBot::Room $room,
+our method echo(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
     $target
@@ -707,7 +707,7 @@ our method help(Str $target, PSBot::User $user, PSBot::Room $room,
           Evaluates a command with the given target, user, and room. Useful for detecting errors in commands.
           Requires admin access to the bot.
 
-        - say <message>
+        - echo <message>
           Says a message in the room or PMs the command was sent in.
           Requires admin access to the bot.
 
