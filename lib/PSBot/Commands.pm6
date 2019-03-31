@@ -172,10 +172,12 @@ our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
 our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
+
     $state.login-server.log-out: $state.username;
     $connection.send-raw: '/logout';
-    $connection.close: :force;
+    await $connection.close: :force;
     sleep 1;
+    $state.database.dbh.dispose;
     exit 0;
 }
 
@@ -227,22 +229,30 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
     my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
-    my Str $res = 'No term was given.';
-    return self.send: $res, $rank, $user, $room, $connection unless $target;
+    return self.send: 'No term was given.', $rank, $user, $room, $connection unless $target;
 
-    my Str                 $term = uri_encode_component($target);
-    my Cro::HTTP::Response $resp = await Cro::HTTP::Client.get:
+    my Str                 $term     = uri_encode_component($target);
+    my Cro::HTTP::Response $response = await Cro::HTTP::Client.get:
         "http://api.urbandictionary.com/v0/define?term=$term",
         http             => '1.1',
         content-type     => 'application/json',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
-    my                     %body = await $resp.body;
-    $res = "Urban Dictionary definition for $target was not found.";
-    return self.send: $res, $rank, $user, $room, $connection unless +%body<list>;
 
-    my %info = %body<list>.head;
-    $res = "Urban Dictionary definition for $target: %info<permalink>";
-    self.send: $res, $rank, $user, $room, $connection;
+    my %body = await $response.body;
+    return self.send:
+        "Urban Dictionary definition for $target was not found.",
+        $rank, $user, $room, $connection unless +%body<list>;
+
+    my %data = %body<list>.head;
+    self.send:
+        "Urban Dictionary definition for $target: %data<permalink>",
+        $rank, $user, $room, $connection;
+
+    CATCH {
+        when X::Cro::HTTP::Error::Client | X::Cro::HTTP::Error::Server {
+            "Request to Urban Dictionary API failed with code {.response.status}.";
+        }
+    }
 }
 
 our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -251,25 +261,25 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
-    my Str $res = "{$state.username} has no configured dictionary API ID.";
-    return self.send: $res, $rank, $user, $room, $connection unless DICTIONARY_API_ID;
-
-    $res = "{$state.username} has no configured dictionary API key.";
-    return self.send: $res, $rank, $user, $room, $connection unless DICTIONARY_API_KEY;
+    return self.send:
+        "No Oxford Dictionary API ID is configured.",
+        $rank, $user, $room, $connection unless DICTIONARY_API_ID;
+    return self.send:
+        "No Oxford Dictionary API key is configured.",
+        $rank, $user, $room, $connection unless DICTIONARY_API_KEY;
 
     my Str $word = to-id $target;
-    $res = 'No word was given.';
-    return self.send: $res, $rank, $user, $room, $connection unless $word;
+    return self.send:
+        'No word was given.', $rank, $user, $room, $connection
+        unless $word;
 
-    my Cro::HTTP::Response $resp = try await Cro::HTTP::Client.get:
+    my Cro::HTTP::Response $response = await Cro::HTTP::Client.get:
         "https://od-api.oxforddictionaries.com:443/api/v1/entries/en/$word",
         http             => '1.1',
         headers          => [app_id => DICTIONARY_API_ID, app_key => DICTIONARY_API_KEY],
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
-    $res = "Definition for $word not found.";
-    return self.send: $res, $rank, $user, $room, $connection unless $resp;
 
-    my %body        = await $resp.body;
+    my %body        = await $response.body;
     my @definitions = %body<results>.flat.map({
         $_<lexicalEntries>.map({
             $_<entries>.map({
@@ -280,19 +290,26 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
                 })
             })
         })
-    }).flat.grep({ .defined });
-
-    $res = "/addhtmlbox <ol>{@definitions.map({ "<li>{$_.head}</li>" })}</ol>";
-    return $connection.send-raw: $res, roomid => $room.id if $room && $state.users{$state.userid}.ranks{$room.id} eq '*';
+    }).flat.grep(*.defined);
+    return $connection.send-raw:
+        "/addhtmlbox <ol>{@definitions.map({ "<li>{.head}</li>" })}</ol>", roomid => $room.id
+        if $room && $state.get-user($state.userid).ranks{$room.id} eq '*';
 
     my Int           $i   = 0;
-    my Failable[Str] $url = paste @definitions.map({ "{++$i}. {$_.head}" }).join: "\n";
-    return self.send:
-        "Failed to upload Urban Dictionary definition for $target: {$url.exception.message}",
-        $rank, $user, $room, $connection unless $url.defined;
-
-    $res = "Oxford Dictionary definition for $word: $url";
+    my Failable[Str] $url = paste @definitions.map({ "{++$i}. {.head}" }).join: "\n";
+    my Str           $res = $url.defined
+        ?? "Oxford Dictionary definition for $word: $url"
+        !! "Failed to upload Urban Dictionary definition for $target: {$url.exception.message}";
     self.send: $res, $rank, $user, $room, $connection;
+
+    CATCH {
+        when X::Cro::HTTP::Error::Client | X::Cro::HTTP::Error::Server {
+            my Str $res = .response.status == 404
+                ?? "Definition for $word not found."
+                !! "Request to Oxford Dictionary API failed with code {.response.status}.";
+            self.send: $res, $rank, $user, $room, $connection;
+        }
+    }
 }
 
 our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -301,21 +318,27 @@ our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
     my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
-    my Str $res = 'No query was given,';
-    return self.send: $res, $rank, $user, $room, $connection unless $target;
+    return self.send: 'No query was given,', $rank, $user, $room, $connection unless $target;
 
-    my Str                 $query = uri_encode_component($target);
+    my Str                 $query = uri_encode_component $target;
     my Cro::HTTP::Response $resp  = await Cro::HTTP::Client.get:
         "https://en.wikipedia.org/w/api.php?action=query&prop=info&titles=$query&inprop=url&format=json",
         http             => '1.1',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
-    my                     %body = await $resp.body;
 
-    $res = "No Wikipedia page for $target was found.";
-    return self.send: $res, $rank, $user, $room, $connection if %body<query><pages> ∋ '-1';
-
-    $res = "The Wikipedia page for $target is {%body<query><pages>.head.value<fullurl>}";
+    my     %body = await $resp.body;
+    my Str $res  = %body<query><pages> ∋ '-1'
+        ?? "No Wikipedia page for $target was found."
+        !! "The Wikipedia page for $target can be found at {%body<query><pages>.head.value<fullurl>}";
     self.send: $res, $rank, $user, $room, $connection;
+
+    CATCH {
+        when X::Cro::HTTP::Error::Client | X::Cro::HTTP::Error::Server {
+            self.send:
+                "Request to Wikipedia API failed with code {.response.status}.",
+                $rank, $user, $room, $connection;
+        }
+    }
 }
 
 our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -324,21 +347,27 @@ our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
     my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
-    my Str $res = 'No query was given,';
-    return self.send: $res, $rank, $user, $room, $connection unless $target;
+    return self.send: 'No query was given,', $rank, $user, $room, $connection unless $target;
 
-    my Str                 $query = uri_encode_component($target);
+    my Str                 $query = uri_encode_component $target;
     my Cro::HTTP::Response $resp  = await Cro::HTTP::Client.get:
         "https://wikimon.net/api.php?action=query&prop=info&titles=$query&inprop=url&format=json",
         http             => '1.1',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
-    my                     %body  = await $resp.body;
 
-    $res = "No Wikimon page for $target was found.";
-    return self.send: $res, $rank, $user, $room, $connection if %body<query><pages> ∋ '-1';
-
-    $res = "The Wikimon page for $target is {%body<query><pages>.head.value<fullurl>}";
+    my     %body = await $resp.body;
+    my Str $res  = %body<query><pages> ∋ '-1'
+        ?? "No Wikipedia page for $target was found."
+        !! "The Wikipedia page for $target can be found at {%body<query><pages>.head.value<fullurl>}";
     self.send: $res, $rank, $user, $room, $connection;
+
+    CATCH {
+        when X::Cro::HTTP::Error::Client | X::Cro::HTTP::Error::Server {
+            self.send:
+                "Request to Wikipedia API failed with code {.response.status}.",
+                $rank, $user, $room, $connection;
+        }
+    }
 }
 
 our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -347,15 +376,12 @@ our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
     my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
-    my Str $res = 'No query was given,';
-    return self.send: $res, $rank, $user, $room, $connection unless $target;
+    return self.send: 'No query was given.', $rank, $user, $room, $connection unless $target;
 
     my Failable[Video] $video = search-video $target;
-    return self.send:
-        qq[Failed to get YouTube video for "$target": {$video.exception.message}],
-        $rank, $user, $room, $connection unless $video.defined;
-
-    $res = "{$video.title} - {$video.url}";
+    my Str             $res   = $video.defined
+        ?? "{$video.title} - {$video.url}"
+        !! qq[Failed to get YouTube video for "$target": {$video.exception.message}];
     self.send: $res, $rank, $user, $room, $connection;
 }
 
@@ -366,8 +392,9 @@ our method translate(Str $target, PSBot::User $user, PSBot::Room $room,
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str @parts = $target.split: ',';
-    my Str $res = 'No source language, target language, and phrase were given.';
-    return self.send: $res, $rank, $user, $room, $connection unless +@parts >= 3;
+    return self.send:
+        'No source language, target language, and phrase were given.',
+        $rank, $user, $room, $connection unless +@parts >= 3;
 
     my Str $source-lang = trim @parts[0];
     return self.send: 'No source language was given', $rank, $user, $room, $connection unless $source-lang;
@@ -379,15 +406,15 @@ our method translate(Str $target, PSBot::User $user, PSBot::Room $room,
     return self.send: 'No phrase was given', $rank, $user, $room, $connection unless $query;
 
     my Failable[Str] @languages = get-languages;
-    return self.send: "Failed to fetch list of Google Translate languages: {@languages.exception.message}}", $rank, $user, $room, $connection unless @languages.defined;
+    return self.send:
+        "Failed to fetch list of Google Translate languages: {@languages.exception.message}}",
+        $rank, $user, $room, $connection unless @languages.defined;
 
     unless @languages ∋ $source-lang && @languages ∋ $target-lang {
         my Failable[Str] $url = paste @languages.join: "\n";
-        return self.send:
-            "Failed to upload valid Google Translate languages list to Pastebin: {$url.exception.message}",
-            $rank, $user, $room, $connection unless $url.defined;
-
-        $res = "A list of valid languages may be found at $url";
+        my Str           $res = $url.defined
+            ?? "A list of valid languages may be found at $url"
+            !! "Failed to upload valid Google Translate languages list to Pastebin: {$url.exception.message}";
         return self.send: $res, $rank, $user, $room, $connection;
     }
 
@@ -398,11 +425,9 @@ our method translate(Str $target, PSBot::User $user, PSBot::Room $room,
 
     if $output.codes > 300 {
         my Failable[Str] $url = paste $output;
-        return self.send:
-            "Failed to upload translation result from Google Translate to Pastebin: {$url.exception.message}",
-            $rank, $user, $room, $connection unless $url.defined;
-
-        $res = "{COMMAND}{&?ROUTINE.name} output was too long. It may be found at $url";
+        my Str           $res = $url.defined
+            ?? "{COMMAND}{&?ROUTINE.name} output was too long. It may be found at $url"
+            !! "Failed to upload translation result from Google Translate to Pastebin: {$url.exception.message}",
         return self.send: $res, $rank, $user, $room, $connection;
     }
 
@@ -439,11 +464,9 @@ our method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
 
     if $output.codes > 300 {
         my Failable[Str] $url = paste $output;
-        return self.send:
-            "Failed to upload translation result from Google Translate to Pastebin: {$url.exception.message}",
-            $rank, $user, $room, $connection unless $url.defined;
-
-        $res = "{COMMAND}{&?ROUTINE.name} output was too long. It may be found at $url";
+        my Str           $res = $url.defined
+            ?? "{COMMAND}{&?ROUTINE.name} output was too long. It may be found at $url"
+            !! "Failed to upload translation result from Google Translate to Pastebin: {$url.exception.message}";
         return self.send: $res, $rank, $user, $room, $connection;
     }
 
@@ -459,7 +482,7 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
     my (Str $time-ago, Str $message) = $target.split(',').map({ .trim });
     return 'A time (e.g. 30s, 10m, 2h) and a message must be given.' unless $time-ago && $message;
 
-    my Int $seconds = 0;
+    my Int $seconds;
     given $time-ago {
         when / ^ ( <[0..9]>+ ) [s | <.ws> seconds?] $ / { $seconds += $0.Int                    }
         when / ^ ( <[0..9]>+ ) [m | <.ws> minutes?] $ / { $seconds += $0.Int * 60               }
@@ -471,27 +494,23 @@ our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my Str     $userid   = $user.id;
     my Str     $username = $user.name;
-    my Str     $roomid   = $room ?? $room.id !! Nil;
     my Instant $time     = now + $seconds;
     if $room {
-        $connection.send: "You set a reminder for $time-ago from now.", :$roomid;
+        my Str $roomid = $room.id;
         $state.database.add-reminder: $username, $time-ago, $time, $message, :$roomid;
+        $*SCHEDULER.cue({
+            $state.database.remove-reminder: $username, $time-ago, $time.Rat, $message, :$roomid;
+            $connection.send: "$username, you set a reminder $time-ago ago: $message", :$roomid;
+        }, in => $seconds);
     } else {
-        $connection.send: "You set a reminder for $time-ago from now.", :$userid;
         $state.database.add-reminder: $username, $time-ago, $time, $message, :$userid;
+        $*SCHEDULER.cue({
+            $state.database.remove-reminder: $username, $time-ago, $time.Rat, $message, :$userid;
+            $connection.send: "$username, you set a reminder $time-ago ago: $message", :$userid;
+        }, in => $seconds);
     }
 
-    $*SCHEDULER.cue({
-        if $room {
-            $connection.send: "{$user.name}, you set a reminder $time-ago ago: $message", :$roomid;
-            $state.database.remove-reminder: $username, $time-ago, $time.Rat, $message, :$roomid;
-        } else {
-            $connection.send: "{$user.name}, you set a reminder $time-ago ago: $message", :$userid;
-            $state.database.remove-reminder: $username, $time-ago, $time.Rat, $message, :$userid;
-        }
-    }, at => $time);
-
-    Nil
+    "You set a reminder for $time-ago from now.";
 }
 
 our method reminderlist(Str $taret, PSBot::User $user, PSBot::Room $room,
@@ -506,9 +525,10 @@ our method reminderlist(Str $taret, PSBot::User $user, PSBot::Room $room,
     }).join("\n");
 
     my Failable[Str] $url = paste $table;
-    return $connection.send: "Failed to upload reminder list to Pastebin: {$url.exception.message}", userid => $user.id unless $url.defined;
-
-    $connection.send: "Your reminder list may be found at $url", userid => $user.id;
+    my Str           $res = $url.defined
+        ?? "Your reminder list may be found at $url"
+        !! "Failed to upload reminder list to Pastebin: {$url.exception.message}";
+    $connection.send: $res, userid => $user.id;
 }
 
 our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -526,13 +546,12 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
     return 'No username was given.' unless $userid;
     return 'No message was given.'  unless $message;
 
-    with $state.database.get-mail: $userid  -> \mail {
-        return unless defined mail;
-        return $username ~ "'s mailbox is full." if +mail == 5;
+    with $state.database.get-mail: $userid -> @mail {
+        return "{$username}'s mailbox is full." if @mail.defined && +@mail >= 5;
     }
 
     if $state.users ∋ $userid {
-        $connection.send: ["You received 1 message:", "[{$user.id}] $message"], :$userid;
+        $connection.send: ("You received 1 message:", "[{$user.id}] $message"), :$userid;
     } else {
         $state.database.add-mail: $userid, $user.id, $message;
     }
@@ -546,14 +565,13 @@ our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
     my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
-    my Str $res    = 'No user was given.';
     my Str $userid = to-id $target;
-    return self.send: $res, $rank, $user, $room, $connection unless $userid;
+    return self.send: 'No user was given.', $rank, $user, $room, $connection unless $userid;
 
-    my \time = $state.database.get-seen: $userid;
-    return unless time ~~ DateTime | Failure;
+    my Failable[DateTime] $time = $state.database.get-seen: $userid;
+    return if $time =:= Nil;
 
-    $res  = time.defined
+    my Str $res = $time.defined
         ?? "$target was last seen on {time.yyyy-mm-dd} at {time.hh-mm-ss} UTC."
         !! "$target has never been seen before.";
     self.send: $res, $rank, $user, $room, $connection;
@@ -561,11 +579,11 @@ our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method set(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
-
     my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
+
+    return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
 
     my (Str $command, $target-rank) = $target.split(',').map({ .trim });
     return 'No command was given.' unless $command;
@@ -581,16 +599,18 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
     return "{COMMAND}$command does not exist." unless defined &command;
 
     $state.database.set-command: $room.id, $command, $target-rank;
+    return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
+
     "{COMMAND}$command was set to '$target-rank'.";
 }
 
 our method toggle(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
-
     my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
     my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
+
+    return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
 
     my Str $command = to-id $target;
     return 'No command was given.' unless $command;
@@ -639,7 +659,7 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
     my (Str $subcommand, Str $guess) = $target.split: ' ';
     given $subcommand {
         when 'new' {
-            return "There is already a game of {$room.game.name} in progress!" if $room.game;
+            return "There is already a game of {$room.game.name} in progress." if $room.game;
 
             my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
             my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
@@ -669,17 +689,19 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         }
         when 'guess' {
             return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
-            my \res = $room.game.guess: $user, $guess;
+            my @res = $room.game.guess: $user, $guess;
             $room.remove-game if $room.game.finished;
-            res
+            @res
         }
         when 'end' {
             return 'There is no game of Hangman in progress.' unless $room.game ~~ PSBot::Games::Hangman;
-            my Str \res = $room.game.end;
+            my Str $res = $room.game.end;
             $room.remove-game;
-            res
+            $res
         }
-        default { "Unknown {COMMAND}{&?ROUTINE.name} subcommand: $subcommand" }
+        default {
+            "Unknown {COMMAND}{&?ROUTINE.name} subcommand: $subcommand"
+        }
     }
 }
 

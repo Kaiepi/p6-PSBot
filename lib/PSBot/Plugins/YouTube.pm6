@@ -37,31 +37,41 @@ sub search-video(Str $title --> Video) is export {
     fail 'No YouTube API key is configured.' unless YOUTUBE_API_KEY;
 
     my Str                 $query    = uri_encode_component $title;
-    my Cro::HTTP::Response $response = try await Cro::HTTP::Client.get:
+    my Cro::HTTP::Response $response = await Cro::HTTP::Client.get:
         "https://www.googleapis.com/youtube/v3/search?part=snippet&q=$query&maxResults=1&key={YOUTUBE_API_KEY}",
         http             => '1.1',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
-    fail "Request to YouTube API failed with code {await $response.status}." if $!;
 
     my %body = await $response.body;
     fail 'No video was found.' unless +%body<items>;
 
     my %data = %body<items>.head;
-    Video.new: %data
+    return Video.new: %data;
+
+    CATCH {
+        when X::Cro::HTTP::Error::Client | X::Cro::HTTP::Error::Server {
+            fail "Request to YouTube API failed with code {await .response.status}.";
+        }
+    }
 }
 
 sub get-video(Str $id --> Video) is export {
     fail 'No YouTube API key is configured.' unless YOUTUBE_API_KEY;
 
-    my Cro::HTTP::Response $response = try await Cro::HTTP::Client.get:
+    my Cro::HTTP::Response $response = await Cro::HTTP::Client.get:
         "https://www.googleapis.com/youtube/v3/videos?part=snippet&id=$id&key={YOUTUBE_API_KEY}",
         http             => '1.1',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
-    fail "Request to YouTube API failed with code {await $response.status}." if $!;
 
     my %body = await $response.body;
     fail 'No video was found.' unless +%body<items>;
 
     my %data = %body<items>.head;
-    Video.new: %data
+    return Video.new: %data;
+
+    CATCH {
+        when X::Cro::HTTP::Error::Client | X::Cro::HTTP::Error::Server {
+            fail "Request to YouTube API failed with code {await .response.status}.";
+        }
+    }
 }

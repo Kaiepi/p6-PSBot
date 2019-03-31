@@ -31,43 +31,44 @@ method start() {
     ["The game of $!name has started!", self!display]
 }
 
-method guess(PSBot::User $player, Str $guess) {
-    return "The game hasn't started yet." unless $!started;
-    return "You are not a player in this game." unless $!players ∋ $player;
-    return 'There is no guess.' unless $guess;
-    return 'Invalid guess.' if $guess ~~ rx:i/<-[a..z]>/;
+method guess(PSBot::User $player, Str $guess --> List) {
+    return ("The game hasn't started yet.") unless $!started;
+    return ("You are not a player in this game.") unless $!players ∋ $player;
+    return ('There is no guess.') unless $guess;
+    return ('Invalid guess.') if $guess ~~ rx:i/ <-[a..z]> /;
 
     if $guess.chars > 1 {
         my Str $word = $guess.uc;
         if $word eq $!word {
-            ['Your guess is correct!', self.end]
+            ('Your guess is correct!', self.end)
         } elsif --$!limbs {
-            ['Your guess is incorrect.', self!display]
+            ('Your guess is incorrect.', self!display)
         } else {
-            ['Your guess is incorrect.', self.end]
+            ('Your guess is incorrect.', self.end)
         }
     } else {
         my Str $letter = $guess.uc;
-        return 'You already guessed this letter.' if $!guessed-letters ∋ $letter;
+        return ('You already guessed this letter.') if $!guessed-letters ∋ $letter;
         $!guessed-letters{$letter}++;
 
         if $!word.contains: $letter {
             if $!guessed-letters ⊇ $!letters {
-                ['Your guess is correct!', self.end]
+                ('Your guess is correct!', self.end)
             } else {
-                ['Your guess is correct!', self!display]
+                ('Your guess is correct!', self!display)
             }
         } elsif --$!limbs {
-            ['Your guess is incorrect.', self!display]
+            ('Your guess is incorrect.', self!display)
         } else {
-            ['Your guess is incorrect.', self.end]
+            ('Your guess is incorrect.', self.end)
         }
     }
 }
 
-method end() {
+method end(--> Str) {
     $!finished = True;
+
     my Str $ret = 'The game has ended.';
-    $ret ~= " The word was $!word" if $!started;
+    $ret ~= " The word was $!word." if $!started;
     $ret
 }
