@@ -101,23 +101,24 @@ subtest '|queryresponse|', sub {
     }
 
     subtest '|queryresponse|userdetails|', {
-        plan 4;
+        plan 5;
 
-        my Str $username = 'Kaiepi';
-        my Str $userid   = to-id $username;
-        my Str $group    = '+';
-        my Str $userinfo = "$group$username";
-        my Str $avatar   = '285';
+        my Str  $username      = 'Kaiepi';
+        my Str  $userid        = to-id $username;
+        my Str  $group         = '+';
+        my Str  $userinfo      = "$group$username";
+        my Str  $avatar        = '285';
 
         my Str $roomid = ROOMS.keys.head;
-        my Str $rooms  = $state.rooms.keys.map({ qs[" $_":{}] }).join(',');
+        my Str $rooms  = $state.rooms.keys.map({ qs["$_":{}] }).join(',');
 
         $parser.parse-init: $roomid, 'chat';
         $parser.parse-join: $roomid, $userinfo;
-        $parser.parse-query-response: $roomid, 'userdetails', qs[{"userid":"$userid","avatar":"$avatar","group":"$group","rooms":{$rooms}}];
+        $parser.parse-query-response: $roomid, 'userdetails', qs[{"userid":"$userid","avatar":"$avatar","group":"$group","autoconfirmed":true,"rooms":{$rooms}}];
 
         my PSBot::User $user = $state.users{$userid};
         is $user.group, $group, 'Sets user group attribute';
+        is $user.autoconfirmed, True, 'Sets user autoconfirmed attribute';
         is $user.avatar, $avatar, 'Sets user avatar attribute';
         ok $user.propagated, 'Sets user propagated attribute';
         is $state.propagated.status, Planned, 'State propagated attribute is not kept before finishing fetching metadata';
@@ -158,13 +159,13 @@ subtest '|queryresponse|', sub {
                 is $room.modchat, ($modchat || ' '), 'Sets room modchat attribute';
                 is $room.modjoin, $modjoin ~~ Bool ?? $modchat || ' ' !! $modjoin // ' ', 'Sets room modjoin attribute';
                 is $room.auth, %auth, 'Sets room auth attribute';
-                is $room.ranks{$userid}, $group, 'Sets room ranks attribute';
+                is $room.ranks{$userid}, $group, 'Sets room rank attribute';
                 ok $room.propagated, 'Sets room propagated attribute';
             }
 
             LAST {
                 my Str $rooms = $state.rooms.keys.map({ qs[" $_":{}] }).join(',');
-                $parser.parse-query-response: $_, 'userdetails', qs[{"userid":"$userid","avatar":"$avatar","group":"$group","rooms":{$rooms}}];
+                $parser.parse-query-response: $_, 'userdetails', qs[{"userid":"$userid","avatar":"$avatar","group":"$group","autoconfirmed":true,"rooms":{$rooms}}];
             }
         } for ROOMS.keys;
 
