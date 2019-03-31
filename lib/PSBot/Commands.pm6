@@ -64,7 +64,7 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
             && $state.get-user($state.userid).ranks{$room.id} ne ' ';
 
         if $res.codes > 296 {
-            my Maybe[Str] $url = paste $res;
+            my Failable[Str] $url = paste $res;
             return "Failed to upload {COMMAND}{&?ROUTINE.name} output to Pastebin: {$url.exception.message}" unless defined $url;
             return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
         }
@@ -74,7 +74,7 @@ our method eval(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my Str @res = $res.split: "\n";
     if @res.first(*.codes > 296) {
-        my Maybe[Str] $url = paste $res;
+        my Failable[Str] $url = paste $res;
         return "Failed to upload {COMMAND}{&?ROUTINE.name} output to Pastebin: {$url.exception.message}" unless defined $url;
         return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
     }
@@ -123,7 +123,7 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
             && $state.get-user($state.userid).ranks{$room.id} ne ' ';
 
         if $res.codes > 296 {
-            my Maybe[Str] $url = paste $res;
+            my Failable[Str] $url = paste $res;
             return "Failed to upload {COMMAND}{&?ROUTINE.name} output to Pastebin: {$url.exception.message}" unless defined $url;
             return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
         }
@@ -133,7 +133,7 @@ our method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my Str @res = $res.split: "\n";
     if @res.first(*.codes > 296) {
-        my Maybe[Str] $url = paste $res;
+        my Failable[Str] $url = paste $res;
         return "Failed to upload {COMMAND}{&?ROUTINE.name} output to Pastebin: {$url.exception.message}" unless defined $url;
         return "{COMMAND}{&?ROUTINE.name} output was too long to send. It may be found at $url";
     }
@@ -165,7 +165,7 @@ our method nick(Str $target, PSBot::User $user, PSBot::Room $room,
         }
     }
 
-    my Maybe[Str] $assertion = $state.authenticate: $username, $password;
+    my Failable[Str] $assertion = $state.authenticate: $username, $password;
     return "Failed to rename to $username: {$assertion.exception.message}" if $assertion ~~ Failure:D;
     return unless defined $assertion;
 
@@ -186,8 +186,8 @@ our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method git(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res  = "{$state.username}'s source code may be found at {GIT}";
@@ -196,8 +196,8 @@ our method git(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res  = do given floor rand * 20 {
@@ -228,8 +228,8 @@ our method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res = 'No term was given.';
@@ -252,8 +252,8 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res = "{$state.username} has no configured dictionary API ID.";
@@ -290,8 +290,8 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     $res = "/addhtmlbox <ol>{@definitions.map({ "<li>{$_.head}</li>" })}</ol>";
     return $connection.send-raw: $res, roomid => $room.id if $room && $state.users{$state.userid}.ranks{$room.id} eq '*';
 
-    my Int        $i   = 0;
-    my Maybe[Str] $url = paste @definitions.map({ "{++$i}. {$_.head}" }).join: "\n";
+    my Int           $i   = 0;
+    my Failable[Str] $url = paste @definitions.map({ "{++$i}. {$_.head}" }).join: "\n";
     return self.send:
         "Failed to upload Urban Dictionary definition for $target: {$url.exception.message}",
         $rank, $user, $room, $connection unless $url.defined;
@@ -302,8 +302,8 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res = 'No query was given,';
@@ -325,8 +325,8 @@ our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res = 'No query was given,';
@@ -348,14 +348,14 @@ our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res = 'No query was given,';
     return self.send: $res, $rank, $user, $room, $connection unless $target;
 
-    my Maybe[Video] $video = search-video $target;
+    my Failable[Video] $video = search-video $target;
     return self.send:
         "Failed to get YouTube video for '$target': {$video.exception.message}",
         $rank, $user, $room, $connection unless $video.defined;
@@ -366,8 +366,8 @@ our method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method translate(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str @parts = $target.split: ',';
@@ -383,11 +383,11 @@ our method translate(Str $target, PSBot::User $user, PSBot::Room $room,
     my Str $query = trim @parts[2..*].join: ',';
     return self.send: 'No phrase was given', $rank, $user, $room, $connection unless $query;
 
-    my Maybe[Str] @languages = get-languages;
+    my Failable[Str] @languages = get-languages;
     return self.send: "Failed to fetch list of Google Translate languages: {@languages.exception.message}}", $rank, $user, $room, $connection unless @languages.defined;
 
     unless @languages ∋ $source-lang && @languages ∋ $target-lang {
-        my Maybe[Str] $url = paste @languages.join: "\n";
+        my Failable[Str] $url = paste @languages.join: "\n";
         return self.send:
             "Failed to upload valid Google Translate languages list to Pastebin: {$url.exception.message}",
             $rank, $user, $room, $connection unless $url.defined;
@@ -396,13 +396,13 @@ our method translate(Str $target, PSBot::User $user, PSBot::Room $room,
         return self.send: $res, $rank, $user, $room, $connection;
     }
 
-    my Maybe[Str] $output = get-translation $query, $source-lang, $target-lang;
+    my Failable[Str] $output = get-translation $query, $source-lang, $target-lang;
     return self.send:
         "Failed to get translation result from Google Translate: {$output.exception.message}",
         $rank, $user, $room, $connection unless $output.defined;
 
     if $output.codes > 300 {
-        my Maybe[Str] $url = paste $output;
+        my Failable[Str] $url = paste $output;
         return self.send:
             "Failed to upload translation result from Google Translate to Pastebin: {$url.exception.message}",
             $rank, $user, $room, $connection unless $url.defined;
@@ -416,19 +416,19 @@ our method translate(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res = 'No phrase was given.';
     return self.send: $res, $rank, $user, $room, $connection unless $target;
 
-    my Maybe[Str] @languages = get-languages;
+    my Failable[Str] @languages = get-languages;
     return self.send:
         "Failed to fetch list of Google Translate languages: {@languages.exception.message}",
         $rank, $user, $room, $connection unless @languages.defined;
 
-    my Maybe[Str] $query = $target;
+    my Failable[Str] $query = $target;
     for 0..^10 {
         my Str $target = @languages.pick;
         $query = get-translation $query, $target;
@@ -437,13 +437,13 @@ our method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
             $rank, $user, $room, $connection unless $query.defined;
     }
 
-    my Maybe[Str] $output = get-translation $query, 'en';
+    my Failable[Str] $output = get-translation $query, 'en';
     return self.send:
         "Failed to get translation result from Google Translate: {$output.exception.message}",
         $rank, $user, $room, $connection unless $output.defined;
 
     if $output.codes > 300 {
-        my Maybe[Str] $url = paste $output;
+        my Failable[Str] $url = paste $output;
         return self.send:
             "Failed to upload translation result from Google Translate to Pastebin: {$url.exception.message}",
             $rank, $user, $room, $connection unless $url.defined;
@@ -457,8 +457,8 @@ our method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my (Str $time-ago, Str $message) = $target.split(',').map({ .trim });
@@ -510,7 +510,7 @@ our method reminderlist(Str $taret, PSBot::User $user, PSBot::Room $room,
         qq[{$i + 1}: "%reminder<reminder>" ($location, set for {$time.hh-mm-ss} UTC on {$time.yyyy-mm-dd})]
     }).join("\n");
 
-    my Maybe[Str] $url = paste $table;
+    my Failable[Str] $url = paste $table;
     return $connection.send: "Failed to upload reminder list to Pastebin: {$url.exception.message}", userid => $user.id unless $url.defined;
 
     $connection.send: "Your reminder list may be found at $url", userid => $user.id;
@@ -518,8 +518,8 @@ our method reminderlist(Str $taret, PSBot::User $user, PSBot::Room $room,
 
 our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Int $idx = $target.index: ',';
@@ -547,8 +547,8 @@ our method mail(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method seen(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $res    = 'No user was given.';
@@ -568,8 +568,8 @@ our method set(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
 
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my (Str $command, $target-rank) = $target.split(',').map({ .trim });
@@ -593,8 +593,8 @@ our method toggle(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
 
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my Str $command = to-id $target;
@@ -613,8 +613,8 @@ our method settings(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     return "{COMMAND}{&?ROUTINE.name} can only be used in rooms." unless $room;
 
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     my @rows = $state.database.get-commands: $room.id;
@@ -631,7 +631,7 @@ our method settings(Str $target, PSBot::User $user, PSBot::Room $room,
     my Str $res = "/addhtmlbox <details><summary>Command Settings</summary><table>{@requirements.map({ "<tr><td>{.head}</td><td>{.tail}</td></tr>" })}</table></details>";
     return $connection.send-raw: $res, roomid => $room.id if $state.users{$state.userid}.ranks{$room.id} eq '*';
 
-    my Maybe[Str] $url = paste @requirements.map({ .join: ': ' }).join: "\n";
+    my Failable[Str] $url = paste @requirements.map({ .join: ': ' }).join: "\n";
     return "Failed to upload command settings to Pastebin: {$url.exception.message}" unless $url.defined;
 
     "Settings for commands in {$room.title} may be found at: $url"
@@ -646,8 +646,8 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
         when 'new' {
             return "There is already a game of {$room.game.name} in progress!" if $room.game;
 
-            my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-            my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+            my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+            my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
             return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
             $room.add-game: PSBot::Games::Hangman.new: $user, :allow-late-joins;
@@ -690,10 +690,10 @@ our method hangman(Str $target, PSBot::User $user, PSBot::Room $room,
 
 our method help(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
-    state Maybe[Str] $url;
+    state Failable[Str] $url;
 
-    my Str        $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
-    my Maybe[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
+    my Str           $default-rank = DEFAULT_COMMAND_RANKS{&?ROUTINE.name};
+    my Failable[Str] $rank         = self.get-permission: &?ROUTINE.name, $default-rank, $user, $room, $state, $connection;
     return self.send: $rank.exception.message, $default-rank, $user, $room, $connection unless $rank.defined;
 
     return "{$state.username} help may be found at: $url" if defined $url;

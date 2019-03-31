@@ -1,14 +1,20 @@
 use v6.d;
-use nqp;
 use Pastebin::Shadowcat;
 unit module PSBot::Tools;
 
-class Maybe is export {
-    method ^parameterize(Mu:U \M, Mu:U \T) {
-        Metamodel::SubsetHOW.new_type:
-            :name("Maybe[{T.^name}]"),
-            :refinee(nqp::if(nqp::istype(T, Junction), Mu, Any)),
-            :refinement(T | Failure)
+class Failable is export {
+    my %cache;
+
+    method ^parameterize($, Mu:U \T) {
+        my Str $name = T.^name;
+        return %cache{$name} if %cache{$name}:exists;
+
+        my $type := Metamodel::SubsetHOW.new_type:
+            :name«Failable[$name]»,
+            :refinee(T =:= Junction ?? Mu !! Any),
+            :refinement(T | Failure);
+        %cache{$name} := $type;
+        $type
     }
 }
 

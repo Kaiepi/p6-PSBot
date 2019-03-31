@@ -65,8 +65,8 @@ method parse-update-user(Str $roomid, Str $username, Str $is-named, Str $avatar)
 method parse-challstr(Str $roomid, Str $type, Str $nonce) {
     return unless USERNAME;
 
-    my Str        $challstr  = "$type|$nonce";
-    my Maybe[Str] $assertion = $!state.authenticate: USERNAME, PASSWORD, $challstr;
+    my Str           $challstr  = "$type|$nonce";
+    my Failable[Str] $assertion = $!state.authenticate: USERNAME, PASSWORD, $challstr;
     $assertion.throw if $assertion ~~ Failure:D;
     if defined $assertion {
         $!connection.send-raw: "/trn {USERNAME},0,$assertion";
