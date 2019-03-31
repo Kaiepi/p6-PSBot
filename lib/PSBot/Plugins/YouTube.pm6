@@ -64,7 +64,7 @@ sub get-video(Str $id --> Video) is export {
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
 
     my %body = await $response.body;
-    fail 'No video was found.' unless +%body<items>;
+    fail 'Invalid video ID.' unless +%body<items>;
 
     my %data = %body<items>.head;
     return Video.new: %data;
