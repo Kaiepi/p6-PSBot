@@ -210,10 +210,9 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
         await $!state.propagated unless ADMINISTRATIVE_COMMANDS ∋ $command;
 
         my Str         $target = defined($<target>) ?? ~$<target> !! '';
-        my PSBot::User $user;
+        my PSBot::User $user   = $!state.get-user: $userid;
         my PSBot::Room $room;
-        if $!state.has-user: $userid {
-            $user = $!state.get-user: $userid;
+        if $user {
             $user.set-group: $group unless $user.group === $group;
         } else {
             $user .= new: $from;
@@ -227,10 +226,9 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
 
     await $!state.propagated;
 
-    my PSBot::User $user;
+    my PSBot::User $user = $!state.get-user: $userid;
     my PSBot::Room $room;
-    if $!state.has-user: $userid {
-        $user = $!state.get-user: $userid;
+    if $user {
         $user.set-group: $group unless $user.group === $group;
     } else {
         $user .= new: $from;
