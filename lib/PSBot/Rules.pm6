@@ -55,7 +55,9 @@ method new() {
                 >>
             },
             -> $/, $room, $user, $state, $connection {
-                if YOUTUBE_API_KEY && $user.name ne $state.username {
+                my Bool $do-fetch = YOUTUBE_API_KEY && $user.name ne $state.username;
+                $do-fetch = $user.ranks{$room.id} !~~ ' ' | '+' if $do-fetch && SERVERID eq 'showdown' && $room.id eq 'lobby';
+                if $do-fetch {
                     my Str             $id    = ~$<id>;
                     my Failable[Video] $video = get-video $id;
                     $video.defined
