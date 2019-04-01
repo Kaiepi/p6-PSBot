@@ -1,40 +1,31 @@
 use v6.d;
-use Cro::HTTP::Router;
-use Cro::HTTP::Router::WebSocket;
-use Cro::HTTP::Server;
 use JSON::Fast;
 use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Parser;
 use PSBot::StateManager;
+use PSBot::Test::Server;
 use PSBot::Tools;
 use PSBot::User;
 use Test;
 
 plan 8;
 
-BEGIN %*ENV<TESTING> = 1;
+my PSBot::Test::Server $server;
 
-my $application = route {
-    get -> 'showdown', 'websocket' {
-        web-socket -> $incoming, $close {
-            supply {
-                whenever $incoming -> $data { }
-                whenever $close             { }
-            }
-        }
-    }
-};
+BEGIN {
+    %*ENV<TESTING> := 1;
+    $server .= new: -> $data, &emit { };
+    $server.start;
+}
 
-my Int $port = 0;
-$port = floor rand * 65535 until $port >= 1000;
-
-my $server = Cro::HTTP::Server.new: :$application, :$port;
-$server.start;
-END $server.stop;
+END {
+    %*ENV<TESTING>:delete;
+    $server.stop;
+}
 
 my PSBot::StateManager $state      .= new: SERVERID // 'showdown';
-my PSBot::Connection   $connection .= new: 'localhost', $port;
+my PSBot::Connection   $connection .= new: 'localhost', $server.port;
 my PSBot::Parser       $parser     .= new: :$connection, :$state;
 $connection.connect;
 
