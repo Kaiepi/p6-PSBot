@@ -175,7 +175,7 @@ our method suicide(Str $target, PSBot::User $user, PSBot::Room $room,
 
     $state.login-server.log-out: $state.username;
     $connection.send-raw: '/logout';
-    await $connection.close: :force;
+    try await $connection.close: :force;
     sleep 1;
     $state.database.dbh.dispose;
     exit 0;
