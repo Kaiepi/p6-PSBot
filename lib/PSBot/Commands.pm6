@@ -249,8 +249,8 @@ our method urban(Str $target, PSBot::User $user, PSBot::Room $room,
         $rank, $user, $room, $connection;
 
     CATCH {
-        when X::Cro::HTTP::Error::Client | X::Cro::HTTP::Error::Server {
-            "Request to Urban Dictionary API failed with code {.response.status}.";
+        when X::Cro::HTTP::Error {
+            "Request to Urban Dictionary API failed with code {await .response.status}.";
         }
     }
 }
@@ -303,10 +303,10 @@ our method dictionary(Str $target, PSBot::User $user, PSBot::Room $room,
     self.send: $res, $rank, $user, $room, $connection;
 
     CATCH {
-        when X::Cro::HTTP::Error::Client | X::Cro::HTTP::Error::Server {
-            my Str $res = .response.status == 404
+        when X::Cro::HTTP::Error {
+            my Str $res = await .response.status == 404
                 ?? "Definition for $word not found."
-                !! "Request to Oxford Dictionary API failed with code {.response.status}.";
+                !! "Request to Oxford Dictionary API failed with code {await .response.status}.";
             self.send: $res, $rank, $user, $room, $connection;
         }
     }
@@ -333,9 +333,9 @@ our method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
     self.send: $res, $rank, $user, $room, $connection;
 
     CATCH {
-        when X::Cro::HTTP::Error::Client | X::Cro::HTTP::Error::Server {
+        when X::Cro::HTTP::Error {
             self.send:
-                "Request to Wikipedia API failed with code {.response.status}.",
+                "Request to Wikipedia API failed with code {await .response.status}.",
                 $rank, $user, $room, $connection;
         }
     }
@@ -362,9 +362,9 @@ our method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
     self.send: $res, $rank, $user, $room, $connection;
 
     CATCH {
-        when X::Cro::HTTP::Error::Client | X::Cro::HTTP::Error::Server {
+        when X::Cro::HTTP::Error {
             self.send:
-                "Request to Wikipedia API failed with code {.response.status}.",
+                "Request to Wikipedia API failed with code {await .response.status}.",
                 $rank, $user, $room, $connection;
         }
     }

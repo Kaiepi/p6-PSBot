@@ -22,8 +22,8 @@ sub get-languages(--> Array[Str]) is export {
     @languages = %body<data><languages>.map({ $_<language> });
 
     CATCH {
-        when X::Cro::HTTP::Error::Client | X::Cro::HTTP::Error::Server {
-            fail "Request to Google Translate API failed with code {.response.status}.";
+        when X::Cro::HTTP::Error {
+            fail "Request to Google Translate API failed with code {await .response.status}.";
         }
     }
 }
@@ -44,8 +44,8 @@ multi sub get-translation(Str $input, Str $target --> Str) is export {
     decode-entities %body<data><translations>.head<translatedText>;
 
     CATCH {
-        when X::Cro::HTTP::Error::Client | X::Cro::HTTP::Error::Server {
-            fail "Request to Google Translate API failed with code {.response.status}.";
+        when X::Cro::HTTP::Error {
+            fail "Request to Google Translate API failed with code {await .response.status}.";
         }
     }
 }
@@ -64,8 +64,8 @@ multi sub get-translation(Str $input, Str $source, Str $target --> Str) is expor
     decode-entities %body<data><translations>.head<translatedText>;
 
     CATCH {
-        when X::Cro::HTTP::Error::Client | X::Cro::HTTP::Error::Server {
-            fail "Request to Google Translate API failed with code {.response.status}.";
+        when X::Cro::HTTP::Error {
+            fail "Request to Google Translate API failed with code {await .response.status}.";
         }
     }
 }
