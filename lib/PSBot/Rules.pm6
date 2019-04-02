@@ -45,18 +45,19 @@ method new() {
         Rule.new(
             [],
             [],
-            regex {
+            token {
                 <<
                 [ https? '://' ]?
                 [
-                | 'www.'? 'youtube.com/watch?v=' $<id>=<-[&]>+? [ '&' <-[=]>+? '=' <-[&]>+? ]*?
-                | 'youtu.be/' $<id>=.+?
+                | 'www.'? 'youtube.com/watch?v=' $<id>=<-[&]>+ [ '&' <-[=]>+ '=' <-[&]>+ ]*
+                | 'youtu.be/' $<id>=.+
                 ]
                 >>
             },
             -> $/, $room, $user, $state, $connection {
                 my Bool $do-fetch = YOUTUBE_API_KEY && $user.name ne $state.username;
-                $do-fetch = $user.ranks{$room.id} !~~ ' ' | '+' if $do-fetch && SERVERID eq 'showdown' && $room.id eq 'lobby';
+                $do-fetch = $user.ranks{$room.id} ~~ '%' | '@' | '&' | '~'
+                    if $do-fetch && SERVERID eq 'showdown' && $room.id eq 'lobby';
                 if $do-fetch {
                     my Str             $id    = ~$<id>;
                     my Failable[Video] $video = get-video $id;
@@ -95,7 +96,7 @@ method new() {
             -> $/, $room, $user, $state, $connection {
                 my Str $roomid = ~$<roomid>;
                 return if $roomid.starts-with: 'battle-';
-                return "/join $roomid" if $user.group !~~ ' ' | '+';
+                return "/join $roomid" if $user.group ~~ '%' | '@' | '&' | '~';
             }
         )
     ];
@@ -108,7 +109,7 @@ method new() {
             token {
                 ^
                 '<img src="//play.pokemonshowdown.com/sprites/trainers/'
-                $<avatar>=[<-[.]>+] '.' <[a..z]>+ 
+                $<avatar>=[<-[.]>+] '.' <[a..z]>+
                 '" alt="' <-["]>* '" width="80" height="80" />'
                 $
             },
