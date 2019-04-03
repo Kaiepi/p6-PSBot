@@ -628,7 +628,7 @@ BEGIN {
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             sub subcommand-grepper(PSBot::Command $command) {
                 $command.subcommands.defined
-                    ?? $command.subcommands.values.map(&subcommand-grepper)
+                    ?? ($command, $command.subcommands.values.map(&subcommand-grepper))
                     !! $command
             }
 
