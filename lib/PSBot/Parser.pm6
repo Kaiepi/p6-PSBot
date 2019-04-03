@@ -9,10 +9,6 @@ use PSBot::StateManager;
 use PSBot::Tools;
 unit role PSBot::Parser;
 
-my Map constant COMMANDS .= new: PSBot::Commands::.values.map(-> $command {
-    ($command.name, $command)
-});
-
 my Regex $command-matcher = token {
     ^
     $(COMMAND)
@@ -176,9 +172,9 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
 
         my Str $command-name = ~$<command>;
         return unless $command-name;
-        return unless COMMANDS ∋ $command-name;
+        return unless PSBot::Commands::{$command-name}:exists;
 
-        my PSBot::Command   $command = COMMANDS{$command-name};
+        my PSBot::Command   $command = PSBot::Commands::{$command-name};
         my Str              $target  = $<target>.defined ?? ~$<target> !! '';
         my PSBot::User      $user    = $!state.get-user: $userid;
         my PSBot::Room      $room    = $!state.get-room: $roomid;
@@ -215,9 +211,9 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
 
         my Str $command-name = ~$<command>;
         return unless $command-name;
-        return unless COMMANDS ∋ $command-name;
+        return unless PSBot::Commands::{$command-name}:exists;
 
-        my PSBot::Command   $command = COMMANDS{$command-name};
+        my PSBot::Command   $command = PSBot::Commands::{$command-name};
         my Str              $target  = $<target>.defined ?? ~$<target> !! '';
         my PSBot::User      $user    = $!state.get-user: $userid;
         my PSBot::Room      $room;
