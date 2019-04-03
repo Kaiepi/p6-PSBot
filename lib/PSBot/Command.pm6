@@ -16,6 +16,8 @@ subset Replier is export where Callable[Nil] | Nil;
 has Str    $.name;
 # Whether or not the user running the command should be a bot admin.
 has Bool   $.administrative;
+# Whether or not the user running the command should be autoconfirmed.
+has Bool   $.autoconfirmed;
 # The default rank required to run the command.
 has Str    $.default-rank;
 # The actual rank required to run the command.
@@ -36,14 +38,14 @@ has ::?CLASS $.root;
 
 # Creates a new command using either a routine or a list of subcommands.
 proto method new(|) {*}
-multi method new(&command, Str :$name = &command.name, Bool :$administrative,
-        Str :$default-rank = ' ', Locale :$locale = Everywhere) {
-    self.bless: :$name, :$administrative, :$default-rank, :$locale, :&command;
+multi method new(&command, Str :$name = &command.name, Bool :$administrative = False,
+        Bool :$autoconfirmed = False, Str :$default-rank = ' ', Locale :$locale = Everywhere) {
+    self.bless: :$name, :$administrative, :$autoconfirmed, :$default-rank, :$locale, :&command;
 }
-multi method new(@subcommands, Str :$name!, Bool :$administrative,
-        Str :$default-rank = ' ', Locale :$locale = Everywhere) {
+multi method new(@subcommands, Str :$name!, Bool :$administrative = False,
+        Bool :$autoconfirmed = False, Str :$default-rank = ' ', Locale :$locale = Everywhere) {
     my Map $subcommands .= new: @subcommands.map(-> $sc { $sc.name => $sc });
-    self.bless: :$name, :$administrative, :$default-rank, :$locale, :$subcommands;
+    self.bless: :$name, :$administrative, :$autoconfirmed, :$default-rank, :$locale, :$subcommands;
 }
 
 # Get the full command chain name.
@@ -57,6 +59,12 @@ method administrative(--> Bool) {
     return $!administrative if $!administrative;
     return $!root.administrative if $!root.defined;
     $!administrative
+}
+
+method autoconfirmed(--> Bool) {
+    return $!autoconfirmed if $!autoconfirmed;
+    return $!root.autoconfirmed if $!root.defined;
+    $!autoconfirmed
 }
 
 method rank(--> Str) {
@@ -148,13 +156,22 @@ method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
         }
     }
 
-    return $connection.send: 'Permission denied.', userid => $user.id
-        if self.administrative && ADMINS ∌ $user.id;
+    if self.administrative {
+        return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
+    } else {
+        # Administrative commands need to be possible to use before state is
+        # fully propagated in case of bugs.
+        await $state.propagated;
+    }
+
+    return $connection.send:
+        "Permission denied. {COMMAND}{self.name} requires your account to be autoconfirmed.",
+        userid => $user.id if self.autoconfirmed && !$user.autoconfirmed;
 
     if $room {
         my      $row     = $state.database.get-command: $room.id, self.name;
         my Bool $enabled = $row.defined ?? $row<enabled>.Int.Bool !! True;
-        $!rank = ($row.defined && $row<rank>) || $!default-rank unless $!rank.defined;
+        $!rank = ($row.defined && $row<rank>.Str) || $!default-rank unless $!rank.defined;
         return $connection.send:
             "{COMMAND}{self.name} is disabled in {$room.title}.",
             userid => $user.id unless $enabled;
@@ -164,7 +181,6 @@ method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
         qq[Permission denied. {COMMAND}{self.name} requires at least rank "{self.rank}".],
         userid => $user.id unless self.can: self.rank, $user.ranks{$room.id};
 
-    await $state.propagated unless $!administrative;
     return &!command(self, $target, $user, $room, $state, $connection) if &!command;
 
     my Int $idx             = $target.index: ' ';

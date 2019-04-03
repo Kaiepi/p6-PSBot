@@ -431,6 +431,7 @@ BEGIN {
         };
 
     my PSBot::Command $reminder .= new:
+        :autoconfirmed,
         anon method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             return self.reply:
@@ -470,6 +471,7 @@ BEGIN {
         };
 
     my PSBot::Command $reminderlist .= new:
+        :autoconfirmed,
         :locale(Locale::PM),
         anon method reminderlist(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
@@ -486,6 +488,7 @@ BEGIN {
         };
 
     my PSBot::Command $mail .= new:
+        :autoconfirmed,
         anon method mail(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             my Int $idx = $target.index: ',';
@@ -830,13 +833,16 @@ BEGIN {
 
                 - reminder <time>, <message>
                   Sets a reminder with the given message to be sent in the given time.
+                  Requires autoconfirmed status.
 
                 - reminderlist
                   Returns a list of reminders you currently have set.
-                  Thsi command can only be used in PMs.
+                  This command can only be used in PMs.
+                  Requires autoconfirmed status.
 
                 - mail <username>, <message>
                   Mails the given message to the given user once they log on.
+                  Requires autoconfirmed status.
 
                 - seen <username>
                   Returns the last time the given user was seen.
