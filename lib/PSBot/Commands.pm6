@@ -400,7 +400,7 @@ our $translate = PSBot::Command.new:
             my Failable[Str] $url = paste @languages.join: "\n";
             my Str           $res = $url.defined
                 ?? "A list of valid languages may be found at $url"
-                !! "Failed to upload valid Google Translate languages list to Pastebin: {$url.exception.message}";
+                !! "Failed to upload list of valid Google Translate languages list to Pastebin: {$url.exception.message}";
             return self.send: $res, $user, $room, $connection;
         }
 

@@ -3,13 +3,14 @@ use PSBot::Config;
 use HTML::Entity;
 use Cro::HTTP::Client;
 use Cro::HTTP::Response;
+use PSBot::Tools;
 use URI::Encode;
 unit module PSBot::Plugins::Translate;
 
 my Str @languages;
 
 sub get-languages(--> Array[Str]) is export {
-    return @languages if defined @languages;
+    return @languages if @languages;
 
     fail "No Google Translate API key is configured." unless TRANSLATE_API_KEY;
 
@@ -20,6 +21,7 @@ sub get-languages(--> Array[Str]) is export {
 
     my %body = await $response.body;
     @languages = %body<data><languages>.map({ $_<language> });
+    return @languages;
 
     CATCH {
         when X::Cro::HTTP::Error {
@@ -28,12 +30,12 @@ sub get-languages(--> Array[Str]) is export {
     }
 }
 
-multi sub get-translation(Str $input, Str $target --> Str) is export {
-    get-languages unless @languages;
-
+proto sub get-translation(Str, Str $target, Str $? --> Str) is export {
     fail "No Google Translate API key is configured." unless TRANSLATE_API_KEY;
-    fail "$target is not a valid language." unless @languages ∋ $target;
 
+    {*}
+}
+multi sub get-translation(Str $input, Str $target --> Str) {
     my Str                 $query    = uri_encode_component($input);
     my Cro::HTTP::Response $response = await Cro::HTTP::Client.get:
         "https://translation.googleapis.com/language/translate/v2?q=$query&target=$target&key={TRANSLATE_API_KEY}",
@@ -41,7 +43,7 @@ multi sub get-translation(Str $input, Str $target --> Str) is export {
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
 
     my %body = await $response.body;
-    decode-entities %body<data><translations>.head<translatedText>;
+    return decode-entities %body<data><translations>.head<translatedText>;
 
     CATCH {
         when X::Cro::HTTP::Error {
@@ -49,11 +51,7 @@ multi sub get-translation(Str $input, Str $target --> Str) is export {
         }
     }
 }
-multi sub get-translation(Str $input, Str $source, Str $target --> Str) is export {
-    get-languages unless @languages;
-    fail "No Google Translate API key is configured." unless TRANSLATE_API_KEY;
-    fail "$target is not a valid language." unless @languages ∋ $target;
-
+multi sub get-translation(Str $input, Str $source, Str $target --> Str) {
     my Str                 $query    = uri_encode_component($input);
     my Cro::HTTP::Response $response = Cro::HTTP::Client.get:
         "https://translation.googleapis.com/language/translate/v2?q=$query&source=$source&target=$target&key={TRANSLATE_API_KEY}",
@@ -61,7 +59,7 @@ multi sub get-translation(Str $input, Str $source, Str $target --> Str) is expor
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
 
     my %body = await $response.body;
-    decode-entities %body<data><translations>.head<translatedText>;
+    return decode-entities %body<data><translations>.head<translatedText>;
 
     CATCH {
         when X::Cro::HTTP::Error {
