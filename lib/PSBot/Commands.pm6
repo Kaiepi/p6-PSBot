@@ -13,6 +13,7 @@ use PSBot::Room;
 use PSBot::StateManager;
 use PSBot::Tools;
 use PSBot::User;
+use Telemetry;
 use URI::Encode;
 unit module PSBot::Commands;
 
@@ -144,10 +145,18 @@ BEGIN {
             @res.map({ "``$_``" })
         };
 
+    my PSBot::Command $max-rss .= new:
+        :administrative,
+        anon method max-rss(Str $target, PSBot::User $user, PSBot::Room $room,
+                PSBot::StateManager $state, PSBot::Connection $connection --> Result) {
+            sprintf '%s currently has a %.2fMB maximum resident set size.',
+                $state.username, T<max-rss> / 1024
+        };
+
     my PSBot::Command $nick .= new:
         :administrative,
         anon method nick(Str $target, PSBot::User $user, PSBot::Room $room,
-                PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+                PSBot::StateManager $state, PSBot::Connection $connection --> Result) {
             return 'A username and optionally a password must be provided.' unless $target.includes: ',';
 
             my (Str $username, Str $password) = $target.split(',').map(*.trim);
@@ -498,7 +507,7 @@ BEGIN {
 
     my PSBot::Command $reminderlist .= new:
         anon method reminderlist(Str $target, PSBot::User $user, PSBot::Room $room,
-                PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+                PSBot::StateManager $state, PSBot::Connection $connection --> Result) {
             my @reminders = $state.database.get-reminders: $user.name;
             return $connection.send: 'You have no reminders set.', userid => $user.id unless +@reminders;
 
@@ -517,7 +526,7 @@ BEGIN {
 
     my PSBot::Command $mail .= new:
         anon method mail(Str $target, PSBot::User $user, PSBot::Room $room,
-                PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+                PSBot::StateManager $state, PSBot::Connection $connection --> Result) {
             my Int $idx = $target.index: ',';
             return 'A username and a message must be included.' unless $idx;
 
@@ -772,7 +781,7 @@ BEGIN {
     my PSBot::Command $help .= new:
         :default-rank<+>,
         anon method help(Str $target, PSBot::User $user, PSBot::Room $room,
-                PSBot::StateManager $state, PSBot::Connection $connection --> Str) {
+                PSBot::StateManager $state, PSBot::Connection $connection --> Result) {
             state Failable[Str] $url;
 
             my Str $help = q:to/END/;
@@ -782,6 +791,10 @@ BEGIN {
 
                 - evalcommand <command>, <target>, <user>, <room>
                   Evaluates a command with the given target, user, and room. Useful for detecting errors in commands.
+                  Requires admin access to the bot.
+
+                - max-rss
+                  Returns the maximum resident set size in megabytes.
                   Requires admin access to the bot.
 
                 - echo <message>
