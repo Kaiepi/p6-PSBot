@@ -99,44 +99,43 @@ method can(Str $required, Str $target --> Bool) {
 # sends a response to the user.
 method reply(Result \output, Bool :$raw = False, Bool :$paste = False --> Replier) is pure {
     sub (PSBot::User $user, PSBot::Room $room, PSBot::Connection $connection --> Nil) {
-        my Result \result = output;
-        result = await result while result ~~ Awaitable:D;
-        return unless result;
-
-        given result {
+        my Result $result := output;
+        $result := await $result while $result ~~ Awaitable:D;
+        given $result {
             when Str {
-                if $paste || result.codes > ($raw ?? 1024 * 100_000 !! 300) {
-                    my Failable[Str] $url = paste result;
-                    result = $url.defined
+                if $paste || $result.codes > ($raw ?? 1024 * 100_000 !! 300) {
+                    my Failable[Str] $url = paste $result;
+                    $result := $url.defined
                         ?? "{COMMAND}{self.name} output was too long to send. It can be found at $url"
                         !! "Failed to upload {COMMAND}{self.name} output to Pastebin: {$url.exception.message}";
                 }
             }
             when Positional | Sequence {
-                if $paste || result.first: *.codes > ($raw ?? 1024 * 100_000 !! 300) {
-                    my Failable[Str] $url = paste result.join: "\n";
-                    result = $url.defined
+                if $paste || $result.cache.first: *.codes > ($raw ?? 1024 * 100_000 !! 300) {
+                    my Failable[Str] $url = paste $result.cache.join: "\n";
+                    $result := $url.defined
                         ?? "{COMMAND}{self.name} output was too long to send. It can be found at $url"
                         !! "Failed to upload {COMMAND}{self.name} output to Pastebin: {$url.exception.message}";
                 }
             }
-        }
+        };
+        return unless $result;
 
         if $raw {
             $room
-                ?? $connection.send-raw: result, roomid => $room.id
-                !! $connection.send-raw: result, userid => $user.id;
+                ?? $connection.send-raw: $result, roomid => $room.id
+                !! $connection.send-raw: $result, userid => $user.id;
         } else {
             $room
-                ?? $connection.send: result, roomid => $room.id
-                !! $connection.send: result, userid => $user.id;
+                ?? $connection.send: $result, roomid => $room.id
+                !! $connection.send: $result, userid => $user.id;
         }
     }
 }
 
 # For regular commands, run the command and return its result. For commands
 # with subcommands, extract the subcommand name from the target and run it, or
-# fail with # the command chain's full name if the subcommand doesn't exist to
+# fail with the command chain's full name if the subcommand doesn't exist to
 # allow the parser to notify the user.
 method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
@@ -175,11 +174,10 @@ method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
         return $connection.send:
             "{COMMAND}{self.name} is disabled in {$room.title}.",
             userid => $user.id unless $enabled;
+        return $connection.send:
+            qq[Permission denied. {COMMAND}{self.name} requires at least rank "{self.rank}".],
+            userid => $user.id unless self.can: self.rank, $user.ranks{$room.id};
     }
-
-    return $connection.send:
-        qq[Permission denied. {COMMAND}{self.name} requires at least rank "{self.rank}".],
-        userid => $user.id unless self.can: self.rank, $user.ranks{$room.id};
 
     return &!command(self, $target, $user, $room, $state, $connection) if &!command;
 

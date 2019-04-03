@@ -675,7 +675,7 @@ BEGIN {
             self.reply: $res, :paste
         };
 
-    my $hangman = do {
+    my PSBot::Command $hangman = do {
         my PSBot::Command @subcommands = (
             PSBot::Command.new(
                 :default-rank<+>,
