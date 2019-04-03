@@ -32,6 +32,7 @@ has Map      $.subcommands;
 # The preceding command in the command chain, if this is a subcommand.
 has ::?CLASS $.root;
 
+# Creates a new command using either a routine or a list of subcommands.
 proto method new(|) {*}
 multi method new(&command, Str :$name = &command.name, Bool :$administrative,
         Str :$default-rank = ' ', Locale :$locale = Everywhere) {
@@ -43,10 +44,13 @@ multi method new(@subcommands, Str :$name!, Bool :$administrative,
     self.bless: :$name, :$administrative, :$default-rank, :$locale, :$subcommands;
 }
 
+# Get the full command chain name.
 method name(--> Str) {
     $!root.defined ?? "{$!root.name} $!name" !! $!name
 }
 
+# The following methods are getters for attributes that should inherit from the
+# root command if this is a subcommand and their value is the default value.
 method administrative(--> Bool) {
     return $!administrative if $!administrative;
     return $!root.administrative if $!root.defined;
@@ -65,15 +69,17 @@ method locale(--> Locale) {
     $!locale
 }
 
+# Sets the root command. Loop over the subcommands list with this when
+# declaring a command with subcommands.
 method set-root(::?CLASS:D $!root) {}
 
-# Check if a group is actually a group.
+# Check if a rank is actually a rank.
 method is-rank(Str $rank --> Bool) {
     Rank.enums{$rank}:exists
 }
 
-# Check if a user's group is at or above the required group. Used for
-# permission checking.
+# Check if a user's rank is at or above the required rank. Used for permission
+# checking.
 method can(Str $required, Str $target --> Bool) {
     my Map $ranks = Rank.enums;
     $ranks{$target} >= $ranks{$required}
@@ -100,11 +106,9 @@ method send(Str $message, PSBot::User $user, PSBot::Room $room, PSBot::Connectio
 }
 
 # For regular commands, run the command and return its result. For commands
-# with subcommands, extract the subcommand name from the target and fail with
-# the command and subcommand name if it doesn't exist. Otherwise, run the
-# subcommand and return its result or fail with the name of the subcommand
-# chain. This is to allow the parser to notify the user which subcommand in a
-# chain of subcommands doesn't exist.
+# with subcommands, extract the subcommand name from the target and run it, or
+# fail with # the command chain's full name if the subcommand doesn't exist to
+# allow the parser to notify the user.
 method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
         PSBot::StateManager $state, PSBot::Connection $connection) {
     given self.locale {
