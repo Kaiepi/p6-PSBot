@@ -49,8 +49,8 @@ method new() {
                 <<
                 [ https? '://' ]?
                 [
-                | 'www.'? 'youtube.com/watch?v=' $<id>=<-[&]>+ [ '&' <-[=]>+ '=' <-[&]>+ ]*
-                | 'youtu.be/' $<id>=.+
+                | 'www.'? 'youtube.com/watch?v=' $<id>=<-[&\s]>+ [ '&' <-[=\s]>+ '=' <-[&\s]>+ ]*
+                | 'youtu.be/' $<id>=<-[\s]>+
                 ]
                 >>
             },
