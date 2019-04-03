@@ -32,10 +32,10 @@ method start() {
 }
 
 method guess(PSBot::User $player, Str $guess --> List) {
-    return ("The game hasn't started yet.") unless $!started;
-    return ("You are not a player in this game.") unless $!players ∋ $player;
-    return ('There is no guess.') unless $guess;
-    return ('Invalid guess.') if $guess ~~ rx:i/ <-[a..z]> /;
+    return ("The game hasn't started yet.",) unless $!started;
+    return ('You are not a player in this game.',) unless $!players ∋ $player;
+    return ('There is no guess.',) unless $guess;
+    return ('Invalid guess.',) if $guess ~~ rx:i/ <-[a..z]> /;
 
     if $guess.chars > 1 {
         my Str $word = $guess.uc;
@@ -48,7 +48,7 @@ method guess(PSBot::User $player, Str $guess --> List) {
         }
     } else {
         my Str $letter = $guess.uc;
-        return ('You already guessed this letter.') if $!guessed-letters ∋ $letter;
+        return ('You already guessed this letter.',) if $!guessed-letters ∋ $letter;
         $!guessed-letters{$letter}++;
 
         if $!word.contains: $letter {

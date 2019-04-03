@@ -1,6 +1,6 @@
 use v6.d;
 use JSON::Fast;
-use PSBot::CommandContext;
+use PSBot::Command;
 use PSBot::Commands;
 use PSBot::Connection;
 use PSBot::Config;
@@ -8,6 +8,14 @@ use PSBot::Exceptions;
 use PSBot::StateManager;
 use PSBot::Tools;
 unit role PSBot::Parser;
+
+my Regex $command-matcher = token {
+    ^
+    $(COMMAND)
+    $<command>=\S+
+    [ \s $<target>=.+ ]?
+    $
+};
 
 has PSBot::Connection   $.connection;
 has PSBot::StateManager $.state;
@@ -160,23 +168,24 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
 
     my Str $message = @message.join: '|';
     if $message.starts-with: COMMAND {
-        return unless $message ~~ / ^ $(COMMAND) $<command>=[\w+] [ <.ws> $<target>=[.+] ]? $ /;
+        return unless $message ~~ $command-matcher;
 
-        my Str $command = ~$<command>;
+        my Str $command-name = ~$<command>;
+        return unless $command-name;
+
+        my PSBot::Command $command = try $PSBot::Commands::($command-name);
         return unless $command;
 
-        my &command = try &PSBot::Commands::($command);
-        return unless &command;
+        my Str              $target  = $<target>.defined ?? ~$<target> !! '';
+        my PSBot::User      $user    = $!state.get-user: $userid;
+        my PSBot::Room      $room    = $!state.get-room: $roomid;
+        my Failable[Result] \output  = $command($target, $user, $room, $!state, $!connection);
+        return $!connection.send:
+            "Invalid subcommand: {COMMAND}{output.exception.message}",
+            :$roomid if output ~~ Failure:D;
 
-        await $!state.propagated unless ADMINISTRATIVE_COMMANDS ∋ $command;
-
-        my Str         $target = $<target>.defined ?? ~$<target> !! '';
-        my PSBot::User $user   = $!state.get-user: $userid;
-        my PSBot::Room $room   = $!state.get-room: $roomid;
-        my Result      \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
         output = await output while output ~~ Awaitable:D;
-        $!connection.send: output, :$roomid if output;
-        return;
+        return $!connection.send: output, :$roomid if output;
     }
 
     await $!state.propagated;
@@ -199,29 +208,24 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
     my Str $userid   = to-id $username;
     my Str $message  = @message.join: '|';
     if $message.starts-with: COMMAND {
-        return unless $message ~~ / ^ $(COMMAND) $<command>=[\w+] [ <.ws> $<target>=[.+] ]? $ /;
+        return unless $message ~~ $command-matcher;
 
-        my Str $command = ~$<command>;
+        my Str $command-name = ~$<command>;
+        return unless $command-name;
+
+        my PSBot::Command $command = try $PSBot::Commands::($command-name);
         return unless $command;
 
-        my &command = try &PSBot::Commands::($command);
-        return unless &command;
+        my Str              $target  = $<target>.defined ?? ~$<target> !! '';
+        my PSBot::User      $user    = $!state.get-user: $userid;
+        my PSBot::Room      $room    = $!state.get-room: $roomid;
+        my Failable[Result] \output  = $command($target, $user, $room, $!state, $!connection);
+        return $!connection.send:
+            "Invalid subcommand: {COMMAND}{output.exception.message}",
+            :$userid if output ~~ Failure:D;
 
-        await $!state.propagated unless ADMINISTRATIVE_COMMANDS ∋ $command;
-
-        my Str         $target = defined($<target>) ?? ~$<target> !! '';
-        my PSBot::User $user   = $!state.get-user: $userid;
-        my PSBot::Room $room;
-        if $user {
-            $user.set-group: $group unless $user.group === $group;
-        } else {
-            $user .= new: $from;
-        }
-
-        my Result \output = &command(PSBot::CommandContext, $target, $user, $room, $!state, $!connection);
         output = await output while output ~~ Awaitable:D;
-        $!connection.send: output, :$userid if output;
-        return;
+        return $!connection.send: output, :$userid if output;
     }
 
     await $!state.propagated;

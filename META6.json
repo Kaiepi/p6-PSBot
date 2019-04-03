@@ -18,7 +18,7 @@
 	"perl" : "6.d",
 	"provides" : {
 		"PSBot" : "lib/PSBot.pm6",
-		"PSBot::CommandContext" : "lib/PSBot/CommandContext.pm6",
+		"PSBot::Command" : "lib/PSBot/Command.pm6",
 		"PSBot::Commands" : "lib/PSBot/Commands.pm6",
 		"PSBot::Config" : "lib/PSBot/Config.pm6",
 		"PSBot::Connection" : "lib/PSBot/Connection.pm6",

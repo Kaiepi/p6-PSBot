@@ -172,7 +172,7 @@ method get-seen(Str $userid --> DateTime) {
     $sth.finish;
 
     fail "No row was found for $userid." unless %row;
-    DateTime.new(%row<time>.Rat)
+    DateTime.new: %row<time>.Rat
 }
 
 method add-seen(Str $userid, Instant $time) {
