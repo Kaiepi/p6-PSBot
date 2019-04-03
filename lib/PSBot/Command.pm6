@@ -9,8 +9,8 @@ unit class PSBot::Command;
 
 enum Locale is export <Room PM Everywhere>;
 
-# The name of the command. This is used by the parser to determine whether or
-# not a command exists.
+# The name of the command. This is used by the parser to find the command. Any
+# Unicode is allowed except for spaces.
 has Str    $.name;
 # Whether or not the user running the command should be a bot admin.
 has Bool   $.administrative;
