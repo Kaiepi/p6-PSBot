@@ -9,6 +9,8 @@ unit class PSBot::Command;
 
 enum Locale is export <Room PM Everywhere>;
 
+subset Replier is export where Callable[Nil] | Nil;
+
 # The name of the command. This is used by the parser to find the command. Any
 # Unicode is allowed except for spaces.
 has Str    $.name;
@@ -23,7 +25,7 @@ has Str    $.rank;
 has Locale $.locale;
 
 # The routine to run when CALL-ME is invoked. It must have this signature:
-# (Str, PSBot::User, PSBot::Room, PSBot::StateManager, PSBot::Connection --> Result)
+# (Str, PSBot::User, PSBot::Room, PSBot::StateManager, PSBot::Connection --> Replier)
 has          &.command;
 # A map of subcommand names to PSBot::Command objects. The subcommand name is
 # extracted from the target when CALL-ME is invoked and the subcommand is run
@@ -85,23 +87,42 @@ method can(Str $required, Str $target --> Bool) {
     $ranks{$target} >= $ranks{$required}
 }
 
-# By default, the return value of commands is used to send a response to the
-# user calling the command. This should be used instead of returning if there
-# needs to be permission checking to determine whether to send the response to
-# the room or through PMs.
-method send(Str $message, PSBot::User $user, PSBot::Room $room, PSBot::Connection $connection, Bool :$raw = False) {
-    if $raw {
-        return $connection.send-raw: $message, roomid => $room.id
-            if $room && ADMINS ∋ $user.id;
-        return $connection.send-raw: $message, userid => $user.id
-            unless $room && self.can: self.rank, $user.ranks{$room.id};
-        $connection.send-raw: $message, roomid => $room.id;
-    } else {
-        return $connection.send: $message, roomid => $room.id
-            if $room && ADMINS ∋ $user.id;
-        return $connection.send: $message, userid => $user.id
-            unless $room && self.can: self.rank, $user.ranks{$room.id};
-        $connection.send: $message, roomid => $room.id;
+# Takes the output of a command and returns a callback that processes it and
+# sends a response to the user.
+method reply(Result \output, Bool :$raw = False, Bool :$paste = False --> Replier) is pure {
+    sub (PSBot::User $user, PSBot::Room $room, PSBot::Connection $connection --> Nil) {
+        my Result \result = output;
+        result = await result while result ~~ Awaitable:D;
+        return unless result;
+
+        given result {
+            when Str {
+                if $paste || result.codes > ($raw ?? 1024 * 100_000 !! 300) {
+                    my Failable[Str] $url = paste result;
+                    result = $url.defined
+                        ?? "{COMMAND}{self.name} output was too long to send. It can be found at $url"
+                        !! "Failed to upload {COMMAND}{self.name} output to Pastebin: {$url.exception.message}";
+                }
+            }
+            when Positional | Sequence {
+                if $paste || result.first: *.codes > ($raw ?? 1024 * 100_000 !! 300) {
+                    my Failable[Str] $url = paste result.join: "\n";
+                    result = $url.defined
+                        ?? "{COMMAND}{self.name} output was too long to send. It can be found at $url"
+                        !! "Failed to upload {COMMAND}{self.name} output to Pastebin: {$url.exception.message}";
+                }
+            }
+        }
+
+        if $raw {
+            $room
+                ?? $connection.send-raw: result, roomid => $room.id
+                !! $connection.send-raw: result, userid => $user.id;
+        } else {
+            $room
+                ?? $connection.send: result, roomid => $room.id
+                !! $connection.send: result, userid => $user.id;
+        }
     }
 }
 
@@ -150,9 +171,9 @@ method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
     my Str $subcommand-name = $idx.defined ?? $target.substr(0, $idx) !! $target;
     fail "{self.name} $subcommand-name" if $!subcommands ∌ $subcommand-name;
 
-    my ::?CLASS         $subcommand = $!subcommands{$subcommand-name};
-    my Str              $subtarget  = $idx.defined ?? $target.substr($idx + 1) !! '';
-    my Failable[Result] \output     = $subcommand($subtarget, $user, $room, $state, $connection);
+    my ::?CLASS          $subcommand = $!subcommands{$subcommand-name};
+    my Str               $subtarget  = $idx.defined ?? $target.substr($idx + 1) !! '';
+    my Failable[Replier] \output     = $subcommand($subtarget, $user, $room, $state, $connection);
     fail output.exception if output ~~ Failure:D;
     output
 }

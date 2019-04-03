@@ -12,7 +12,7 @@ unit role PSBot::Parser;
 my Regex $command-matcher = token {
     ^
     $(COMMAND)
-    $<command>=\S+
+    $<command>=<-[\s]>+
     [ \s $<target>=.+ ]?
     $
 };
@@ -174,17 +174,15 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
         return unless $command-name;
         return unless PSBot::Commands::{$command-name}:exists;
 
-        my PSBot::Command   $command = PSBot::Commands::{$command-name};
-        my Str              $target  = $<target>.defined ?? ~$<target> !! '';
-        my PSBot::User      $user    = $!state.get-user: $userid;
-        my PSBot::Room      $room    = $!state.get-room: $roomid;
-        my Failable[Result] \output  = $command($target, $user, $room, $!state, $!connection);
+        my PSBot::Command    $command = PSBot::Commands::{$command-name};
+        my Str               $target  = $<target>.defined ?? ~$<target> !! '';
+        my PSBot::User       $user    = $!state.get-user: $userid;
+        my PSBot::Room       $room    = $!state.get-room: $roomid;
+        my Failable[Replier] $replier = $command($target, $user, $room, $!state, $!connection);
         return $!connection.send:
-            "Invalid subcommand: {COMMAND}{output.exception.message}",
-            :$roomid if output ~~ Failure:D;
-
-        output = await output while output ~~ Awaitable:D;
-        return $!connection.send: output, :$roomid if output;
+            "Invalid subcommand: {COMMAND}{$replier.exception.message}",
+            :$roomid if $replier ~~ Failure:D;
+        return $replier($user, $room, $!connection) if $replier.defined;
     }
 
     await $!state.propagated;
@@ -213,17 +211,15 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
         return unless $command-name;
         return unless PSBot::Commands::{$command-name}:exists;
 
-        my PSBot::Command   $command = PSBot::Commands::{$command-name};
-        my Str              $target  = $<target>.defined ?? ~$<target> !! '';
-        my PSBot::User      $user    = $!state.get-user: $userid;
-        my PSBot::Room      $room;
-        my Failable[Result] \output  = $command($target, $user, $room, $!state, $!connection);
+        my PSBot::Command    $command = PSBot::Commands::{$command-name};
+        my Str               $target  = $<target>.defined ?? ~$<target> !! '';
+        my PSBot::User       $user    = $!state.get-user: $userid;
+        my PSBot::Room       $room;
+        my Failable[Replier] $replier = $command($target, $user, $room, $!state, $!connection);
         return $!connection.send:
-            "Invalid subcommand: {COMMAND}{output.exception.message}",
-            :$userid if output ~~ Failure:D;
-
-        output = await output while output ~~ Awaitable:D;
-        return $!connection.send: output, :$userid if output;
+            "Invalid subcommand: {COMMAND}{$replier.exception.message}",
+            :$userid if $replier ~~ Failure:D;
+        return $replier($user, $room, $!connection) if $replier.defined;
     }
 
     await $!state.propagated;
