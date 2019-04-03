@@ -218,7 +218,7 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
 
         my Str              $target  = $<target>.defined ?? ~$<target> !! '';
         my PSBot::User      $user    = $!state.get-user: $userid;
-        my PSBot::Room      $room    = $!state.get-room: $roomid;
+        my PSBot::Room      $room;
         my Failable[Result] \output  = $command($target, $user, $room, $!state, $!connection);
         return $!connection.send:
             "Invalid subcommand: {COMMAND}{output.exception.message}",
