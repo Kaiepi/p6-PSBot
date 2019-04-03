@@ -193,10 +193,15 @@ our $git = PSBot::Command.new:
     };
 
 our $eightball = PSBot::Command.new:
+    :name<8ball>,
     :default-rank<+>,
-    anon method eightball(Str $target, PSBot::User $user, PSBot::Room $room,
+    method (Str $target, PSBot::User $user, PSBot::Room $room,
             PSBot::StateManager $state, PSBot::Connection $connection --> Result) {
-        my Str $res = do given floor rand * 20 {
+        return self.send:
+            "{COMMAND}{self.name} is currently unavailable due to a bug in Perl 6's runtime.",
+            $user, $room, $connection;
+
+        my Str $res = do given 20.rand.floor {
             when 0  { 'It is certain.'             }
             when 1  { 'It is decidedly so.'        }
             when 2  { 'Without a doubt.'           }
@@ -217,7 +222,7 @@ our $eightball = PSBot::Command.new:
             when 17 { 'My sources say no.'         }
             when 18 { 'Outlook not so good.'       }
             when 19 { 'Very doubtful.'             }
-        };
+        }
         self.send: $res, $user, $room, $connection;
     };
 
@@ -798,7 +803,7 @@ our $help = PSBot::Command.new:
               Returns the GitHub repo for the bot.
               Requires at least rank + by default.
 
-            - eightball <question>
+            - 8ball <question>
               Returns an 8ball message in response to the given question.
               Requires at least rank + by default.
 
