@@ -771,120 +771,128 @@ BEGIN {
         anon method help(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
             my Str $help = q:to/END/;
-                - eval <expression>
-                  Evaluates an expression.
-                  Requires admin access to the bot.
+                Command rank requirements only apply when they're used in rooms.
+                In PMs, you can use any command as long as you're not locked or semilocked, unless stated otherwise.
 
-                - evalcommand <command>, <target>, <user>, <room>
-                  Evaluates a command with the given target, user, and room. Useful for detecting errors in commands.
-                  Requires admin access to the bot.
+                Regular commands:
+                    - 8ball <question>
+                      Returns an 8ball message in response to the given question.
+                      Requires at least rank + by default.
 
-                - max-rss
-                  Returns the maximum resident set size in megabytes.
-                  Requires admin access to the bot.
+                    - urban <term>
+                      Returns the link to the Urban Dictionary definition for the given term.
+                      Requires at least rank + by default.
 
-                - echo <message>
-                  Says a message in the room or PMs the command was sent in.
-                  Requires admin access to the bot.
+                    - dictionary <word>
+                      Returns the Oxford Dictionary definitions for the given word.
+                      Requires at least rank + by default.
 
-                - nick <username>, <password>
-                  Logs the bot into the account given. Password is optional.
-                  Requires admin access to the bot.
+                    - wikipedia <query>
+                      Returns the Wikipedia page for the given query.
+                      Requires at least rank + by default.
 
-                - suicide
-                  Kills the bot.
-                  Requires admin access to the bot.
+                    - wikimon <query>
+                      Returns the Wikimon page for the given query.
+                      Requires at least rank + by default.
 
-                - git
-                  Returns the GitHub repo for the bot.
-                  Requires at least rank + by default.
+                    - youtube <query>
+                      Returns the first YouTube result for the given query.
+                      Requires at least rank + by default.
 
-                - 8ball <question>
-                  Returns an 8ball message in response to the given question.
-                  Requires at least rank + by default.
+                    - translate <source>, <target>, <query>
+                      Translates the given query from the given source language to the given target language.
+                      Requires at least rank + by default.
 
-                - urban <term>
-                  Returns the link to the Urban Dictionary definition for the given term.
-                  Requires at least rank + by default.
+                    - badtranslate <query>
+                      Runs the given query through Google Translate 10 times using random languages before translating back to English.
+                      Requires at least rank + by default.
 
-                - dictionary <word>
-                  Returns the Oxford Dictionary definitions for the given word.
-                  Requires at least rank + by default.
+                    - reminder <time>, <message>
+                      Sets a reminder with the given message to be sent in the given time.
+                      Requires autoconfirmed status.
 
-                - wikipedia <query>
-                  Returns the Wikipedia page for the given query.
-                  Requires at least rank + by default.
+                    - reminderlist
+                      Returns a list of reminders you currently have set.
+                      This command can only be used in PMs.
+                      Requires autoconfirmed status.
 
-                - wikimon <query>
-                  Returns the Wikimon page for the given query.
-                  Requires at least rank + by default.
+                    - mail <username>, <message>
+                      Mails the given message to the given user once they log on.
+                      Requires autoconfirmed status.
 
-                - youtube <query>
-                  Returns the first YouTube result for the given query.
-                  Requires at least rank + by default.
+                    - seen <username>
+                      Returns the last time the given user was seen.
+                      Requires at least rank + by default.
 
-                - translate <source>, <target>, <query>
-                  Translates the given query from the given source language to the given target language.
-                  Requires at least rank + by default.
+                    - help
+                      Returns a link to this help page.
+                      Requires at least rank + by default.
 
-                - badtranslate <query>
-                  Runs the given query through Google Translate 10 times using random languages before translating back to English.
-                  Requires at least rank + by default.
+                Moderation commands:
+                    - set <command>, <rank>
+                      Sets the rank required to use the given command to the given rank. To set a command so all users can use it, make the rank "regular user".
+                      This command can only be used in rooms.
+                      Requires at least rank % by default.
 
-                - reminder <time>, <message>
-                  Sets a reminder with the given message to be sent in the given time.
-                  Requires autoconfirmed status.
+                    - toggle <command>
+                      Enables/disables the given command.
+                      This command can only be used in rooms.
+                      Requires at least rank % by default.
 
-                - reminderlist
-                  Returns a list of reminders you currently have set.
-                  This command can only be used in PMs.
-                  Requires autoconfirmed status.
+                    - settings
+                      Returns the list of commands and their usability in the room.
+                      This command can only be used in rooms.
+                      Requires at least rank % by default.
 
-                - mail <username>, <message>
-                  Mails the given message to the given user once they log on.
-                  Requires autoconfirmed status.
+                Game commands:
+                    - hangman
+                        - hangman new             Starts a new hangman game.
+                                                  Requires at least rank + by default.
+                        - hangman join            Joins the hangman game.
+                        - hangman start           Starts the hangman game.
+                                                  Requires at least rank + by default.
+                        - hangman guess <letter>  Guesses the given letter.
+                        - hangman guess <word>    Guesses the given word.
+                        - hangman end             Ends the hangman game.
+                                                  Requires at least rank + by default.
+                        - hangman players         Returns a list of the players in the hangman game.
+                                                  Requires at least rank + by default.
 
-                - seen <username>
-                  Returns the last time the given user was seen.
-                  Requires at least rank + by default.
+                Administrative commands:
+                    - eval <expression>
+                      Evaluates an expression.
+                      Requires admin access to the bot.
 
-                - set <command>, <rank>
-                  Sets the rank required to use the given command to the given rank.
-                  This command can only be used in rooms.
-                  Requires at least rank % by default.
+                    - evalcommand <command>, <target>, <user>, <room>
+                      Evaluates a command with the given target, user, and room. Useful for detecting errors in commands.
+                      Requires admin access to the bot.
 
-                - toggle <command>
-                  Enables/disables the given command.
-                  This command can only be used in rooms.
-                  Requires at least rank % by default.
+                    - max-rss
+                      Returns the maximum resident set size in megabytes.
+                      Requires admin access to the bot.
 
-                - settings
-                  Returns the list of commands and their usability in the room.
-                  This command can only be used in rooms.
-                  Requires at least rank % by default.
+                    - echo <message>
+                      Says a message in the room or PMs the command was sent in.
+                      Requires admin access to the bot.
 
-                - hangman
-                    - hangman new             Starts a new hangman game.
-                                              Requires at least rank + by default.
-                    - hangman join            Joins the hangman game.
-                    - hangman start           Starts the hangman game.
-                                              Requires at least rank + by default.
-                    - hangman guess <letter>  Guesses the given letter.
-                    - hangman guess <word>    Guesses the given word.
-                    - hangman end             Ends the hangman game.
-                                              Requires at least rank + by default.
-                    - hangman players         Returns a list of the players in the hangman game.
-                                              Requires at least rank + by default.
+                    - nick <username>, <password>
+                      Logs the bot into the account given. Password is optional.
+                      Requires admin access to the bot.
 
-                - help
-                  Returns a link to this help page.
-                  Requires at least rank + by default.
+                    - suicide
+                      Kills the bot.
+                      Requires admin access to the bot.
+
+                    - git
+                      Returns the GitHub repo for the bot.
+                      Requires at least rank + by default.
                 END
 
             my Failable[Str] $url = paste $help;
-            $url.defined
-                ?? self.reply("{$state.username} help can be found at $url")
-                !! self.reply("Failed to upload help to Pastebin: {$url.exception.message}");
+            my Str           $res = $url.defined
+                ?? "{$state.username} help can be found at $url"
+                !! "Failed to upload help to Pastebin: {$url.exception.message}";
+            self.reply: $res;
         };
 
     # Since variable names can't use all of Unicode, we can't just define the
