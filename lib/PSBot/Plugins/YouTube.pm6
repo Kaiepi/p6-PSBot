@@ -40,7 +40,7 @@ sub search-video(Str $title --> Video) is export {
 
     CATCH {
         when X::Cro::HTTP::Error {
-            fail "Request to YouTube API failed with code {await .response.status}.";
+            fail "Request to YouTube API failed with code {.response.status}.";
         }
     }
 }
@@ -61,7 +61,7 @@ sub get-video(Str $id --> Video) is export {
 
     CATCH {
         when X::Cro::HTTP::Error {
-            fail "Request to YouTube API failed with code {await .response.status}.";
+            fail "Request to YouTube API failed with code {.response.status}.";
         }
     }
 }

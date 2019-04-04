@@ -57,7 +57,7 @@ BEGIN {
                     PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             return self.reply:
                 'No command, target, user, and room were given.'
-                unless $target || $target.includes: ',';
+                unless $target || $target.contains: ',';
 
             my Str @parts = $target.split(',').map(*.trim);
             my Str $command-chain = @parts.head;
@@ -141,7 +141,7 @@ BEGIN {
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             return self.reply:
                 'A username and, optionally, a password must be provided.'
-                unless $target.includes: ',';
+                unless $target || $target.contains: ',';
 
             my (Str $username, Str $password) = $target.split(',').map(*.trim);
             return self.reply: 'No username was given.' unless $username;
@@ -241,7 +241,7 @@ BEGIN {
 
             CATCH {
                 when X::Cro::HTTP::Error {
-                    "Request to Urban Dictionary API failed with code {await .response.status}.";
+                    "Request to Urban Dictionary API failed with code {.response.status}.";
                 }
             }
         };
@@ -297,9 +297,9 @@ BEGIN {
 
             CATCH {
                 when X::Cro::HTTP::Error {
-                    my Str $res = await .response.status == 404
+                    my Str $res = .response.status == 404
                         ?? "Definition for $target not found."
-                        !! "Request to Oxford Dictionary API failed with code {await .response.status}.";
+                        !! "Request to Oxford Dictionary API failed with code {.response.status}.";
                     return self.reply: $res;
                 }
             }
@@ -325,7 +325,7 @@ BEGIN {
 
             CATCH {
                 when X::Cro::HTTP::Error {
-                    return self.reply: "Request to Wikipedia API failed with code {await .response.status}.";
+                    return self.reply: "Request to Wikipedia API failed with code {.response.status}.";
                 }
             }
         };
@@ -350,7 +350,7 @@ BEGIN {
 
             CATCH {
                 when X::Cro::HTTP::Error {
-                    return self.reply: "Request to Wikipedia API failed with code {await .response.status}.";
+                    return self.reply: "Request to Wikipedia API failed with code {.response.status}.";
                 }
             }
         };
@@ -372,27 +372,30 @@ BEGIN {
         :default-rank<+>,
         anon method translate(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-            my Str @parts = $target.split: ',';
             return self.reply:
                 'No source language, target language, and phrase were given.',
-                unless +@parts >= 3;
+                unless $target || $target.contains: ',';
 
-            my Str $source-lang = trim @parts[0];
+            my Str @parts       = $target.split(',').map(*.trim);
+            my Str $source-lang = @parts[0];
             return self.reply: 'No source language was given' unless $source-lang;
 
-            my Str $target-lang = trim @parts[1];
+            my Str $target-lang = @parts[1];
             return self.reply: 'No target language was given' unless $target-lang;
 
-            my Str $query = trim @parts[2..*].join: ',';
+            my Str $query = @parts[2..*].join: ',';
             return self.reply: 'No phrase was given' unless $query;
 
-            my Failable[Str] @languages = get-languages;
+            my Failable[Set] $languages = get-languages;
             return self.reply:
-                "Failed to fetch list of Google Translate languages: {@languages.exception.message}}",
-                unless @languages.defined;
+                "Failed to fetch list of Google Translate languages: {$languages.exception.message}}",
+                unless $languages.defined;
             return self.reply:
-                @languages, :paste
-                unless @languages ∋ $source-lang && @languages ∋ $target-lang;
+                qq["$source-lang" is either not an ISO-639-1 language code or not a supported language. A list of supported languages can be found at https://cloud.google.com/translate/docs/languages]
+                unless $languages ∋ $source-lang;
+            return self.reply:
+                qq["$target-lang" is either not an ISO-639-1 language code or not a supported language. A list of supported languages can be found at https://cloud.google.com/translate/docs/languages]
+                unless $languages ∋ $target-lang;
 
             my Failable[Str] $output = get-translation $query, $source-lang, $target-lang;
             return self.reply:
@@ -408,14 +411,14 @@ BEGIN {
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
             return self.reply: 'No phrase was given.' unless $target;
 
-            my Failable[Str] @languages = get-languages;
+            my Failable[Set] $languages = get-languages;
             return self.reply:
-                "Failed to fetch list of Google Translate languages: {@languages.exception.message}",
-                unless @languages.defined;
+                "Failed to fetch list of Google Translate languages: {$languages.exception.message}",
+                unless $languages.defined;
 
             my Failable[Str] $query = $target;
             for 0..^10 {
-                my Str $target = @languages.pick;
+                my Str $target = $languages.pick;
                 $query = get-translation $query, $target;
                 return self.reply:
                     "Failed to get translation result from Google Translate: {$query.exception.message}",
@@ -436,7 +439,7 @@ BEGIN {
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             return self.reply:
                 'A time (e.g. 30s, 10m, 2h) and a message must be given.'
-                unless $target || $target.includes: ',';
+                unless $target || $target.contains: ',';
 
             my (Str $time-ago, Str $message) = $target.split(',').map(*.trim);
             my Int $seconds;
@@ -536,7 +539,7 @@ BEGIN {
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             return self.reply:
                 'A command and a rank must be given.'
-                unless $target || $target.includes: ',';
+                unless $target || $target.contains: ',';
 
             my (Str $command-chain, Str $target-rank) = $target.split(',').map(*.trim);
             return self.reply: 'No command was given.' unless $command-chain;

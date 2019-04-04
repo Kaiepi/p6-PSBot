@@ -7,10 +7,12 @@ use PSBot::Tools;
 use URI::Encode;
 unit module PSBot::Plugins::Translate;
 
-my Str @languages;
 
-sub get-languages(--> Array[Str]) is export {
-    return @languages if @languages;
+
+my Set $languages;
+
+sub get-languages(--> Set) is export {
+    return $languages if $languages.defined;
 
     fail "No Google Translate API key is configured." unless TRANSLATE_API_KEY;
 
@@ -20,8 +22,8 @@ sub get-languages(--> Array[Str]) is export {
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
 
     my %body = await $response.body;
-    @languages = %body<data><languages>.map({ $_<language> });
-    return @languages;
+    $languages .= new: |%body<data><languages>.map({ $_<language> });
+    return $languages;
 
     CATCH {
         when X::Cro::HTTP::Error {
@@ -36,7 +38,7 @@ proto sub get-translation(Str, Str $target, Str $? --> Str) is export {
     {*}
 }
 multi sub get-translation(Str $input, Str $target --> Str) {
-    my Str                 $query    = uri_encode_component($input);
+    my Str                 $query    = uri_encode_component $input;
     my Cro::HTTP::Response $response = await Cro::HTTP::Client.get:
         "https://translation.googleapis.com/language/translate/v2?q=$query&target=$target&key={TRANSLATE_API_KEY}",
         http             => '1.1',
@@ -47,13 +49,13 @@ multi sub get-translation(Str $input, Str $target --> Str) {
 
     CATCH {
         when X::Cro::HTTP::Error {
-            fail "Request to Google Translate API failed with code {await .response.status}.";
+            fail "Request to Google Translate API failed with code {.response.status}.";
         }
     }
 }
 multi sub get-translation(Str $input, Str $source, Str $target --> Str) {
-    my Str                 $query    = uri_encode_component($input);
-    my Cro::HTTP::Response $response = Cro::HTTP::Client.get:
+    my Str                 $query    = uri_encode_component $input;
+    my Cro::HTTP::Response $response = await Cro::HTTP::Client.get:
         "https://translation.googleapis.com/language/translate/v2?q=$query&source=$source&target=$target&key={TRANSLATE_API_KEY}",
         http             => '1.1',
         body-serializers => [Cro::HTTP::BodySerializer::JSON.new];
@@ -63,7 +65,7 @@ multi sub get-translation(Str $input, Str $source, Str $target --> Str) {
 
     CATCH {
         when X::Cro::HTTP::Error {
-            fail "Request to Google Translate API failed with code {await .response.status}.";
+            fail "Request to Google Translate API failed with code {.response.status}.";
         }
     }
 }
