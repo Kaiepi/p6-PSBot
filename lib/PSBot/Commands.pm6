@@ -456,13 +456,13 @@ BEGIN {
                 my Str $roomid = $room.id;
                 $state.database.add-reminder: $username, $time-ago, $time, $message, :$roomid;
                 $*SCHEDULER.cue({
-                    $state.database.remove-reminder: $username, $time-ago, $time.Rat, $message, :$roomid;
+                    $state.database.remove-reminder: $username, $time-ago, $time, $message, :$roomid;
                     $connection.send: "$username, you set a reminder $time-ago ago: $message", :$roomid;
                 }, in => $seconds);
             } else {
                 $state.database.add-reminder: $username, $time-ago, $time, $message, :$userid;
                 $*SCHEDULER.cue({
-                    $state.database.remove-reminder: $username, $time-ago, $time.Rat, $message, :$userid;
+                    $state.database.remove-reminder: $username, $time-ago, $time, $message, :$userid;
                     $connection.send: "$username, you set a reminder $time-ago ago: $message", :$userid;
                 }, in => $seconds);
             }

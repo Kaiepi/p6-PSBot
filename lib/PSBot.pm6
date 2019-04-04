@@ -50,31 +50,38 @@ method start() {
             whenever $!state.propagated {
                 # Send user mail if the recipient is online. If not, wait until
                 # they join a room the bot's in.
-                for $!state.users.keys -> $userid {
-                    my @mail = $!state.database.get-mail: $userid;
-                    if +@mail && @mail !eqv [Nil] {
-                        $!state.database.remove-mail: $userid;
-                        $!connection.send:
-                            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-                            @mail.map(-> %data { "[%data<source>] %data<message>" }),
-                            :$userid;
+                with $!state.database.get-mail -> @mail {
+                    my Array %mail = ({}, |@mail).reduce({
+                        my Str $userid = $^b<target>.Str;
+                        $^a{$userid}:exists
+                            ?? $^a{$userid}.push($^b)
+                            !! $^a{$userid} = [$^b];
+                        $^a
+                    }) if +@mail;
+
+                    for %mail.kv -> $userid, @messages {
+                        if $!state.has-user: $userid {
+                            $!state.database.remove-mail: $userid;
+                            $!connection.send:
+                                "You received {+@messages} message{+@mail == 1 ?? '' !! 's'}:",
+                                @messages.map(-> %row { "[%row<source>] %row<message>" }),
+                                :$userid;
+                        }
                     }
                 }
 
                 # Schedule user reminders.
                 with $!state.database.get-reminders -> @reminders {
-                    if @reminders !eqv [Nil] {
-                        for @reminders -> %row {
-                            $*SCHEDULER.cue({
-                                if %row<roomid> {
-                                    $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>.Rat, %row<reminder>, roomid => %row<roomid>;
-                                    $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
-                                } else {
-                                    $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>.Rat, %row<reminder>, userid => %row<userid>;
-                                    $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
-                                }
-                            }, at => %row<time>.Rat);
-                        }
+                    for @reminders -> %row {
+                        $*SCHEDULER.cue({
+                            if %row<roomid> {
+                                $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>, %row<reminder>, roomid => %row<roomid>;
+                                $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
+                            } else {
+                                $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>, %row<reminder>, userid => %row<userid>;
+                                $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
+                            }
+                        }, at => %row<time>.Num);
                     }
                 }
             }

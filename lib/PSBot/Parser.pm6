@@ -123,13 +123,14 @@ method parse-join(Str $roomid, Str $userinfo) {
     my Str $userid = to-id $userinfo.substr: 1;
     $!state.database.add-seen: $userid, now;
 
-    my @mail = $!state.database.get-mail: $userid;
-    if +@mail && @mail !eqv [Nil] {
-        $!state.database.remove-mail: $userid;
-        $!connection.send:
-            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-            @mail.map(-> %row { "[%row<source>] %row<message>" }),
-            :$userid;
+    with $!state.database.get-mail: $userid -> @mail {
+        if +@mail {
+            $!state.database.remove-mail: $userid;
+            $!connection.send:
+                "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
+                @mail.map(-> %row { "[%row<source>] %row<message>" }),
+                :$userid;
+        }
     }
 
     $!connection.send-raw: "/cmd userdetails $userid" unless $userid.starts-with: 'guest';
@@ -147,13 +148,14 @@ method parse-rename(Str $roomid, Str $userinfo, Str $oldid) {
     $!state.database.add-seen: $oldid, $time;
     $!state.database.add-seen: $userid, $time;
 
-    my @mail = $!state.database.get-mail: $userid;
-    if +@mail && @mail !eqv [Nil] {
-        $!state.database.remove-mail: $userid;
-        $!connection.send:
-            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-            @mail.map(-> %row { "[%row<source>] %row<message>" }),
-            :$userid;
+    with $!state.database.get-mail: $userid -> @mail {
+        if +@mail {
+            $!state.database.remove-mail: $userid;
+            $!connection.send:
+                "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
+                @mail.map(-> %row { "[%row<source>] %row<message>" }),
+                :$userid;
+        }
     }
 
     $!connection.send-raw: "/cmd userdetails $userid" unless $userid.starts-with: 'guest';
