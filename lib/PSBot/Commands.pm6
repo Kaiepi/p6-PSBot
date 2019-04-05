@@ -580,6 +580,7 @@ BEGIN {
                 if $command.administrative;
 
             $state.database.set-command: $room.id, $command.name, $target-rank;
+            $command.set-rank: $target-rank;
             self.reply: qq[{COMMAND}{$command.name} was set to "$target-rank".]
         };
 

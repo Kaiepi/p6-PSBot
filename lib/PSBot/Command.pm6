@@ -36,7 +36,6 @@ has Map      $.subcommands;
 # The preceding command in the command chain, if this is a subcommand.
 has ::?CLASS $.root;
 
-# Creates a new command using either a routine or a list of subcommands.
 proto method new(|) {*}
 multi method new(&command, Str :$name = &command.name, Bool :$administrative = False,
         Bool :$autoconfirmed = False, Str :$default-rank = ' ', Locale :$locale = Everywhere) {
@@ -48,13 +47,10 @@ multi method new(@subcommands, Str :$name!, Bool :$administrative = False,
     self.bless: :$name, :$administrative, :$autoconfirmed, :$default-rank, :$locale, :$subcommands;
 }
 
-# Get the full command chain name.
 method name(--> Str) {
     $!root.defined ?? "{$!root.name} $!name" !! $!name
 }
 
-# The following methods are getters for attributes that should inherit from the
-# root command if this is a subcommand and their value is the default value.
 method administrative(--> Bool) {
     return $!administrative if $!administrative;
     return $!root.administrative if $!root.defined;
@@ -79,9 +75,9 @@ method locale(--> Locale) {
     $!locale
 }
 
-# Sets the root command. Loop over the subcommands list with this when
-# declaring a command with subcommands.
 method set-root(::?CLASS:D $!root) {}
+
+method set-rank(Str $!rank) {}
 
 # Check if a rank is actually a rank.
 method is-rank(Str $rank --> Bool) {
