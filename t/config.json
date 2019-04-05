@@ -1,0 +1,18 @@
+{
+    "username":               "Test Bot",
+    "password":               null,
+    "avatar":                 "1",
+    "host":                   "sim2.psim.us",
+    "port":                   443,
+    "ssl":                    true,
+    "serverid":               "showdown",
+    "command":                "$",
+    "rooms":                  ["lobby"],
+    "admins":                 ["kaiepi", "morfent"],
+    "max_reconnect_attempts": 16,
+    "git":                    "https://github.com/Kaiepi/p6-PSBot",
+    "dictionary_api_id":      null,
+    "dictionary_api_key":     null,
+    "youtube_api_key":        null,
+    "translate_api_key":      null
+}

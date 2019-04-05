@@ -12,54 +12,46 @@ use Test;
 plan 8;
 
 my PSBot::Test::Server $server;
+my PSBot::Connection   $connection;
 
 BEGIN {
     %*ENV<TESTING> := 1;
     $server .= new: -> $data, &emit { };
     $server.start;
+    $connection .= new: 'localhost', $server.port;
+    $connection.connect;
 }
 
 END {
-    %*ENV<TESTING>:delete;
+    $connection.close: :force;
     $server.stop;
+    %*ENV<TESTING>:delete;
 }
 
-my PSBot::StateManager $state      .= new: SERVERID // 'showdown';
-my PSBot::Connection   $connection .= new: 'localhost', $server.port;
+my PSBot::StateManager $state      .= new: SERVERID;
+ .= new: 'localhost', $server.port;
 my PSBot::Parser       $parser     .= new: :$connection, :$state;
-$connection.connect;
 
 subtest '|updateuser|', {
     plan 10;
 
     my Str $roomid         = 'lobby';
     my Str $guest-username = 'Guest 1';
-    my Str $avatar         = AVATAR // '1';
 
-    $parser.parse-update-user: $roomid, $guest-username, '0', $avatar;
+    $parser.parse-update-user: $roomid, $guest-username, '0', AVATAR;
     is $state.username, $guest-username, 'Sets state username attribute';
     is $state.guest-username, $guest-username, 'Sets state guest-username attribute as a guest';
     ok $state.is-guest, 'Sets state is-guest attribute properly as a guest';
-    is $state.avatar, $avatar, 'Sets state avatar attribute';
+    is $state.avatar, AVATAR, 'Sets state avatar attribute';
 
-    if USERNAME {
-        nok $state.inited, 'Waits until the second user update to set the state inited attribute if there is a configured username';
-        nok $state.pending-rename.poll, 'Does not send to state pending-rename channel when state is first initialilzed if there is a configured username';
-        nok $state.logged-in.poll, 'Does not send to state logged-in channel if there is a configured usernamed';
-    } else {
-        ok $state.inited, 'Does not wait until the second user update to set the state inited attribute as a guest';
-        ok $state.pending-rename.poll, 'Sends to state pending-rename channel when state is first initialilzed as a guest';
-        ok $state.logged-in.poll, 'Sends to state logged-in channel if there is no configured username as a guest';
-    }
+    nok $state.inited, 'Waits until the second user update to set the state inited attribute if there is a configured username';
+    nok $state.pending-rename.poll, 'Does not send to state pending-rename channel when state is first initialilzed if there is a configured username';
+    nok $state.logged-in.poll, 'Does not send to state logged-in channel if there is a configured usernamed';
 
     $parser.parse-update-user: $roomid, USERNAME // 'PoS-Bot', '1', $avatar;
     nok $state.is-guest, 'Sets state is-guest attribute properly if named';
     ok $state.pending-rename.poll, 'Sends to state pending-rename channel when inited';
-    if USERNAME {
-        ok $state.logged-in.poll, 'Sends to state logged-in channel when inited if there is a configured username';
-    } else {
-        nok $state.logged-in.poll, 'Does not send to state logged-in channel again when inited as a guest';
-    }
+    ok $state.logged-in.poll, 'Sends to state logged-in channel when inited if there is a configured username';
 };
 
 subtest '|challstr|', {
@@ -76,20 +68,11 @@ subtest '|challstr|', {
 
     $parser.parse-challstr: $roomid, $type, $nonce;
 
-    if USERNAME {
-        is $state.challstr, $challstr, 'Sets state challstr attribute';
-    } else {
-        skip 'Cannot check if state challstr attribute was updated without a configured username', 1;
-    }
+    is $state.challstr, $challstr, 'Sets state challstr attribute';
 };
 
 subtest '|queryresponse|', sub {
     plan 2;
-
-    unless +ROOMS {
-        skip-rest 'There must be at least one configured room in order to test this';
-        return;
-    }
 
     subtest '|queryresponse|userdetails|', {
         plan 5;

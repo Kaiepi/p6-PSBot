@@ -3,6 +3,9 @@ use PSBot::Config;
 use PSBot::StateManager;
 use Test;
 
+BEGIN %*ENV<TESTING> := 1;
+END   %*ENV<TESTING>:delete;
+
 plan 12;
 
 my Str                 $username        = 'PoS-Bot';
@@ -15,7 +18,7 @@ my Str                 $roomid          = 'techcode';
 my Str                 $type            = 'chat';
 my Str                 @users           = '@Morfent';
 my Str                 $userinfo        = '+Kaiepi';
-my PSBot::StateManager $state          .= new: SERVERID // 'showdown';
+my PSBot::StateManager $state          .= new: SERVERID;
 
 $state.set-avatar: $avatar;
 is $state.avatar, $avatar, 'Can set state avatar attribute';
