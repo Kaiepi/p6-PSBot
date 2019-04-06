@@ -74,7 +74,7 @@ method on-user-details(%data) {
             $user.on-user-details: %data;
         }
 
-        if $userid eq $!userid {
+        if $userid === $!userid {
             $!group         = %data<group>;
             $!avatar        = ~%data<avatar>;
             $!autoconfirmed = %data<autoconfirmed>;

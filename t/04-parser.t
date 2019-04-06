@@ -16,7 +16,7 @@ my PSBot::Connection   $connection;
 
 BEGIN {
     %*ENV<TESTING> := 1;
-    $server .= new: -> $data, &emit { };
+    $server .= new: -> $data, &emit { emit await $data.body-text };
     $server.start;
     $connection .= new: 'localhost', $server.port;
     $connection.connect;
@@ -39,19 +39,19 @@ subtest '|updateuser|', {
     my Str $guest-username = 'Guest 1';
 
     $parser.parse-update-user: $roomid, $guest-username, '0', AVATAR;
-    is $state.username, $guest-username, 'Sets state username attribute';
-    is $state.guest-username, $guest-username, 'Sets state guest-username attribute as a guest';
-    ok $state.is-guest, 'Sets state is-guest attribute properly as a guest';
-    is $state.avatar, AVATAR, 'Sets state avatar attribute';
+    is $state.username, $guest-username, 'sets state username attribute';
+    is $state.guest-username, $guest-username, 'sets state guest-username attribute as a guest';
+    ok $state.is-guest, 'sets state is-guest attribute properly as a guest';
+    is $state.avatar, AVATAR, 'sets state avatar attribute';
 
-    nok $state.inited, 'Waits until the second user update to set the state inited attribute if there is a configured username';
-    nok $state.pending-rename.poll, 'Does not send to state pending-rename channel when state is first initialilzed if there is a configured username';
-    nok $state.logged-in.poll, 'Does not send to state logged-in channel if there is a configured usernamed';
+    nok $state.inited, 'waits until the second user update to set the state inited attribute if there is a configured username';
+    nok $state.pending-rename.poll, 'does not send to state pending-rename channel when state is first initialilzed if there is a configured username';
+    nok $state.logged-in.poll, 'does not send to state logged-in channel if there is a configured usernamed';
 
     $parser.parse-update-user: $roomid, USERNAME // 'PoS-Bot', '1', $avatar;
-    nok $state.is-guest, 'Sets state is-guest attribute properly if named';
-    ok $state.pending-rename.poll, 'Sends to state pending-rename channel when inited';
-    ok $state.logged-in.poll, 'Sends to state logged-in channel when inited if there is a configured username';
+    nok $state.is-guest, 'sets state is-guest attribute properly if named';
+    ok $state.pending-rename.poll, 'sends to state pending-rename channel when inited';
+    ok $state.logged-in.poll, 'sends to state logged-in channel when inited if there is a configured username';
 };
 
 subtest '|challstr|', {
@@ -68,7 +68,7 @@ subtest '|challstr|', {
 
     $parser.parse-challstr: $roomid, $type, $nonce;
 
-    is $state.challstr, $challstr, 'Sets state challstr attribute';
+    is $state.challstr, $challstr, 'sets state challstr attribute';
 };
 
 subtest '|queryresponse|', sub {
@@ -91,11 +91,11 @@ subtest '|queryresponse|', sub {
         $parser.parse-query-response: $roomid, 'userdetails', qs[{"userid":"$userid","avatar":"$avatar","group":"$group","autoconfirmed":true,"rooms":{$rooms}}];
 
         my PSBot::User $user = $state.users{$userid};
-        is $user.group, $group, 'Sets user group attribute';
-        is $user.autoconfirmed, True, 'Sets user autoconfirmed attribute';
-        is $user.avatar, $avatar, 'Sets user avatar attribute';
-        ok $user.propagated, 'Sets user propagated attribute';
-        is $state.propagated.status, Planned, 'State propagated attribute is not kept before finishing fetching metadata';
+        is $user.group, $group, 'sets user group attribute';
+        is $user.autoconfirmed, True, 'sets user autoconfirmed attribute';
+        is $user.avatar, $avatar, 'sets user avatar attribute';
+        ok $user.propagated, 'sets user propagated attribute';
+        is $state.propagated.status, Planned, 'state propagated attribute is not kept before finishing fetching metadata';
 
         $parser.parse-deinit: $roomid;
         $state.rooms-joined⚛--;
@@ -128,13 +128,13 @@ subtest '|queryresponse|', sub {
                 $parser.parse-query-response: $_, 'roominfo', qs[{"title":"$title","type":"$type","visibility":"$visibility","modchat":$(to-json $modchat),"modjoin":$(to-json $modjoin),"auth":$auth,"users":$users}];
 
                 my PSBot::Room $room = $state.rooms{$_};
-                is $room.title, $title, 'Sets room title attribute';
-                is $room.visibility, Visibility($visibility), 'Sets room visibility attribute';
-                is $room.modchat, ($modchat || ' '), 'Sets room modchat attribute';
-                is $room.modjoin, $modjoin ~~ Bool ?? $modchat || ' ' !! $modjoin // ' ', 'Sets room modjoin attribute';
-                is $room.auth, %auth, 'Sets room auth attribute';
-                is $room.ranks{$userid}, $group, 'Sets room rank attribute';
-                ok $room.propagated, 'Sets room propagated attribute';
+                is $room.title, $title, 'sets room title attribute';
+                is $room.visibility, Visibility($visibility), 'sets room visibility attribute';
+                is $room.modchat, ($modchat || ' '), 'sets room modchat attribute';
+                is $room.modjoin, $modjoin ~~ Bool ?? $modchat || ' ' !! $modjoin // ' ', 'sets room modjoin attribute';
+                is $room.auth, %auth, 'sets room auth attribute';
+                is $room.ranks{$userid}, $group, 'sets room rank attribute';
+                ok $room.propagated, 'sets room propagated attribute';
             }
 
             LAST {
@@ -143,8 +143,8 @@ subtest '|queryresponse|', sub {
             }
         } for ROOMS.keys;
 
-        is $state.propagation-mitigation.status, Kept, 'State propagation-mitigation attribute is kept after fetching metadata for all configured rooms';
-        is $state.propagated.status, Kept, "State propagated attribute is kept once all user and room metadata has been propagated";
+        is $state.propagation-mitigation.status, Kept, 'state propagation-mitigation attribute is kept after fetching metadata for all configured rooms';
+        is $state.propagated.status, Kept, "state propagated attribute is kept once all user and room metadata has been propagated";
     }
 
     $parser.parse-deinit: $_ for ROOMS.keys;
@@ -157,7 +157,7 @@ subtest '|init|', {
     my Str $type   = 'chat';
 
     $parser.parse-init: $roomid, $type;
-    cmp-ok $state.rooms, '∋', $roomid, 'Adds room to state';
+    cmp-ok $state.rooms, '∋', $roomid, 'adds room to state';
     $parser.parse-deinit: $roomid;
 };
 
@@ -170,8 +170,8 @@ subtest '|J| and |j|', {
 
     $parser.parse-init: $roomid, 'chat';
     $parser.parse-join: $roomid, $userinfo;
-    cmp-ok $state.users, '∋', $userid, 'Adds user to user state';
-    cmp-ok $state.rooms{$roomid}.ranks, '∋', $userid, 'Adds user to room state';
+    cmp-ok $state.users, '∋', $userid, 'adds user to user state';
+    cmp-ok $state.rooms{$roomid}.ranks, '∋', $userid, 'adds user to room state';
 };
 
 subtest '|N|', {
@@ -183,12 +183,12 @@ subtest '|N|', {
     my Str $oldid = 'b' x 19;
 
     $parser.parse-rename: $roomid, $userinfo, $oldid;
-    cmp-ok $state.users, '∋', $userid, 'Updates user state for user';
-    cmp-ok $state.users, '∌', $oldid, 'Removes user state for old user';
+    cmp-ok $state.users, '∋', $userid, 'updates user state for user';
+    cmp-ok $state.users, '∌', $oldid, 'removes user state for old user';
 
     my PSBot::Room $room = $state.rooms{$roomid};
-    cmp-ok $room.ranks, '∋', $userid, 'Updates room state for user';
-    cmp-ok $room.ranks, '∌', $oldid, 'Removes room state for old user';
+    cmp-ok $room.ranks, '∋', $userid, 'updates room state for user';
+    cmp-ok $room.ranks, '∌', $oldid, 'removes room state for old user';
 };
 
 subtest '|L| and |l|', {
@@ -199,8 +199,8 @@ subtest '|L| and |l|', {
     my Str $userinfo = " $userid";
 
     $parser.parse-leave: $roomid, $userinfo;
-    cmp-ok $state.users, '∌', $userid, 'Removes user state for user';
-    cmp-ok $state.rooms{$roomid}.ranks, '∌', $userid, 'Removes room state for user';
+    cmp-ok $state.users, '∌', $userid, 'removes user state for user';
+    cmp-ok $state.rooms{$roomid}.ranks, '∌', $userid, 'removes room state for user';
 };
 
 subtest '|deinit|', {
@@ -209,7 +209,7 @@ subtest '|deinit|', {
     my Str $roomid = 'lobby';
 
     $parser.parse-deinit: $roomid;
-    cmp-ok $state.rooms, '∌', $roomid, 'Deletes room from room state';
+    cmp-ok $state.rooms, '∌', $roomid, 'deletes room from room state';
 };
 
 # vim: ft=perl6 sw=4 ts=4 sts=4 expandtab

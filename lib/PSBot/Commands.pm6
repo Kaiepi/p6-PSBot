@@ -21,7 +21,7 @@ BEGIN {
         :administrative,
         anon method echo(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-            self.reply: $target;
+            self.reply: $target, $user, $room
         };
 
     my PSBot::Command $eval .= new:
@@ -44,10 +44,10 @@ BEGIN {
             my Str $res = await $p;
             if $room {
                 $res.contains("\n") && self.can('+', $state.get-user($state.userid).ranks{$room.id})
-                    ?? self.reply("!code $res", :raw)
-                    !! self.reply("``$res``");
+                    ?? self.reply("!code $res", $user, $room, :raw)
+                    !! self.reply("``$res``", $user, $room);
             } else {
-                self.reply: $res.split("\n").map({ "``$_``" })
+                self.reply: $res.split("\n").map({ "``$_``" }), $user, $room
             }
         };
 
@@ -56,8 +56,8 @@ BEGIN {
         anon method evalcommand(Str $target, PSBot::User $user, PSBot::Room $room,
                     PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             return self.reply:
-                'No command, target, user, and room were given.'
-                unless $target || $target.contains: ',';
+                'No command, target, user, and room were given.',
+                $user, $room unless $target || $target.contains: ',';
 
             my Str @parts = $target.split(',').map(*.trim);
             my Str $command-chain = @parts.head;
@@ -71,32 +71,35 @@ BEGIN {
                 $root-command = $command-chain;
             }
             return self.reply:
-                "{COMMAND}$root-command does not exist."
-                unless OUR::{$root-command}:exists;
+                "{COMMAND}$root-command does not exist.",
+                $user, $room unless OUR::{$root-command}:exists;
 
             my PSBot::Command $command = OUR::{$root-command};
-            return self.reply: "{COMMAND}$root-command does not exist." unless $command.defined;
+            return self.reply:
+                "{COMMAND}$root-command does not exist.",
+                $user, $room unless $command.defined;
 
             for @subcommands -> $name {
-                return self.reply: "{COMMAND}{$command.name} $name does not exist."
-                    unless $command.subcommands ∋ $name;
+                return self.reply:
+                    "{COMMAND}{$command.name} $name does not exist.",
+                    $user, $room unless $command.subcommands ∋ $name;
                 $command = $command.subcommands{$name};
             }
 
             my Str $command-target = @parts[1..*-3].join: ',';
-            return self.reply: 'No target was given.' unless $command-target;
+            return self.reply: 'No target was given.', $user, $room unless $command-target;
 
             my Str $userid = to-id @parts[*-2];
-            return self.reply: 'No user was given.' unless $userid;
+            return self.reply: 'No user was given.', $user, $room unless $userid;
 
             my PSBot::User $command-user = $state.get-user: $userid;
-            return self.reply: "$userid is not a known user." unless $command-user.defined;
+            return self.reply: "$userid is not a known user.", $user, $room unless $command-user.defined;
 
             my Str $roomid = to-id @parts[*-1];
-            return self.reply: 'No room was given.' unless $roomid;
+            return self.reply: 'No room was given.', $user, $room unless $roomid;
 
             my PSBot::Room $command-room = $state.get-room: $roomid;
-            return self.reply: "$roomid is not a known room." unless $command-room.defined;
+            return self.reply: "$roomid is not a known room.", $user, $room unless $command-room.defined;
 
             my Promise $p .= new;
             await Promise.anyof(
@@ -113,15 +116,13 @@ BEGIN {
             );
 
             my Str $res = await $p;
-            return unless $res;
-
             if $room {
                 my Bool $raw = self.can('+', $state.get-user($state.userid).ranks{$room.id})
                     && ($res.contains("\n") ?? $res.codes > 150 !! 150 < $res.codes < 8192);
                 $res = "!code $res" if $raw;
-                self.reply: "``$res``", :$raw;
+                self.reply: "``$res``", $user, $room, :$raw;
             } else {
-                self.reply: $res.split("\n").map({ "``$_``" })
+                self.reply: $res.split("\n").map({ "``$_``" }), $user, $room
             }
         };
 
@@ -132,7 +133,7 @@ BEGIN {
             my Str $res = sprintf
                 '%s currently has a %.2fMB maximum resident set size.',
                 $state.username, T<max-rss> / 1024;
-            self.reply: $res
+            self.reply: $res, $user, $room
         };
 
     my PSBot::Command $nick .= new:
@@ -140,13 +141,13 @@ BEGIN {
         anon method nick(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             return self.reply:
-                'A username and, optionally, a password must be provided.'
-                unless $target || $target.contains: ',';
+                'A username and, optionally, a password must be provided.',
+                $user, $room unless $target || $target.contains: ',';
 
             my (Str $username, Str $password) = $target.split(',').map(*.trim);
-            return self.reply: 'No username was given.' unless $username;
-            return self.reply: 'Username must be under 19 characters.' if $username.chars > 18;
-            return self.reply: 'Only use passwords with this command in PMs.' if $room && $password;
+            return self.reply: 'No username was given.', $user, $room unless $username;
+            return self.reply: 'Username must be under 19 characters.', $user, $room if $username.chars > 18;
+            return self.reply: 'Only use passwords with this command in PMs.', $user, $room if $room && $password;
 
             my Str $userid = to-id $username;
             $password = PASSWORD if $userid eq to-id USERNAME;
@@ -155,18 +156,17 @@ BEGIN {
                 # but the userid is the same.
                 $connection.send-raw: "/trn $username";
                 await $state.pending-rename;
-                return self.reply: "Successfully renamed to $username!";
+                return self.reply: "Successfully renamed to $username!", $user, $room;
             }
 
             my Failable[Str] $assertion = $state.authenticate: $username, $password;
             return self.reply:
-                "Failed to rename to $username: {$assertion.exception.message}"
-                if $assertion ~~ Failure:D;
-            return unless $assertion.defined;
+                "Failed to rename to $username: {$assertion.exception.message}",
+                $user, $room if $assertion ~~ Failure:D;
 
             $connection.send-raw: "/trn $username,0,$assertion";
             await $state.pending-rename;
-            self.reply: "Successfully renamed to $username!"
+            self.reply: "Successfully renamed to $username!", $user, $room
         };
 
     my PSBot::Command $suicide .= new:
@@ -185,7 +185,7 @@ BEGIN {
         :default-rank<+>,
         anon method git(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-            self.reply: "{$state.username}'s source code may be found at {GIT}"
+            self.reply: "{$state.username}'s source code may be found at {GIT}", $user, $room
         };
 
     my PSBot::Command $eightball .= new:
@@ -215,14 +215,14 @@ BEGIN {
                 when 18 { 'Outlook not so good.'       }
                 when 19 { 'Very doubtful.'             }
             }
-            self.reply: $res
+            self.reply: $res, $user, $room
         };
 
     my PSBot::Command $urban .= new:
         :default-rank<+>,
         anon method urban(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
-            return self.reply: 'No term was given.' unless $target;
+            return self.reply: 'No term was given.', $user, $room unless $target;
 
             my Str                 $term     = uri_encode_component($target);
             my Cro::HTTP::Response $response = await Cro::HTTP::Client.get:
@@ -233,11 +233,11 @@ BEGIN {
 
             my %body = await $response.body;
             return self.reply:
-                "Urban Dictionary definition for $target was not found."
-                unless +%body<list>;
+                "Urban Dictionary definition for $target was not found.",
+                $user, $room unless +%body<list>;
 
             my %data = %body<list>.head;
-            return self.reply: "Urban Dictionary definition for $target: %data<permalink>";
+            return self.reply: "Urban Dictionary definition for $target: %data<permalink>", $user, $room;
 
             CATCH {
                 when X::Cro::HTTP::Error {
@@ -252,11 +252,11 @@ BEGIN {
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             return self.reply:
                 "No Oxford Dictionary API ID is configured.",
-                unless DICTIONARY_API_ID;
+                $user, $room unless DICTIONARY_API_ID;
             return self.reply:
                 "No Oxford Dictionary API key is configured.",
-                unless DICTIONARY_API_KEY;
-            return self.reply: 'No word was given.' unless $target;
+                $user, $room unless DICTIONARY_API_KEY;
+            return self.reply: 'No word was given.', $user, $room unless $target;
 
             my Cro::HTTP::Response $response = await Cro::HTTP::Client.get:
                 "https://od-api.oxforddictionaries.com:443/api/v1/entries/en/$target",
@@ -285,22 +285,22 @@ BEGIN {
                     "{$i + 1}. {@definition.head}"
                 });
             return self.reply:
-                "/addhtmlbox <ol>{@definitions.map({ "<li>{$_}</li>" })}</ol>", :raw
-                if self.can: '*', $state.get-user($state.userid).ranks{$room.id};
+                "/addhtmlbox <ol>{@definitions.map({ "<li>{$_}</li>" })}</ol>",
+                $user, $room, :raw if self.can: '*', $state.get-user($state.userid).ranks{$room.id};
 
             my Int           $i   = 0;
             my Failable[Str] $url = paste @definitions.join;
             my Str           $res = $url.defined
                 ?? "The Oxford Dictionary definitions for $target can be found at $url"
                 !! "Failed to upload Urban Dictionary definition for $target to Pastebin: {$url.exception.message}";
-            return self.reply: $res;
+            return self.reply: $res, $user, $room;
 
             CATCH {
                 when X::Cro::HTTP::Error {
                     my Str $res = .response.status == 404
                         ?? "Definition for $target not found."
                         !! "Request to Oxford Dictionary API failed with code {.response.status}.";
-                    return self.reply: $res;
+                    return self.reply: $res, $user, $room;
                 }
             }
         };
@@ -309,7 +309,7 @@ BEGIN {
         :default-rank<+>,
         anon method wikipedia(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
-            return self.reply: 'No query was given.' unless $target;
+            return self.reply: 'No query was given.', $user, $room unless $target;
 
             my Str                 $query = uri_encode_component $target;
             my Cro::HTTP::Response $resp  = await Cro::HTTP::Client.get:
@@ -321,11 +321,11 @@ BEGIN {
             my Str $res  = %body<query><pages> ∋ '-1'
                 ?? "No Wikipedia page for $target was found."
                 !! "The Wikipedia page for $target can be found at {%body<query><pages>.head.value<fullurl>}";
-            return self.reply: $res;
+            return self.reply: $res, $user, $room;
 
             CATCH {
                 when X::Cro::HTTP::Error {
-                    return self.reply: "Request to Wikipedia API failed with code {.response.status}.";
+                    return self.reply: "Request to Wikipedia API failed with code {.response.status}.", $user, $room;
                 }
             }
         };
@@ -334,7 +334,7 @@ BEGIN {
         :default-rank<+>,
         anon method wikimon(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
-            return self.reply: 'No query was given.' unless $target;
+            return self.reply: 'No query was given.', $user, $room unless $target;
 
             my Str                 $query = uri_encode_component $target;
             my Cro::HTTP::Response $resp  = await Cro::HTTP::Client.get:
@@ -346,11 +346,11 @@ BEGIN {
             my Str $res  = %body<query><pages> ∋ '-1'
                 ?? "No Wikipedia page for $target was found."
                 !! "The Wikipedia page for $target can be found at {%body<query><pages>.head.value<fullurl>}";
-            return self.reply: $res;
+            return self.reply: $res, $user, $room;
 
             CATCH {
                 when X::Cro::HTTP::Error {
-                    return self.reply: "Request to Wikipedia API failed with code {.response.status}.";
+                    return self.reply: "Request to Wikipedia API failed with code {.response.status}.", $user, $room;
                 }
             }
         };
@@ -359,13 +359,13 @@ BEGIN {
         :default-rank<+>,
         anon method youtube(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-            return self.reply: 'No query was given.' unless $target;
+            return self.reply: 'No query was given.', $user, $room unless $target;
 
             my Failable[Video] $video = search-video $target;
             my Str             $res   = $video.defined
                 ?? "{$video.title} - {$video.url}"
                 !! qq[Failed to get YouTube video for "$target": {$video.exception.message}];
-            self.reply: $res;
+            self.reply: $res, $user, $room
         };
 
     my PSBot::Command $translate .= new:
@@ -374,47 +374,47 @@ BEGIN {
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
             return self.reply:
                 'No source language, target language, and phrase were given.',
-                unless $target || $target.contains: ',';
+                $user, $room unless $target || $target.contains: ',';
 
             my Str @parts       = $target.split(',').map(*.trim);
             my Str $source-lang = @parts[0];
-            return self.reply: 'No source language was given' unless $source-lang;
+            return self.reply: 'No source language was given', $user, $room unless $source-lang;
 
             my Str $target-lang = @parts[1];
-            return self.reply: 'No target language was given' unless $target-lang;
+            return self.reply: 'No target language was given', $user, $room unless $target-lang;
 
             my Str $query = @parts[2..*].join: ',';
-            return self.reply: 'No phrase was given' unless $query;
+            return self.reply: 'No phrase was given', $user, $room unless $query;
 
             my Failable[Set] $languages = get-languages;
             return self.reply:
                 "Failed to fetch list of Google Translate languages: {$languages.exception.message}}",
-                unless $languages.defined;
+                $user, $room unless $languages.defined;
             return self.reply:
-                qq["$source-lang" is either not an ISO-639-1 language code or not a supported language. A list of supported languages can be found at https://cloud.google.com/translate/docs/languages]
-                unless $languages ∋ $source-lang;
+                qq["$source-lang" is either not an ISO-639-1 language code or not a supported language. A list of supported languages can be found at https://cloud.google.com/translate/docs/languages],
+                $user, $room unless $languages ∋ $source-lang;
             return self.reply:
-                qq["$target-lang" is either not an ISO-639-1 language code or not a supported language. A list of supported languages can be found at https://cloud.google.com/translate/docs/languages]
-                unless $languages ∋ $target-lang;
+                qq["$target-lang" is either not an ISO-639-1 language code or not a supported language. A list of supported languages can be found at https://cloud.google.com/translate/docs/languages],
+                $user, $room unless $languages ∋ $target-lang;
 
             my Failable[Str] $output = get-translation $query, $source-lang, $target-lang;
             return self.reply:
                 "Failed to get translation result from Google Translate: {$output.exception.message}",
-                unless $output.defined;
+                $user, $room unless $output.defined;
 
-            self.reply: $output
+            self.reply: $output, $user, $room
         };
 
     my PSBot::Command $badtranslate .= new:
         :default-rank<+>,
         anon method badtranslate(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-            return self.reply: 'No phrase was given.' unless $target;
+            return self.reply: 'No phrase was given.', $user, $room unless $target;
 
             my Failable[Set] $languages = get-languages;
             return self.reply:
                 "Failed to fetch list of Google Translate languages: {$languages.exception.message}",
-                unless $languages.defined;
+                $user, $room unless $languages.defined;
 
             my Failable[Str] $query = $target;
             for 0..^10 {
@@ -422,15 +422,15 @@ BEGIN {
                 $query = get-translation $query, $target;
                 return self.reply:
                     "Failed to get translation result from Google Translate: {$query.exception.message}",
-                    unless $query.defined;
+                    $user, $room unless $query.defined;
             }
 
             my Failable[Str] $output = get-translation $query, 'en';
             return self.reply:
                 "Failed to get translation result from Google Translate: {$output.exception.message}",
-                unless $output.defined;
+                $user, $room unless $output.defined;
 
-            self.reply: $output
+            self.reply: $output, $user, $room
         };
 
     my PSBot::Command $reminder .= new:
@@ -438,18 +438,18 @@ BEGIN {
         anon method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             return self.reply:
-                'A time (e.g. 30s, 10m, 2h) and a message must be given.'
-                unless $target || $target.contains: ',';
+                'A time (e.g. 30s, 10m, 2h) and a message must be given.',
+                $user, $room unless $target || $target.contains: ',';
 
             my (Str $time-ago, Str $message) = $target.split(',').map(*.trim);
             my Int $seconds;
             given $time-ago {
-                when / ^ ( <[0..9]>+ ) [s | <.ws> seconds?] $ / { $seconds += $0.Int                    }
-                when / ^ ( <[0..9]>+ ) [m | <.ws> minutes?] $ / { $seconds += $0.Int * 60               }
-                when / ^ ( <[0..9]>+ ) [h | <.ws> hours?  ] $ / { $seconds += $0.Int * 60 * 60          }
-                when / ^ ( <[0..9]>+ ) [d | <.ws> days?   ] $ / { $seconds += $0.Int * 60 * 60 * 24     }
-                when / ^ ( <[0..9]>+ ) [w | <.ws> weeks?  ] $ / { $seconds += $0.Int * 60 * 60 * 24 * 7 }
-                default                                         { return self.reply: 'Invalid time.'     }
+                when / ^ ( <[0..9]>+ ) [s | <.ws> seconds?] $ / { $seconds += $0.Int                               }
+                when / ^ ( <[0..9]>+ ) [m | <.ws> minutes?] $ / { $seconds += $0.Int * 60                          }
+                when / ^ ( <[0..9]>+ ) [h | <.ws> hours?  ] $ / { $seconds += $0.Int * 60 * 60                     }
+                when / ^ ( <[0..9]>+ ) [d | <.ws> days?   ] $ / { $seconds += $0.Int * 60 * 60 * 24                }
+                when / ^ ( <[0..9]>+ ) [w | <.ws> weeks?  ] $ / { $seconds += $0.Int * 60 * 60 * 24 * 7            }
+                default                                         { return self.reply: 'Invalid time.', $user, $room }
             }
 
             my Str     $userid   = $user.id;
@@ -470,7 +470,7 @@ BEGIN {
                 }, in => $seconds);
             }
 
-            self.reply: "You set a reminder for $time-ago from now."
+            self.reply: "You set a reminder for $time-ago from now.", $user, $room
         };
 
     my PSBot::Command $reminderlist .= new:
@@ -479,7 +479,7 @@ BEGIN {
         anon method reminderlist(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             my @reminders = $state.database.get-reminders: $user.name;
-            return self.reply: 'You have no reminders set.' unless @reminders eqv [Nil] || +@reminders;
+            return self.reply: 'You have no reminders set.', $user, $room unless +@reminders;
 
             my Str $table = @reminders.kv.map(-> $i, %reminder {
                 my Str      $location  = %reminder<roomid> ?? "in room %reminder<roomid>" !! 'in private';
@@ -487,7 +487,7 @@ BEGIN {
                 qq[{$i + 1}. "%reminder<reminder>" ($location, set for {$time.hh-mm-ss} UTC on {$time.yyyy-mm-dd})]
             }).join("\n");
 
-            self.reply: $table, :paste
+            self.reply: $table, $user, $room, :paste
         };
 
     my PSBot::Command $mail .= new:
@@ -495,16 +495,16 @@ BEGIN {
         anon method mail(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             my Int $idx = $target.index: ',';
-            return self.reply: 'A username and a message must be included.' unless $idx.defined;
+            return self.reply: 'A username and a message must be included.', $user, $room unless $idx.defined;
 
             my Str   $username = $target.substr: 0, $idx;
             my Str   $userid   = to-id $username;
             my Str   $message  = $target.substr: $idx + 1;
-            return self.reply: 'No username was given.' unless $userid;
-            return self.reply: 'No message was given.'  unless $message;
+            return self.reply: 'No username was given.', $user, $room unless $userid;
+            return self.reply: 'No message was given.', $user, $room  unless $message;
 
             with $state.database.get-mail: $userid -> @mail {
-                return self.reply: "{$username}'s mailbox is full." if @mail.defined && +@mail >= 5;
+                return self.reply: "{$username}'s mailbox is full.", $user, $room if @mail.defined && +@mail >= 5;
             }
 
             if $state.has-user: $userid {
@@ -513,7 +513,7 @@ BEGIN {
                 $state.database.add-mail: $userid, $user.id, $message;
             }
 
-            self.reply: "Your mail has been delivered to $username."
+            self.reply: "Your mail has been delivered to $username.", $user, $room
         };
 
     my PSBot::Command $seen .= new:
@@ -521,15 +521,13 @@ BEGIN {
         anon method seen(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             my Str $userid = to-id $target;
-            return self.reply: 'No valid user was given.' unless $userid;
+            return self.reply: 'No valid user was given.', $user, $room unless $userid;
 
             my Failable[DateTime] $time = $state.database.get-seen: $userid;
-            return if $time =:= Nil;
-
-            my Str $res = $time.defined
+            my Str                $res  = $time.defined
                 ?? "$target was last seen on {$time.yyyy-mm-dd} at {$time.hh-mm-ss} UTC."
                 !! "$target has never been seen before.";
-            self.reply: $res;
+            self.reply: $res, $user, $room
         };
 
     my PSBot::Command $set .= new:
@@ -538,15 +536,15 @@ BEGIN {
         anon method set(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             return self.reply:
-                'A command and a rank must be given.'
-                unless $target || $target.contains: ',';
+                'A command and a rank must be given.',
+                $user, $room unless $target || $target.contains: ',';
 
             my (Str $command-chain, Str $target-rank) = $target.split(',').map(*.trim);
-            return self.reply: 'No command was given.' unless $command-chain;
-            return self.reply: 'No rank was given.' unless $target-rank;
+            return self.reply: 'No command was given.', $user, $room unless $command-chain;
+            return self.reply: 'No rank was given.', $user, $room unless $target-rank;
 
             $target-rank = ' ' if $target-rank eq 'regular user';
-            return self.reply: qq["$target-rank" is not a rank.] unless self.is-rank: $target-rank;
+            return self.reply: qq["$target-rank" is not a rank.], $user, $room unless self.is-rank: $target-rank;
 
             my Int $idx          = $command-chain.index: ' ';
             my Str $root-command = $idx.defined ?? $command-chain.substr(0, $idx) !! $command-chain;
@@ -558,30 +556,30 @@ BEGIN {
                 $root-command = $command-chain;
             }
             return self.reply:
-                "{COMMAND}$root-command does not exist."
-                unless OUR::{$root-command}:exists;
+                "{COMMAND}$root-command does not exist.",
+                $user, $room unless OUR::{$root-command}:exists;
 
             my PSBot::Command $command = OUR::{$root-command};
             return self.reply:
-                "{COMMAND}$root-command does not exist."
-                unless $command.defined;
+                "{COMMAND}$root-command does not exist.",
+                $user, $room unless $command.defined;
             return self.reply:
-                "{COMMAND}$root-command is an administrative command and thus can't have its rank set."
-                if $command.administrative;
+                "{COMMAND}$root-command is an administrative command and thus can't have its rank set.",
+                $user, $room if $command.administrative;
 
             for @subcommands -> $name {
                 return self.reply:
-                    "{COMMAND}{$command.name} $name does not exist."
-                    unless $command.subcommands ∋ $name;
+                    "{COMMAND}{$command.name} $name does not exist.",
+                    $user, $room unless $command.subcommands ∋ $name;
                 $command = $command.subcommands{$name};
             }
             return self.reply:
-                "{COMMAND}{$command.name} is an administrative command and thus can't have its rank set."
-                if $command.administrative;
+                "{COMMAND}{$command.name} is an administrative command and thus can't have its rank set.",
+                $user, $room if $command.administrative;
 
             $state.database.set-command: $room.id, $command.name, $target-rank;
             $command.set-rank: $target-rank;
-            self.reply: qq[{COMMAND}{$command.name} was set to "$target-rank".]
+            self.reply: qq[{COMMAND}{$command.name} was set to "$target-rank".], $user, $room
         };
 
     my PSBot::Command $toggle .= new:
@@ -589,11 +587,11 @@ BEGIN {
         :locale(Locale::Room),
         anon method toggle(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
-            return self.reply: 'No command was given.' unless $target;
+            return self.reply: 'No command was given.', $user, $room unless $target;
 
             my Int $idx          = $target.index: ' ';
             my Str $root-command = $idx.defined ?? $target.substr(0, $idx) !! $target;
-            return self.reply: "$root-command can't be disabled." if $root-command eq self.name;
+            return self.reply: "$root-command can't be disabled.", $user, $room if $root-command eq self.name;
 
             my Str @subcommands;
             if $idx.defined {
@@ -603,26 +601,26 @@ BEGIN {
                 $root-command = $target;
             }
             return self.reply:
-                "{COMMAND}$root-command does not exist."
-                unless OUR::{$root-command}:exists;
+                "{COMMAND}$root-command does not exist.",
+                $user, $room unless OUR::{$root-command}:exists;
 
             my PSBot::Command $command = OUR::{$root-command};
             return self.reply:
-                "{COMMAND}$root-command is an administrative command and thus can't be toggled."
-                if $command.administrative;
+                "{COMMAND}$root-command is an administrative command and thus can't be toggled.",
+                $user, $room if $command.administrative;
 
             for @subcommands -> $name {
                 return self.reply:
-                    "{COMMAND}{$command.name} $name does not exist."
-                    unless $command.subcommands ∋ $name;
+                    "{COMMAND}{$command.name} $name does not exist.",
+                    $user, $room unless $command.subcommands ∋ $name;
                 $command = $command.subcommands{$name};
             }
             return self.reply:
-                "{COMMAND}{$command.name} is an administrative command and thus can't be toggled."
-                if $command.administrative;
+                "{COMMAND}{$command.name} is an administrative command and thus can't be toggled.",
+                $user, $room if $command.administrative;
 
             my Bool $enabled = $state.database.toggle-command: $room.id, $command.name;
-            self.reply: "{COMMAND}{$command.name} has been {$enabled ?? 'enabled' !! 'disabled'}."
+            self.reply: "{COMMAND}{$command.name} has been {$enabled ?? 'enabled' !! 'disabled'}.", $user, $room
         };
 
     my PSBot::Command $settings .= new:
@@ -668,7 +666,7 @@ BEGIN {
                     }).join;
                     "/addhtmlbox <details><summary>Command Settings</summary><table>{$rows}</table></details>"
                 };
-                return self.reply: $res, :raw;
+                return self.reply: $res, $user, $room, :raw;
             }
 
             my Str $res = @requirements.map(-> $p {
@@ -676,7 +674,7 @@ BEGIN {
                 my Str $requirement = $p.value;
                 "$name: $requirement"
             }).join("\n");
-            self.reply: $res, :paste
+            self.reply: $res, $user, $room, :paste
         };
 
     my PSBot::Command $hangman = do {
@@ -686,31 +684,31 @@ BEGIN {
                 anon method new(Str $target, PSBot::User $user, PSBot::Room $room,
                         PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
                     return self.reply:
-                        "There is already a game of {$room.game.name} in progress."
-                        if $room.game;
+                        "There is already a game of {$room.game.name} in progress.",
+                        $user, $room if $room.game;
 
                     $room.add-game: PSBot::Games::Hangman.new: $user, :allow-late-joins;
-                    self.reply: "A game of {$room.game.name} has been created."
+                    self.reply: "A game of {$room.game.name} has been created.", $user, $room
                 }
             ),
             PSBot::Command.new(
                 anon method join(Str $target, PSBot::User $user, PSBot::Room $room,
                         PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
                     return self.reply:
-                        'There is no game of Hangman in progress.'
-                        unless $room.game ~~ PSBot::Games::Hangman;
+                        'There is no game of Hangman in progress.',
+                        $user, $room unless $room.game ~~ PSBot::Games::Hangman;
 
-                    self.reply: $room.game.join: $user
+                    self.reply: $room.game.join($user), $user, $room
                 }
             ),
             PSBot::Command.new(
                 anon method leave(Str $target, PSBot::User $user, PSBot::Room $room,
                         PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
                     return self.reply:
-                        'There is no game of Hangman in progress.'
-                        unless $room.game ~~ PSBot::Games::Hangman;
+                        'There is no game of Hangman in progress.',
+                        $user, $room unless $room.game ~~ PSBot::Games::Hangman;
 
-                    self.reply: $room.game.leave: $user
+                    self.reply: $room.game.leave($user), $user, $room
                 }
             ),
             PSBot::Command.new(
@@ -718,10 +716,10 @@ BEGIN {
                 anon method players(Str $target, PSBot::User $user, PSBot::Room $room,
                         PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
                     return self.reply:
-                        'There is no game of Hangman in progress.'
-                        unless $room.game ~~ PSBot::Games::Hangman;
+                        'There is no game of Hangman in progress.',
+                        $user, $room unless $room.game ~~ PSBot::Games::Hangman;
 
-                    self.reply: $room.game.players
+                    self.reply: $room.game.players, $user, $room
                 }
             ),
             PSBot::Command.new(
@@ -729,25 +727,25 @@ BEGIN {
                 anon method start(Str $target, PSBot::User $user, PSBot::Room $room,
                         PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
                     return self.reply:
-                        'There is no game of Hangman in progress.'
-                        unless $room.game ~~ PSBot::Games::Hangman;
+                        'There is no game of Hangman in progress.',
+                        $user, $room unless $room.game ~~ PSBot::Games::Hangman;
 
-                    self.reply: $room.game.start
+                    self.reply: $room.game.start, $user, $room
                 }
             ),
             PSBot::Command.new(
                 anon method guess(Str $target, PSBot::User $user, PSBot::Room $room,
                         PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
                     return self.reply:
-                        'There is no game of Hangman in progress.'
-                        unless $room.game ~~ PSBot::Games::Hangman;
+                        'There is no game of Hangman in progress.',
+                        $user, $room unless $room.game ~~ PSBot::Games::Hangman;
 
                     my Str $guess = to-id $target;
-                    return self.reply: 'No valid guess was given.' unless $guess;
+                    return self.reply: 'No valid guess was given.', $user, $room unless $guess;
 
                     my @res = $room.game.guess: $user, $guess;
                     $room.remove-game if $room.game.finished;
-                    self.reply: @res
+                    self.reply: @res, $user, $room
                 }
             ),
             PSBot::Command.new(
@@ -755,12 +753,12 @@ BEGIN {
                 anon method end(Str $target, PSBot::User $user, PSBot::Room $room,
                         PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
                     return self.reply:
-                        'There is no game of Hangman in progress.'
-                        unless $room.game ~~ PSBot::Games::Hangman;
+                        'There is no game of Hangman in progress.',
+                        $user, $room unless $room.game ~~ PSBot::Games::Hangman;
 
                     my Str $res = $room.game.end;
                     $room.remove-game;
-                    self.reply: $res
+                    self.reply: $res, $user, $room
                 }
             )
         );
@@ -896,7 +894,7 @@ BEGIN {
             my Str           $res = $url.defined
                 ?? "{$state.username} help can be found at $url"
                 !! "Failed to upload help to Pastebin: {$url.exception.message}";
-            self.reply: $res;
+            self.reply: $res, $user, $room
         };
 
     # Since variable names can't use all of Unicode, we can't just define the

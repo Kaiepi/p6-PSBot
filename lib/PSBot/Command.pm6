@@ -9,7 +9,7 @@ unit class PSBot::Command;
 
 enum Locale is export <Room PM Everywhere>;
 
-subset Replier is export where Callable[Nil] | Nil;
+subset Replier is export where Callable[Result];
 
 # The name of the command. This is used by the parser to find the command. Any
 # Unicode is allowed except for spaces.
@@ -20,8 +20,8 @@ has Bool   $.administrative;
 has Bool   $.autoconfirmed;
 # The default rank required to run the command.
 has Str    $.default-rank;
-# The actual rank required to run the command.
-has Str    $.rank;
+# The actual ranks required to run the command.
+has Str    %!ranks;
 # Where the command can be used, depending on where the message containing the
 # command was sent from.
 has Locale $.locale;
@@ -63,10 +63,14 @@ method autoconfirmed(--> Bool) {
     $!autoconfirmed
 }
 
-method rank(--> Str) {
-    return $!rank if $!rank.defined;
-    return $!root.rank if $!root.defined && $!default-rank eq ' ';
-    return $!default-rank;
+method get-rank(Str $roomid  --> Str) {
+    return %!ranks{$roomid} if %!ranks{$roomid}:exists && %!ranks{$roomid} ne ' ';
+    return $!root.get-rank: $roomid if $!root.defined;
+    $!default-rank
+}
+
+method set-rank(Str $roomid, Str $rank) {
+    %!ranks{$roomid} := $rank;
 }
 
 method locale(--> Locale) {
@@ -77,9 +81,6 @@ method locale(--> Locale) {
 
 method set-root(::?CLASS:D $!root) {}
 
-method set-rank(Str $!rank) {}
-
-# Check if a rank is actually a rank.
 method is-rank(Str $rank --> Bool) {
     Rank.enums{$rank}:exists
 }
@@ -93,8 +94,9 @@ method can(Str $required, Str $target --> Bool) {
 
 # Takes the output of a command and returns a callback that processes it and
 # sends a response to the user.
-method reply(Result \output, Bool :$raw = False, Bool :$paste = False --> Replier) is pure {
-    sub (PSBot::User $user, PSBot::Room $room, PSBot::Connection $connection --> Nil) {
+method reply(Result \output, PSBot::User $user, PSBot::Room $room,
+        Bool :$raw = False, Bool :$paste = False --> Replier) is pure {
+    sub (PSBot::Connection $connection --> Result) {
         my Result $result := output;
         $result := await $result while $result ~~ Awaitable:D;
         given $result {
@@ -126,6 +128,8 @@ method reply(Result \output, Bool :$raw = False, Bool :$paste = False --> Replie
                 ?? $connection.send: $result, roomid => $room.id
                 !! $connection.send: $result, userid => $user.id;
         }
+
+        $result
     }
 }
 
@@ -134,17 +138,17 @@ method reply(Result \output, Bool :$raw = False, Bool :$paste = False --> Replie
 # fail with the command chain's full name if the subcommand doesn't exist to
 # allow the parser to notify the user.
 method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection) {
+        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
     given self.locale {
         when Locale::Room {
-            return $connection.send:
-                "{COMMAND}{self.name} can only be used in rooms.",
-                userid => $user.id unless $room;
+            return self.reply:
+                "Permission denied. {COMMAND}{self.name} can only be used in rooms.",
+                $user, PSBot::Room unless $room;
         }
         when Locale::PM {
-            return $connection.send:
-                "{COMMAND}{self.name} can only be used in PMs.",
-                roomid => $room.id if $room;
+            return self.reply:
+                "Permission denied. {COMMAND}{self.name} can only be used in PMs.",
+                $user, PSBot::Room if $room;
         }
         when Locale::Everywhere {
             # No check necessary.
@@ -152,27 +156,32 @@ method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
     }
 
     if self.administrative {
-        return $connection.send: 'Permission denied.', userid => $user.id unless ADMINS ∋ $user.id;
+        return self.reply: 'Permission denied.', $user, PSBot::Room unless ADMINS ∋ $user.id;
     } else {
         # Administrative commands need to be possible to use before state is
         # fully propagated in case of bugs.
         await $state.propagated;
     }
 
-    return $connection.send:
-        "Permission denied. {COMMAND}{self.name} requires your account to be autoconfirmed.",
-        userid => $user.id if self.autoconfirmed && !$user.autoconfirmed;
+    if self.autoconfirmed {
+        return self.reply:
+            "Permission denied. {COMMAND}{self.name} requires your account to be autoconfirmed.",
+            $user, PSBot::Room unless $user.autoconfirmed;
+    }
 
     if $room {
         my      $row     = $state.database.get-command: $room.id, self.name;
         my Bool $enabled = $row.defined ?? $row<enabled>.Int.Bool !! True;
-        $!rank = ($row.defined && $row<rank>.Str) || $!default-rank unless $!rank.defined;
-        return $connection.send:
-            "{COMMAND}{self.name} is disabled in {$room.title}.",
-            userid => $user.id unless $enabled;
-        return $connection.send:
-            qq[Permission denied. {COMMAND}{self.name} requires at least rank "{self.rank}".],
-            userid => $user.id unless self.can: self.rank, $user.ranks{$room.id};
+        return self.reply:
+            "Permision denied. {COMMAND}{self.name} is disabled in {$room.title}.",
+            $user, PSBot::Room unless $enabled;
+
+        my Str $rank = %!ranks ∋ $room.id
+            ?? self.get-rank($room.id)
+            !! self.set-rank($room.id, ($row.defined && $row<rank>.Str) || $!default-rank);
+        return self.reply:
+            qq[Permission denied. {COMMAND}{self.name} requires at least rank "$rank".],
+            $user, PSBot::Room unless self.can: $rank, $user.ranks{$room.id};
     }
 
     return &!command(self, $target, $user, $room, $state, $connection) if &!command;
@@ -181,9 +190,9 @@ method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
     my Str $subcommand-name = $idx.defined ?? $target.substr(0, $idx) !! $target;
     fail "{self.name} $subcommand-name" if $!subcommands ∌ $subcommand-name;
 
-    my ::?CLASS          $subcommand = $!subcommands{$subcommand-name};
-    my Str               $subtarget  = $idx.defined ?? $target.substr($idx + 1) !! '';
-    my Failable[Replier] \output     = $subcommand($subtarget, $user, $room, $state, $connection);
-    fail output.exception if output ~~ Failure:D;
-    output
+    my ::?CLASS          $subcommand  = $!subcommands{$subcommand-name};
+    my Str               $subtarget   = $idx.defined ?? $target.substr($idx + 1) !! '';
+    my Failable[Replier] $output     := $subcommand($subtarget, $user, $room, $state, $connection);
+    fail "$!name {$output.exception}" unless $output.defined;
+    $output
 }

@@ -24,7 +24,7 @@ has Tap      $!sender-tap;
 
 submethod TWEAK(Cro::WebSocket::Client :$!client) {
     $!receiver        .= new;
-    $!receiver-supply  = $!receiver.Supply.schedule-on($*SCHEDULER).serialize;
+    $!receiver-supply  = $!receiver.Supply.schedule-on($*SCHEDULER);
     $!sender          .= new;
     $!sender-supply    = $!sender.Supply.throttle(1, 0.6).schedule-on($*SCHEDULER);
 }
@@ -92,7 +92,8 @@ method reconnect() {
     $!timeout *= 2;
 }
 
-multi method send(*@data) {
+proto method send(*@, Str :$roomid?, Str :$userid? --> Nil) {*}
+multi method send(*@data --> Nil) {
     return if self.closed;
 
     for @data -> $data {
@@ -103,7 +104,7 @@ multi method send(*@data) {
         }
     }
 }
-multi method send(*@data, Str :$roomid!) {
+multi method send(*@data, Str :$roomid! --> Nil) {
     return if self.closed;
 
     for @data -> $data {
@@ -114,7 +115,7 @@ multi method send(*@data, Str :$roomid!) {
         }
     }
 }
-multi method send(*@data, Str :$userid!) {
+multi method send(*@data, Str :$userid! --> Nil) {
     return if self.closed;
 
     for @data -> $data {
@@ -127,7 +128,8 @@ multi method send(*@data, Str :$userid!) {
     }
 }
 
-multi method send-raw(*@data) {
+proto method send-raw(*@, Str :$roomid?, Str :$userid? --> Nil) {*}
+multi method send-raw(*@data --> Nil) {
     return if self.closed;
 
     for @data -> $data {
@@ -140,7 +142,7 @@ multi method send-raw(*@data) {
         }
     }
 }
-multi method send-raw(*@data, Str :$roomid!) {
+multi method send-raw(*@data, Str :$roomid! --> Nil) {
     return if self.closed;
 
     for @data -> $data {
@@ -153,7 +155,7 @@ multi method send-raw(*@data, Str :$roomid!) {
         }
     }
 }
-multi method send-raw(*@data, Str :$userid!) {
+multi method send-raw(*@data, Str :$userid! --> Nil) {
     return if self.closed;
 
     for @data -> $data {

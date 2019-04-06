@@ -183,8 +183,8 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
         my Failable[Replier] $replier = $command($target, $user, $room, $!state, $!connection);
         return $!connection.send:
             "Invalid subcommand: {COMMAND}{$replier.exception.message}",
-            :$roomid if $replier ~~ Failure:D;
-        return $replier($user, $room, $!connection) if $replier.defined;
+            :$roomid unless $replier.defined;
+        return $replier($!connection);
     }
 
     await $!state.propagated;
@@ -220,8 +220,8 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
         my Failable[Replier] $replier = $command($target, $user, $room, $!state, $!connection);
         return $!connection.send:
             "Invalid subcommand: {COMMAND}{$replier.exception.message}",
-            :$userid if $replier ~~ Failure:D;
-        return $replier($user, $room, $!connection) if $replier.defined;
+            :$userid unless $replier.defined;
+        return $replier($!connection);
     }
 
     await $!state.propagated;
