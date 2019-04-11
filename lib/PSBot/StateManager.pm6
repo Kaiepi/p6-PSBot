@@ -161,7 +161,7 @@ method delete-room(Str $roomid) {
         my PSBot::Room $room = %!rooms{$roomid}:delete;
         for $room.ranks.kv -> $userid, $rank {
             my PSBot::User $user = %!users{$userid};
-            $user.on-leave: $roomid;
+            $user.on-leave: $roomid if $user;
             %!users{$userid}:delete unless +$user.ranks;
         }
     })
