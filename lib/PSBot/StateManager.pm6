@@ -60,7 +60,6 @@ method on-update-user(Str $username, Str $is-named, Str $avatar, %data) {
     $!pms-blocked        = %data<blockPMs>;
     $!challenges-blocked = %data<blockChallenges>;
 
-    say USERNAME;
     if $!inited {
         $!pending-rename.send: True;
     } elsif !USERNAME || $username === USERNAME {
