@@ -280,16 +280,12 @@ BEGIN {
                 })
                 .flat
                 .grep(*.defined)
-                .kv
-                .map(-> $i, @definition {
-                    "{$i + 1}. {@definition.head}"
-                });
+                .map(*.head);
             return self.reply:
                 "/addhtmlbox <ol>{@definitions.map({ "<li>{$_}</li>" })}</ol>",
                 $user, $room, :raw if self.can: '*', $state.get-user($state.userid).ranks{$room.id};
 
-            my Int           $i   = 0;
-            my Failable[Str] $url = paste @definitions.join;
+            my Failable[Str] $url = paste @definitions.kv.map(-> $i, $definition { "$i. $definition" }).join;
             my Str           $res = $url.defined
                 ?? "The Oxford Dictionary definitions for $target can be found at $url"
                 !! "Failed to upload Urban Dictionary definition for $target to Pastebin: {$url.exception.message}";
