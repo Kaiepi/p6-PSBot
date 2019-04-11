@@ -1,4 +1,8 @@
 use v6.d;
+
+BEGIN %*ENV<TESTING> := 1;
+END   %*ENV<TESTING>:delete;
+
 use JSON::Fast;
 use PSBot::Config;
 use PSBot::Connection;
@@ -11,44 +15,34 @@ use Test;
 
 plan 8;
 
-my PSBot::Test::Server $server;
-my PSBot::Connection   $connection;
-
-BEGIN {
-    %*ENV<TESTING> := 1;
-    $server .= new: -> $data, &emit { emit await $data.body-text };
-    $server.start;
-    $connection .= new: 'localhost', $server.port;
-    $connection.connect;
-}
-
-END {
-    $connection.close: :force;
-    $server.stop;
-    %*ENV<TESTING>:delete;
-}
-
+my PSBot::Test::Server $server     .= new: -> $data, &emit { emit await $data.body-text };
+my PSBot::Connection   $connection .= new: 'localhost', $server.port;
 my PSBot::StateManager $state      .= new: SERVERID;
- .= new: 'localhost', $server.port;
 my PSBot::Parser       $parser     .= new: :$connection, :$state;
 
+$server.start;
+$connection.connect;
+
 subtest '|updateuser|', {
-    plan 10;
+    plan 12;
 
     my Str $roomid         = 'lobby';
     my Str $guest-username = 'Guest 1';
+    my Str $data           = '{"blockChallenges":true,"blockPMs":true}';
 
-    $parser.parse-update-user: $roomid, $guest-username, '0', AVATAR;
+    $parser.parse-update-user: $roomid, $guest-username, '0', AVATAR, $data;
     is $state.username, $guest-username, 'sets state username attribute';
     is $state.guest-username, $guest-username, 'sets state guest-username attribute as a guest';
     ok $state.is-guest, 'sets state is-guest attribute properly as a guest';
     is $state.avatar, AVATAR, 'sets state avatar attribute';
+    ok $state.pms-blocked, 'sets state pms-blocked attribute';
+    ok $state.challenges-blocked, 'sets state challenges-blocked attribute';
 
     nok $state.inited, 'waits until the second user update to set the state inited attribute if there is a configured username';
     nok $state.pending-rename.poll, 'does not send to state pending-rename channel when state is first initialilzed if there is a configured username';
     nok $state.logged-in.poll, 'does not send to state logged-in channel if there is a configured usernamed';
 
-    $parser.parse-update-user: $roomid, USERNAME // 'PoS-Bot', '1', $avatar;
+    $parser.parse-update-user: $roomid, USERNAME, '1', AVATAR, $data;
     nok $state.is-guest, 'sets state is-guest attribute properly if named';
     ok $state.pending-rename.poll, 'sends to state pending-rename channel when inited';
     ok $state.logged-in.poll, 'sends to state logged-in channel when inited if there is a configured username';
@@ -211,5 +205,8 @@ subtest '|deinit|', {
     $parser.parse-deinit: $roomid;
     cmp-ok $state.rooms, '∌', $roomid, 'deletes room from room state';
 };
+
+$connection.close: :force;
+$server.stop;
 
 # vim: ft=perl6 sw=4 ts=4 sts=4 expandtab

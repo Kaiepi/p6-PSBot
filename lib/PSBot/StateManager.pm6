@@ -16,6 +16,8 @@ has Bool $.is-guest;
 has Str  $.avatar;
 has Bool $.autoconfirmed;
 has Str  $.group;
+has Bool $.pms-blocked;
+has Bool $.challenges-blocked;
 
 has Bool      $.inited                        = False;
 has Channel   $.pending-rename               .= new;
@@ -49,16 +51,19 @@ method authenticate(Str $username, Str $password?, Str $challstr? --> Str) {
     $!login-server.log-in: $username, $password, $!challstr
 }
 
-method on-update-user(Str $username, Str $is-named, Str $avatar) {
-    $!username       = $username;
-    $!userid         = to-id $username;
-    $!guest-username = $username if $!userid.starts-with: 'guest';
-    $!is-guest       = $is-named eq '0';
-    $!avatar         = $avatar;
+method on-update-user(Str $username, Str $is-named, Str $avatar, %data) {
+    $!username           = $username;
+    $!userid             = to-id $username;
+    $!guest-username     = $username if $!userid.starts-with: 'guest';
+    $!is-guest           = $is-named eq '0';
+    $!avatar             = $avatar;
+    $!pms-blocked        = %data<blockPMs>;
+    $!challenges-blocked = %data<blockChallenges>;
 
+    say USERNAME;
     if $!inited {
         $!pending-rename.send: True;
-    } elsif !USERNAME || $username eq USERNAME {
+    } elsif !USERNAME || $username === USERNAME {
         $!inited = True;
         $!pending-rename.send: True;
         $!logged-in.send: True;

@@ -66,15 +66,16 @@ method parse(Str $text) {
     }
 }
 
-method parse-update-user(Str $roomid, Str $username, Str $is-named, Str $avatar) {
-    $!state.on-update-user: $username, $is-named, $avatar;
+method parse-update-user(Str $roomid, Str $username, Str $is-named, Str $avatar, Str $data) {
+    my %data = from-json $data;
+    $!state.on-update-user: $username, $is-named, $avatar, %data;
 }
 
 method parse-challstr(Str $roomid, Str $type, Str $nonce) {
     return unless USERNAME;
 
     my Str           $challstr  = "$type|$nonce";
-    my Failable[Str] $assertion = $!state.authenticate: USERNAME, PASSWORD, $challstr;
+    my Failable[Str] $assertion = $!state.authenticate: USERNAME // '', PASSWORD // '', $challstr;
     $assertion.throw if $assertion ~~ Failure:D;
     if defined $assertion {
         $!connection.send-raw: "/trn {USERNAME},0,$assertion";
@@ -97,7 +98,7 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
             $!state.on-user-details: %data;
         }
         when 'roominfo' {
-            if $data eq 'null' && $!state.rooms ∋ $roomid {
+            if $data eq 'null' && $!state.has-room: $roomid {
                 note "This server must support /cmd roominfo in order for {USERNAME} to run properly! Contact a server administrator and ask them to update the server.";
                 exit 1;
             }

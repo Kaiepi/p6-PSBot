@@ -1,6 +1,8 @@
 use v6.d;
+
 BEGIN %*ENV<TESTING> := 1;
 END   %*ENV<TESTING>:delete;
+
 use PSBot::Command;
 use PSBot::Config;
 use PSBot::Connection;

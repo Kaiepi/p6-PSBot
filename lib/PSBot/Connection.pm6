@@ -24,7 +24,7 @@ has Tap      $!sender-tap;
 
 submethod TWEAK(Cro::WebSocket::Client :$!client) {
     $!receiver        .= new;
-    $!receiver-supply  = $!receiver.Supply.schedule-on($*SCHEDULER);
+    $!receiver-supply  = $!receiver.Supply.schedule-on($*SCHEDULER).serialize;
     $!sender          .= new;
     $!sender-supply    = $!sender.Supply.throttle(1, 0.6).schedule-on($*SCHEDULER);
 }
