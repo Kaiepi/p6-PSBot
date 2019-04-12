@@ -513,7 +513,7 @@ BEGIN {
         };
 
     my PSBot::Command $seen .= new:
-        :default-rank<+>,
+        :autoconfirmed,
         anon method seen(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             my Str $userid = to-id $target;
@@ -524,6 +524,13 @@ BEGIN {
                 ?? "$target was last seen on {$time.yyyy-mm-dd} at {$time.hh-mm-ss} UTC."
                 !! "$target has never been seen before.";
             self.reply: $res, $user, $room
+        };
+
+    my PSBot::Command $shrug .= new:
+        :autoconfirmed,
+        anon method shrug(Str $target, PSBot::User $user, PSBot::Room $room,
+                PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
+            self.reply: '¯\_(ツ)_/¯', $user, $room;
         };
 
     my PSBot::Command $set .= new:
@@ -765,7 +772,7 @@ BEGIN {
     };
 
     my PSBot::Command $help .= new:
-        :default-rank<+>,
+        :autoconfirmed,
         anon method help(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
             my Str $help = q:to/END/;
@@ -820,11 +827,15 @@ BEGIN {
 
                     - seen <username>
                       Returns the last time the given user was seen.
-                      Requires at least rank + by default.
+                      Requires autoconfirmed status.
+
+                    - shrug.
+                      Returns "¯\_(ツ)_/¯".
+                      Requires autoconfirmed status.
 
                     - help
                       Returns a link to this help page.
-                      Requires at least rank + by default.
+                      Requires autoconfirmed status.
 
                 Moderation commands:
                     - set <command>, <rank>
