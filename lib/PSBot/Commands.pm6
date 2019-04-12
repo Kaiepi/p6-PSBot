@@ -43,9 +43,10 @@ BEGIN {
 
             my Str $res = await $p;
             if $room {
-                $res.contains("\n") && self.can('+', $state.get-user($state.userid).ranks{$room.id})
-                    ?? self.reply("!code $res", $user, $room, :raw)
-                    !! self.reply("``$res``", $user, $room);
+                my Bool $raw = self.can('+', $state.get-user($state.userid).ranks{$room.id})
+                        && ($res.contains("\n") || 150 < $res.codes < 8194);
+                $res = $raw ?? "!code $res" !! "``$res``";
+                self.reply: $res, $user, $room, :$raw;
             } else {
                 self.reply: $res.split("\n").map({ "``$_``" }), $user, $room
             }
@@ -66,7 +67,7 @@ BEGIN {
             my Str @subcommands;
             if $idx.defined {
                 $root-command = $command-chain.substr: 0, $idx;
-                @subcommands  = $command-chain.substr($idx + 1).split(' ').Array;
+                @subcommands  = $command-chain.substr($idx + 1).split(' ');
             } else {
                 $root-command = $command-chain;
             }
@@ -75,10 +76,6 @@ BEGIN {
                 $user, $room unless OUR::{$root-command}:exists;
 
             my PSBot::Command $command = OUR::{$root-command};
-            return self.reply:
-                "{COMMAND}$root-command does not exist.",
-                $user, $room unless $command.defined;
-
             for @subcommands -> $name {
                 return self.reply:
                     "{COMMAND}{$command.name} $name does not exist.",
@@ -107,7 +104,6 @@ BEGIN {
                     $p.keep: 'Evaluation timed out after 30 seconds.';
                 }),
                 Promise.start({
-                    use MONKEY-SEE-NO-EVAL;
                     my Replier $replier = $command($command-target, $command-user, $command-room, $state, $connection);
                     $replier($command-user, $command-room, $connection) if $replier.defined;
                     $p.keep: Nil.gist;
@@ -118,9 +114,9 @@ BEGIN {
             my Str $res = await $p;
             if $room {
                 my Bool $raw = self.can('+', $state.get-user($state.userid).ranks{$room.id})
-                    && ($res.contains("\n") ?? $res.codes > 150 !! 150 < $res.codes < 8192);
-                $res = "!code $res" if $raw;
-                self.reply: "``$res``", $user, $room, :$raw;
+                        && ($res.contains("\n") || 150 < $res.codes < 8192);
+                $res = $raw ?? "!code $res" !! "``$res``";
+                self.reply: $res, $user, $room, :$raw;
             } else {
                 self.reply: $res.split("\n").map({ "``$_``" }), $user, $room
             }
