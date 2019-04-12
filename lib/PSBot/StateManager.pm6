@@ -160,8 +160,6 @@ method delete-room(Str $roomid) {
 
         my PSBot::Room $room = %!rooms{$roomid}:delete;
         for $room.ranks.kv -> $userid, $rank {
-            next unless %!users ∋ $userid;
-
             my PSBot::User $user = %!users{$userid};
             $user.on-leave: $roomid;
             %!users{$userid}:delete unless +$user.ranks;
@@ -213,8 +211,7 @@ method rename-user(Str $userinfo, Str $oldid, Str $roomid) {
             %!users{$userid} := %!users{$oldid}:delete;
         } else {
             # Already received a rename message from another room.
-            %!rooms{$roomid}.join: $userinfo;
-            %!users{$userid}.on-join: $userinfo, $roomid;
+            %!rooms{$roomid}.on-rename: $oldid, $userinfo;
         }
     })
 }
