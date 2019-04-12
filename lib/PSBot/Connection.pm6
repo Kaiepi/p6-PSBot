@@ -9,10 +9,11 @@ unit class PSBot::Connection;
 has Cro::WebSocket::Client             $!client;
 has Cro::WebSocket::Client::Connection $.connection;
 
-has Int     $.timeout        = 1;
-has Bool    $.force-closed   = False;
-has Channel $.on-connect    .= new;
-has Channel $.on-disconnect .= new;
+has Int         $.timeout        = 1;
+has Lock::Async $!throttle-mux  .= new;
+has Bool        $.force-closed   = False;
+has Channel     $.on-connect    .= new;
+has Channel     $.on-disconnect .= new;
 
 has Supplier $!receiver;
 has Supply   $!receiver-supply;
@@ -26,7 +27,7 @@ submethod TWEAK(Cro::WebSocket::Client :$!client) {
     $!receiver        .= new;
     $!receiver-supply  = $!receiver.Supply.schedule-on($*SCHEDULER).serialize;
     $!sender          .= new;
-    $!sender-supply    = $!sender.Supply.throttle(1, 0.6).schedule-on($*SCHEDULER);
+    $!sender-supply    = $!sender.Supply.schedule-on($*SCHEDULER);
 }
 
 method new(Str $host, Int $port) {
@@ -58,25 +59,37 @@ method connect() {
     $!timeout      = 1;
     $!force-closed = False;
 
-    # Throttle outgoing messages.
-    $!sender-tap = $!sender-supply.tap(-> $data {
+    # Reset the sender supply in case of reconnect and set up message handling.
+    $!sender-supply = $!sender.Supply.schedule-on($*SCHEDULER);
+    $!sender-tap    = $!sender-supply.tap(-> $data {
         debug '[SEND]', $data;
         $!connection.send: $data;
     });
 
     # Pass any received messages back to PSBot to pass to the parser.
-    $!receiver-tap = $!connection.messages.tap(-> $data {
-        when $data.is-text {
+    $!receiver-tap = $!connection.messages.on-close({
+        $!on-disconnect.send: True;
+        $*SCHEDULER.cue({ self.reconnect }) unless $!force-closed;
+    }).tap(-> $data {
+        if $data.is-text {
             my Str $text = await $data.body-text;
             debug '[RECV]', $text;
             $!receiver.emit: $text;
         }
-    }, done => {
-        $!on-disconnect.send: True;
-        $*SCHEDULER.cue({ self.reconnect }) unless $!force-closed;
     });
 
     $!on-connect.send: True;
+}
+
+method set-throttle(Rat $throttle --> Nil) {
+    $!throttle-mux.protect({
+        $!sender-tap.close;
+        $!sender-supply = $!sender.Supply.schedule-on($*SCHEDULER).throttle(1, $throttle);
+        $!sender-tap    = $!sender-supply.tap(-> $data {
+            debug '[SEND]', $data;
+            $!connection.send: $data;
+        });
+    })
 }
 
 method reconnect() {

@@ -96,6 +96,12 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
                 exit 1;
             }
             $!state.on-user-details: %data;
+
+            if $!state.userid === %data<userid> {
+                my Map $ranks    = Rank.enums;
+                my Rat $throttle = $ranks{%data<group>} >= $ranks<+> ?? 0.3 !! 0.6;
+                $!connection.set-throttle: $throttle;
+            }
         }
         when 'roominfo' {
             if $data eq 'null' && $!state.has-room: $roomid {
