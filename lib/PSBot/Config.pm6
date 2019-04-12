@@ -4,7 +4,9 @@ use PSBot::Tools;
 
 sub EXPORT(--> Hash) {
     my Str $path = do if %*ENV<TESTING> {
-        $*REPO.Str.IO.parent.child('t/config.json').Str
+        $*REPO.Str.IO.child('META6.json').e
+            ?? $*REPO.Str.IO.child('t/config.json').Str         # For when testing using zef
+            !! $*REPO.Str.IO.parent.child('t/config.json').Str; # For when testing using prove
     } elsif $*DISTRO.is-win {
         "%*ENV<LOCALAPPDATA>\\PSBot\\config.json"
     } else {
