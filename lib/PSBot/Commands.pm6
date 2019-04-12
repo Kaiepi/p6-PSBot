@@ -526,7 +526,14 @@ BEGIN {
         :autoconfirmed,
         anon method shrug(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
-            self.reply: '¯\_(ツ)_/¯', $user, $room;
+            self.reply: '¯\_(ツ)_/¯', $user, $room
+        };
+
+    my PSBot::Command $thinking .= new:
+        :autoconfirmed,
+        anon method thinking(Str $target, PSBot::User $user, PSBot::Room $room,
+                PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
+            self.reply: "\c[THINKING FACE]", $user, $room
         };
 
     my PSBot::Command $set .= new:
@@ -827,6 +834,10 @@ BEGIN {
 
                     - shrug.
                       Returns "¯\_(ツ)_/¯".
+                      Requires autoconfirmed status.
+
+                    - thinking
+                      Returns the thinking emoji.
                       Requires autoconfirmed status.
 
                     - help
