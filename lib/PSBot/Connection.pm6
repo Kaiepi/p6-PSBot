@@ -42,7 +42,7 @@ method receiver(--> Supply) { $!receiver-supply }
 method uri(--> Str) { $!client.uri.Str }
 
 method closed(--> Bool) {
-    return True unless defined $!connection;
+    return True unless $!connection.defined;
     $!connection.closed
 }
 
@@ -63,7 +63,7 @@ method connect() {
     $!sender-supply = $!sender.Supply.schedule-on($*SCHEDULER);
     $!sender-tap    = $!sender-supply.tap(-> $data {
         debug '[SEND]', $data;
-        $!connection.send: $data;
+        $!connection.send: $data unless self.closed;
     });
 
     # Pass any received messages back to PSBot to pass to the parser.
@@ -107,8 +107,6 @@ method reconnect() {
 
 proto method send(*@, Str :$roomid?, Str :$userid? --> Nil) {*}
 multi method send(*@data --> Nil) {
-    return if self.closed;
-
     for @data -> $data {
         if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
             $!sender.emit: "| $data";
@@ -118,8 +116,6 @@ multi method send(*@data --> Nil) {
     }
 }
 multi method send(*@data, Str :$roomid! --> Nil) {
-    return if self.closed;
-
     for @data -> $data {
         if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
             $!sender.emit: "$roomid| $data";
@@ -129,8 +125,6 @@ multi method send(*@data, Str :$roomid! --> Nil) {
     }
 }
 multi method send(*@data, Str :$userid! --> Nil) {
-    return if self.closed;
-
     for @data -> $data {
         given $data {
             when / ^ '/' <!before '/'> /          { $!sender.emit: "|/w $userid, /$data" }
@@ -143,8 +137,6 @@ multi method send(*@data, Str :$userid! --> Nil) {
 
 proto method send-raw(*@, Str :$roomid?, Str :$userid? --> Nil) {*}
 multi method send-raw(*@data --> Nil) {
-    return if self.closed;
-
     for @data -> $data {
         if $data.starts-with('/cmd userdetails') || $data.starts-with('>> ') {
             # These commands are not throttled.
@@ -156,8 +148,6 @@ multi method send-raw(*@data --> Nil) {
     }
 }
 multi method send-raw(*@data, Str :$roomid! --> Nil) {
-    return if self.closed;
-
     for @data -> $data {
         if $data.starts-with: '>> ' {
             # This command is not throttled.
@@ -169,8 +159,6 @@ multi method send-raw(*@data, Str :$roomid! --> Nil) {
     }
 }
 multi method send-raw(*@data, Str :$userid! --> Nil) {
-    return if self.closed;
-
     for @data -> $data {
         $!sender.emit: "|/w $userid, $data";
     }
