@@ -149,7 +149,7 @@ method add-room(Str $roomid) {
         return if %!rooms ∋ $roomid;
 
         my PSBot::Room $room .= new: $roomid;
-        %!rooms{$roomid} := $room;
+        %!rooms{$roomid} = $room;
         $!autojoined.send: True if ++⚛$!rooms-joined == +ROOMS;
     })
 }
@@ -184,7 +184,7 @@ method add-user(Str $userinfo, Str $roomid) {
         my Str $userid = to-id $userinfo.substr: 1;
         if %!users ∌ $userid {
             my PSBot::User $user .= new: $userinfo, $roomid;
-            %!users{$userid} := $user;
+            %!users{$userid} = $user;
         }
         %!rooms{$roomid}.join: $userinfo;
         %!users{$userid}.on-join: $userinfo, $roomid;
@@ -208,7 +208,7 @@ method rename-user(Str $userinfo, Str $oldid, Str $roomid) {
         if %!users ∋ $oldid {
             %!users{$oldid}.rename: $userinfo, $roomid;
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
-            %!users{$userid} := %!users{$oldid}:delete;
+            %!users{$userid} = %!users{$oldid}:delete;
         } else {
             # Already received a rename message from another room.
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
