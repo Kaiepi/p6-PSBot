@@ -75,7 +75,7 @@ method new() {
                 state Instant $timeout = now - 600;
                 if now - $timeout >= 600 {
                     $timeout = now;
-                    'The AR in AR-15 stands for assault rifle'
+                    'The AR in AR-15 stands for assault rifle (15 is the number of bullets the clip holds)'
                 }
             }
         ),
@@ -95,8 +95,10 @@ method new() {
             token { ^ '/invite ' $<roomid>=[<[a..z]>+] $ },
             -> $/, $room, $user, $state, $connection {
                 my Str $roomid = ~$<roomid>;
-                return if $roomid.starts-with: 'battle-';
-                return "/join $roomid" if $user.group ~~ '%' | '@' | '&' | '~';
+                unless $roomid.starts-with: 'battle-' {
+                    my Map $ranks  = Rank.enums;
+                    "/join $roomid" if $ranks{$user.group} >= $ranks<%>;
+                }
             }
         )
     ];
