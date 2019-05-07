@@ -99,7 +99,7 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
 
             if $!state.userid === %data<userid> {
                 my Map $ranks    = Rank.enums;
-                my Rat $throttle = $ranks{%data<group>} >= $ranks<+> ?? 0.3 !! 0.6;
+                my Rat $throttle = $ranks{%data<group>} >= $ranks<+> ?? 0.301 !! 0.601;
                 $!connection.set-throttle: $throttle;
             }
         }
