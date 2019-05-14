@@ -66,7 +66,7 @@ method connect() {
 
     # Reset the sender supply in case of reconnect and set up message handling.
     $!sender-mux.protect({
-        $!sender-supply = $!sender.Supply.schedule-on($*SCHEDULER).throttle(1, 0.6);
+        $!sender-supply = $!sender.Supply.schedule-on($*SCHEDULER).serialize.throttle(1, 0.6);
         $!sender-tap    = $!sender-supply.tap(-> $data {
             debug '[SEND]', $data;
             $!connection.send: $data unless self.closed;
@@ -91,7 +91,7 @@ method connect() {
 method set-throttle(Rat $throttle --> Nil) {
     $!sender-mux.protect({
         $!sender-tap.close;
-        $!sender-supply = $!sender.Supply.schedule-on($*SCHEDULER).throttle(1, $throttle);
+        $!sender-supply = $!sender.Supply.schedule-on($*SCHEDULER).serialize.throttle(1, $throttle);
         $!sender-tap    = $!sender-supply.tap(-> $data {
             debug '[SEND]', $data;
             $!connection.send: $data;
