@@ -10,7 +10,6 @@ has Cro::WebSocket::Client             $!client;
 has Cro::WebSocket::Client::Connection $.connection;
 
 has Int         $.timeout        = 1;
-has Lock::Async $!throttle-mux  .= new;
 has Bool        $.force-closed   = False;
 has Channel     $.on-connect    .= new;
 has Channel     $.on-disconnect .= new;
@@ -19,15 +18,17 @@ has Supplier $!receiver;
 has Supply   $!receiver-supply;
 has Tap      $!receiver-tap;
 
-has Supplier $!sender;
-has Supply   $!sender-supply;
-has Tap      $!sender-tap;
+has Lock::Async $!sender-mux;
+has Supplier    $!sender;
+has Supply      $!sender-supply;
+has Tap         $!sender-tap;
 
-submethod TWEAK(Cro::WebSocket::Client :$!client) {
+submethod BUILD(Cro::WebSocket::Client :$!client) {
     $!receiver        .= new;
     $!receiver-supply  = $!receiver.Supply.schedule-on($*SCHEDULER).serialize;
+    $!sender-mux      .= new;
     $!sender          .= new;
-    $!sender-supply    = $!sender.Supply.schedule-on($*SCHEDULER);
+    # $!sender-supply is assigned on connect.
 }
 
 method new(Str $host, Int $port) {
@@ -37,9 +38,13 @@ method new(Str $host, Int $port) {
     self.bless: :$client;
 }
 
-method receiver(--> Supply) { $!receiver-supply }
+method receiver(--> Supply) {
+    $!receiver-supply
+}
 
-method uri(--> Str) { $!client.uri.Str }
+method uri(--> Str) {
+    $!client.uri.Str
+}
 
 method closed(--> Bool) {
     return True unless $!connection.defined;
@@ -49,7 +54,7 @@ method closed(--> Bool) {
 method connect() {
     debug '[DEBUG]', 'Connecting...';
     $!connection = try await $!client.connect;
-    when $! ~~ Exception:D {
+    when $!.defined {
         debug '[DEBUG]', "Connection to {self.uri} failed: {$!.message}";
         $*SCHEDULER.cue({ self.reconnect });
     }
@@ -60,10 +65,12 @@ method connect() {
     $!force-closed = False;
 
     # Reset the sender supply in case of reconnect and set up message handling.
-    $!sender-supply = $!sender.Supply.schedule-on($*SCHEDULER);
-    $!sender-tap    = $!sender-supply.tap(-> $data {
-        debug '[SEND]', $data;
-        $!connection.send: $data unless self.closed;
+    $!sender-mux.protect({
+        $!sender-supply = $!sender.Supply.schedule-on($*SCHEDULER).throttle(1, 0.6);
+        $!sender-tap    = $!sender-supply.tap(-> $data {
+            debug '[SEND]', $data;
+            $!connection.send: $data unless self.closed;
+        });
     });
 
     # Pass any received messages back to PSBot to pass to the parser.
@@ -82,7 +89,7 @@ method connect() {
 }
 
 method set-throttle(Rat $throttle --> Nil) {
-    $!throttle-mux.protect({
+    $!sender-mux.protect({
         $!sender-tap.close;
         $!sender-supply = $!sender.Supply.schedule-on($*SCHEDULER).throttle(1, $throttle);
         $!sender-tap    = $!sender-supply.tap(-> $data {
@@ -105,7 +112,9 @@ method reconnect() {
     $!timeout *= 2;
 }
 
-proto method send(*@, Str :$roomid?, Str :$userid? --> Nil) {*}
+proto method send(*@, Str :$roomid?, Str :$userid? --> Nil) {
+    $!sender-mux.protect({{*}})
+}
 multi method send(*@data --> Nil) {
     for @data -> $data {
         if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
@@ -135,7 +144,9 @@ multi method send(*@data, Str :$userid! --> Nil) {
     }
 }
 
-proto method send-raw(*@, Str :$roomid?, Str :$userid? --> Nil) {*}
+proto method send-raw(*@, Str :$roomid?, Str :$userid? --> Nil) {
+    $!sender-mux.protect({{*}})
+}
 multi method send-raw(*@data --> Nil) {
     for @data -> $data {
         if $data.starts-with('/cmd userdetails') || $data.starts-with('>> ') {

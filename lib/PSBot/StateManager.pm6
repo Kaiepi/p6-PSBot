@@ -12,20 +12,23 @@ has Str  $.challstr;
 has Str  $.guest-username;
 has Str  $.username;
 has Str  $.userid;
-has Bool $.is-guest;
 has Str  $.avatar;
-has Bool $.autoconfirmed;
 has Str  $.group;
+has Bool $.autoconfirmed;
+has Bool $.is-guest;
+has Bool $.is-staff;
+has Bool $.is-sysop;
 has Bool $.pms-blocked;
 has Bool $.challenges-blocked;
+has Bool $.help-tickets-ignored;
 
-has Bool      $.inited                        = False;
-has Channel   $.pending-rename               .= new;
-has Channel   $.logged-in                    .= new;
-has atomicint $.rooms-joined           is rw  = 0;
-has Channel   $.autojoined                   .= new;
-has Promise   $.propagation-mitigation       .= new;
-has Promise   $.propagated                   .= new;
+has Bool     $.inited            = False;
+has Channel  $.pending-rename   .= new;
+has Channel  $.logged-in        .= new;
+has Supplier $.room-joined      .= new;
+has Supplier $.user-joined      .= new;
+has Promise  $.rooms-propagated .= new;
+has Promise  $.users-propagated .= new;
 
 has Lock::Async $!chat-mux .= new;
 has PSBot::User %.users;
@@ -34,6 +37,13 @@ has PSBot::Room %.rooms;
 has PSBot::Database    $.database;
 has PSBot::LoginServer $.login-server;
 has PSBot::Rules       $.rules;
+
+method propagated(--> Promise) {
+    Promise.allof(
+        $!rooms-propagated,
+        $!users-propagated
+    )
+}
 
 method new(Str $serverid!) {
     my PSBot::Database    $database     .= new;
@@ -52,13 +62,16 @@ method authenticate(Str $username, Str $password?, Str $challstr? --> Str) {
 }
 
 method on-update-user(Str $username, Str $is-named, Str $avatar, %data) {
-    $!username           = $username;
-    $!userid             = to-id $username;
-    $!guest-username     = $username if $!userid.starts-with: 'guest';
-    $!is-guest           = $is-named eq '0';
-    $!avatar             = $avatar;
-    $!pms-blocked        = %data<blockPMs>;
-    $!challenges-blocked = %data<blockChallenges>;
+    $!username             = $username;
+    $!userid               = to-id $username;
+    $!is-guest             = $is-named eq '0';
+    $!guest-username       = $username if $!is-guest;
+    $!avatar               = $avatar;
+    $!is-staff             = %data<isStaff>         // False;
+    $!is-sysop             = %data<isSysop>         // False;
+    $!pms-blocked          = %data<blockPMs>        // False;
+    $!challenges-blocked   = %data<blockChallenges> // False;
+    $!help-tickets-ignored = %data<ignoreTickets>   // False;
 
     if $!inited {
         $!pending-rename.send: True;
@@ -84,14 +97,10 @@ method on-user-details(%data) {
             $!autoconfirmed = %data<autoconfirmed>;
         }
 
-        $!propagation-mitigation.keep if $!propagation-mitigation.status ~~ Planned
-            && ⚛$!rooms-joined == +ROOMS
-            && not %!rooms.values.first({ !.propagated });
-
-        $!propagated.keep if $!propagated.status ~~ Planned
-            && ⚛$!rooms-joined == +ROOMS
-            && not %!users.values.first({ !.propagated && !.is-guest }) || %!rooms.values.first({ !.propagated });
-    })
+        $!users-propagated.keep
+            if $!users-propagated.status ~~ Planned
+            && all %!users.values.map({ .propagated || .is-guest });
+    });
 }
 
 method on-room-info(%data) {
@@ -122,14 +131,11 @@ method on-room-info(%data) {
             }
         }
 
-        $!propagation-mitigation.keep if $!propagation-mitigation.status ~~ Planned
-            && ⚛$!rooms-joined == +ROOMS
-            && not %!rooms.values.first({ !.propagated });
-
-        $!propagated.keep if $!propagated.status ~~ Planned
-            && ⚛$!rooms-joined == +ROOMS
-            && not %!users.values.first({ !.propagated && !.is-guest }) || %!rooms.values.first({ !.propagated });
-    })
+        $!rooms-propagated.keep
+            if $!rooms-propagated.status ~~ Planned
+            && (ROOMS.keys ∖ %!rooms.keys === ∅)
+            && all(%!rooms.values).propagated;
+    });
 }
 
 method has-room(Str $roomid --> Bool) {
@@ -146,18 +152,14 @@ method get-room(Str $roomid --> PSBot::Room) {
 
 method add-room(Str $roomid) {
     $!chat-mux.protect({
-        return if %!rooms ∋ $roomid;
-
         my PSBot::Room $room .= new: $roomid;
         %!rooms{$roomid} = $room;
-        $!autojoined.send: True if ++⚛$!rooms-joined == +ROOMS;
+        $!room-joined.emit: $roomid;
     })
 }
 
 method delete-room(Str $roomid) {
     $!chat-mux.protect({
-        return if %!rooms ∌ $roomid;
-
         my PSBot::Room $room = %!rooms{$roomid}:delete;
         for $room.ranks.kv -> $userid, $rank {
             my PSBot::User $user = %!users{$userid};
@@ -188,17 +190,18 @@ method add-user(Str $userinfo, Str $roomid) {
         }
         %!rooms{$roomid}.join: $userinfo;
         %!users{$userid}.on-join: $userinfo, $roomid;
+        $!user-joined.emit: $userid;
     })
 }
 
 method delete-user(Str $userinfo, Str $roomid) {
     $!chat-mux.protect({
         my Str $userid = to-id $userinfo.substr: 1;
-        return if %!users ∌ $userid;
-
-        %!rooms{$roomid}.leave: $userinfo;
-        %!users{$userid}.on-leave: $roomid;
-        %!users{$userid}:delete unless %!rooms.values.first(-> $room { $room.ranks ∋ $userid });
+        if %!users ∋ $userid {
+            %!rooms{$roomid}.leave: $userinfo;
+            %!users{$userid}.on-leave: $roomid;
+            %!users{$userid}:delete if none(%!rooms.values).ranks ∋ $userid;
+        }
     })
 }
 
@@ -209,6 +212,7 @@ method rename-user(Str $userinfo, Str $oldid, Str $roomid) {
             %!users{$oldid}.rename: $userinfo, $roomid;
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
             %!users{$userid} = %!users{$oldid}:delete;
+            $!user-joined.emit: $userid;
         } else {
             # Already received a rename message from another room.
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
@@ -217,18 +221,21 @@ method rename-user(Str $userinfo, Str $oldid, Str $roomid) {
 }
 
 method reset() {
-    $!challstr        = Nil;
-    $!guest-username  = Nil;
-    $!username        = Nil;
-    $!userid          = Nil;
-    $!is-guest        = Nil;
-    $!avatar          = Nil;
-    $!group           = Nil;
+    $!guest-username     = Nil;
+    $!username           = Nil;
+    $!userid             = Nil;
+    $!avatar             = Nil;
+    $!group              = Nil;
+    $!autoconfirmed      = False;
+    $!is-guest           = True;
+    $!is-staff           = False;
+    $!is-sysop           = False;
+    $!pms-blocked        = False;
+    $!challenges-blocked = False;
 
-    $!inited                  = False;
-    $!rooms-joined           ⚛= 0;
-    $!propagation-mitigation .= new;
-    $!propagated             .= new;
+    $!inited            = False;
+    $!rooms-propagated .= new;
+    $!users-propagated .= new;
 
     $!chat-mux.protect({
         %!users .= new;

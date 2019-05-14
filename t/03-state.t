@@ -7,20 +7,21 @@ use PSBot::Config;
 use PSBot::StateManager;
 use Test;
 
-plan 14;
+plan 16;
 
-my Str                 $username        = 'PoS-Bot';
-my Str                 $userid          = 'posbot';
-my Str                 $guest-username  = 'Guest 1';
-my Str                 $avatar          = '1';
-my Str                 $group           = '*';
-my Str                 @public-rooms    = 'lobby';
-my Str                 $roomid          = 'techcode';
-my Str                 $type            = 'chat';
-my Str                 @users           = '@Morfent';
-my Str                 $userinfo        = '+Kaiepi';
-my                     %data            = %(blockPMs => True, blockChallenges => True);
-my PSBot::StateManager $state          .= new: SERVERID;
+my PSBot::StateManager $state .= new: SERVERID;
+
+my Str  $username        = 'PoS-Bot';
+my Str  $userid          = 'posbot';
+my Str  $guest-username  = 'Guest 1';
+my Str  $avatar          = '1';
+my Str  $group           = '*';
+my Str  @public-rooms    = 'lobby';
+my Str  $roomid          = 'techcode';
+my Str  $type            = 'chat';
+my Str  @users           = '@Morfent';
+my Str  $userinfo        = '+Kaiepi';
+my Bool %data            = %(:isStaff, :isSysop, :blockPMs, :blockChallenges, :ignoreTickets);
 
 $state.set-avatar: $avatar;
 is $state.avatar, $avatar, 'can set state avatar attribute';
@@ -34,8 +35,11 @@ is $state.username, $username, 'can set state username attribute';
 is $state.userid, $userid, 'can set state userid attribute';
 is $state.guest-username, $guest-username, 'cannot set state guest-username attribute if not guest';
 is $state.is-guest, False, 'can set state is-guest attribute if not guest';
+ok $state.is-staff, 'can set state is-staff attribute';
+ok $state.is-sysop, 'can set state is-sysop attribute';
 ok $state.pms-blocked, 'can set state pms-blocked attribute';
 ok $state.challenges-blocked, 'can set state challenges-blocked attribute';
+ok $state.help-tickets-ignored, 'can set state help-tickets-ignored attribute';
 
 # PSBot::StateManager.on-user-details is tested in t/04-parser.t
 
@@ -43,7 +47,6 @@ ok $state.challenges-blocked, 'can set state challenges-blocked attribute';
 
 $state.add-room: $roomid;
 cmp-ok $state.rooms, '∋', $roomid, 'can update state rooms attribute on room add';
-is ⚛$state.rooms-joined, 1, 'can update state rooms-joined attribute on room add';
 
 $state.add-user: $userinfo, $roomid;
 cmp-ok $state.users, '∋', 'kaiepi', 'can update state users attribute on user add';

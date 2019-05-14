@@ -71,11 +71,11 @@ subtest '|queryresponse|', sub {
     subtest '|queryresponse|userdetails|', {
         plan 5;
 
-        my Str  $username      = 'Kaiepi';
-        my Str  $userid        = to-id $username;
-        my Str  $group         = '+';
-        my Str  $userinfo      = "$group$username";
-        my Str  $avatar        = '285';
+        my Str  $username = 'Kaiepi';
+        my Str  $userid   = to-id $username;
+        my Str  $group    = '+';
+        my Str  $userinfo = "$group$username";
+        my Str  $avatar   = '285';
 
         my Str $roomid = ROOMS.keys.head;
         my Str $rooms  = $state.rooms.keys.map({ qs["$_":{}] }).join(',');
@@ -92,7 +92,6 @@ subtest '|queryresponse|', sub {
         is $state.propagated.status, Planned, 'state propagated attribute is not kept before finishing fetching metadata';
 
         $parser.parse-deinit: $roomid;
-        $state.rooms-joined⚛--;
     }
 
     subtest '|queryresponse|roominfo|', {
@@ -113,7 +112,7 @@ subtest '|queryresponse|', sub {
                 my Str        $visibility = Visibility.pick.value;
                 my            $modchat    = [False, '+', '%', '@', '☆', '#', '&', '~'].pick;
                 my            $modjoin    = [Nil, '+', '%', '@', '☆', '#', '&', '~', True].pick;
-                my Array[Str] %auth{Str}  = %('#' => Array[Str].new: 'zarel');
+                my Array[Str] %auth       = %('#' => Array[Str].new: 'zarel');
                 my Str        $auth       = to-json(%auth).subst(/<[\n\s]>+/, '', :g);
                 my Str        @users      = $userinfo;
                 my Str        $users      = to-json(@users).subst(/<[\n\s]>+/, '', :g);
@@ -137,8 +136,8 @@ subtest '|queryresponse|', sub {
             }
         } for ROOMS.keys;
 
-        is $state.propagation-mitigation.status, Kept, 'state propagation-mitigation attribute is kept after fetching metadata for all configured rooms';
-        is $state.propagated.status, Kept, "state propagated attribute is kept once all user and room metadata has been propagated";
+        is $state.rooms-propagated.status, Kept, 'state propagation-mitigation attribute is kept after fetching metadata for all configured rooms';
+        is $state.users-propagated.status, Kept, "state propagated attribute is kept once all user and room metadata has been propagated";
     }
 
     $parser.parse-deinit: $_ for ROOMS.keys;

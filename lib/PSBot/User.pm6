@@ -36,7 +36,7 @@ method on-user-details(%data) {
     $!group         = %data<group>;
     $!avatar        = ~%data<avatar>;
     $!autoconfirmed = %data<autoconfirmed>;
-    $!propagated    = True;
+    cas $!propagated, { True };
 }
 
 method on-join(Str $userinfo, Str $roomid) {

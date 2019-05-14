@@ -11,8 +11,8 @@ has Str         $.type;
 has Visibility  $.visibility;
 has Str         $.modchat;
 has Modjoin     $.modjoin;
-has Array[Str]  %.auth{Str};
-has Str         %.ranks{Str};
+has Array[Str]  %.auth;
+has Str         %.ranks;
 has Bool        $.propagated = False;
 has PSBot::Game $.game;
 
@@ -49,7 +49,7 @@ method on-room-info(%data) {
         my Str $userid = to-id $userinfo.substr: 1;
         $userid => $rank
     });
-    $!propagated = True;
+    cas $!propagated, { True };
 }
 
 method join(Str $userinfo) {

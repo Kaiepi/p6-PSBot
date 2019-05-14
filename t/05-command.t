@@ -103,8 +103,8 @@ subtest 'running commands', {
         $_
     };
 
-    $state.propagation-mitigation.keep;
-    $state.propagated.keep;
+    $state.rooms-propagated.keep;
+    $state.users-propagated.keep;
 
     my PSBot::Command $subsubcommand .= new: &echo;
     my PSBot::Command $subcommand    .= new: :name<do>, ($subsubcommand,);

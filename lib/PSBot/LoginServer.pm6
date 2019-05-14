@@ -42,7 +42,9 @@ method log-in(Str $username!, Str $password!, Str $challstr! --> Str) {
         body         => %(act => 'login', name => $username, pass => $password, challstr => $challstr);
 
     my Str $data = await $response.body-text;
-    my     %data = from-json $data.substr: 1;
+    fail $data unless $data.starts-with: ']';
+
+    my %data = from-json $data.substr: 1;
     fail 'Invalid username, password, or challstr' unless %data<curuser><loggedin>;
     fail %data<assertion>.substr: 2 if %data<assertion>.starts-with: ';;';
 

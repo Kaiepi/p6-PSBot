@@ -117,7 +117,6 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
 
 method parse-init(Str $roomid, Str $type) {
     $!state.add-room: $roomid;
-    $!connection.send-raw: "/cmd roominfo $roomid";
 }
 
 method parse-deinit(Str $roomid) {
@@ -139,8 +138,6 @@ method parse-join(Str $roomid, Str $userinfo) {
                 :$userid;
         }
     }
-
-    $!connection.send-raw: "/cmd userdetails $userid" unless $userid.starts-with: 'guest';
 }
 
 method parse-leave(Str $roomid, Str $userinfo) {
@@ -164,8 +161,6 @@ method parse-rename(Str $roomid, Str $userinfo, Str $oldid) {
                 :$userid;
         }
     }
-
-    $!connection.send-raw: "/cmd userdetails $userid" unless $userid.starts-with: 'guest';
 }
 
 method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {

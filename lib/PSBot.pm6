@@ -14,8 +14,12 @@ method new(Str $host = HOST, Int $port = PORT, Str $serverid = SERVERID) {
 method start() {
     react {
         whenever $!connection.on-connect {
-            my Str @autojoin  = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
-            $!connection.send-raw: "/autojoin {@autojoin.join: ','}";
+            # Setup prologue.
+            $!connection.send-raw: "/avatar {AVATAR}" if AVATAR;
+
+            my Str @rooms     = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
+            my Str $autojoin  = @rooms.join: ',';
+            $!connection.send-raw: "/autojoin $autojoin";
         }
         whenever $!connection.receiver -> $message {
             self.parse: $message;
@@ -23,31 +27,34 @@ method start() {
         whenever $!connection.on-disconnect {
             $!state.reset unless $!connection.force-closed;
         }
-        whenever $!state.logged-in {
-            $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
-            $!connection.send-raw: "/avatar {AVATAR}" if AVATAR;
+        whenever $!state.room-joined.Supply -> $roomid {
+            # Propagate room state on join.
+            $!connection.send-raw: "/cmd roominfo $roomid";
         }
-        whenever $!state.autojoined {
-            # Get user metadata. We don't get metadata for guest users
-            # since the server gives us nothing of use in response.
-            $!connection.send-raw: $!state.users.values
-                .grep({ !.propagated && !.is-guest })
-                .map({ "/cmd userdetails {$_.id}" });
+        whenever $!state.user-joined.Supply -> $userid {
+            # Propagate user state on join or rename.
+            $!connection.send-raw: "/cmd userdetails $userid" if $!state.rooms-propagated.status ~~ Kept;
+        }
+        whenever $!state.logged-in {
+            # Now that we're logged in, join any remaining rooms manually. This
+            # is in case any of them have modjoin set.
+            $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
 
-            # Faye is buggy and doesn't always send a response to the slew of
-            # /cmd userdetails messages we send, preventing our state from
-            # fully getting propagated. Wait until we have all our room
-            # metadata before continuing.
-            whenever $!state.propagation-mitigation {
-                # Collect the rest of the user metadata the server never bothered
-                # to send us earlier.
+            whenever $!state.rooms-propagated {
+                # Now that we have the full lists of users in all our rooms,
+                # propagate our user state.
                 $!connection.send-raw: $!state.users.values
                     .grep({ !.propagated && !.is-guest })
                     .map({ "/cmd userdetails {$_.id}" });
             }
 
-            # Wait until our state is fully propagated before continuing.
-            whenever $!state.propagated {
+            whenever $!state.users-propagated {
+                # Setup epilogue.
+                $!connection.send-raw: '/blockchallenges' unless $!state.challenges-blocked;
+                $!connection.send-raw: '/unblockpms' if $!state.pms-blocked;
+                $!connection.send-raw: '/ht ignore', :roomid<staff>
+                    if $!state.has-room('staff') && !$!state.help-tickets-ignored;
+
                 # Send user mail if the recipient is online. If not, wait until
                 # they join a room the bot's in.
                 with $!state.database.get-mail -> @mail {
