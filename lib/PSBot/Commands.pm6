@@ -588,7 +588,7 @@ BEGIN {
                 $user, $room if $command.administrative;
 
             $state.database.set-command: $room.id, $command.name, $target-rank;
-            $command.set-rank: $target-rank;
+            $command.set-rank: $room.id, $target-rank;
             self.reply: qq[{COMMAND}{$command.name} was set to "$target-rank".], $user, $room
         };
 
@@ -658,10 +658,12 @@ BEGIN {
                         } elsif $row<rank> {
                             "requires rank $row<rank>"
                         } else {
-                            "requires rank {$command.rank eq ' ' ?? 'regular user' !! $command.rank}"
+                            my Str $rank = $command.get-rank: $room.id;
+                            "requires rank {$rank eq ' ' ?? 'regular user' !! $rank}"
                         }
                     } else {
-                        "requires rank {$command.rank eq ' ' ?? 'regular user' !! $command.rank}"
+                        my Str $rank = $command.get-rank: $room.id;
+                        "requires rank {$rank eq ' ' ?? 'regular user' !! $rank}"
                     };
                     $key => $value
                 })
