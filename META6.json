@@ -6,7 +6,7 @@
 	"depends" : [
 		"Cro::HTTP",
 		"Cro::WebSocket",
-		"DBIish",
+		"DB::SQLite",
 		"HTML::Entity",
 		"JSON::Fast",
 		"Pastebin::Shadowcat",

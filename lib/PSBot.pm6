@@ -59,7 +59,7 @@ method start() {
                 # they join a room the bot's in.
                 with $!state.database.get-mail -> @mail {
                     my Array %mail = ({}, |@mail).reduce({
-                        my Str $userid = $^b<target>.Str;
+                        my Str $userid = $^b<target>;
                         $^a{$userid}:exists
                             ?? $^a{$userid}.push($^b)
                             !! $^a{$userid} = [$^b];
@@ -82,21 +82,20 @@ method start() {
                     for @reminders -> %row {
                         $*SCHEDULER.cue({
                             if %row<roomid> {
-                                $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>, %row<reminder>, roomid => %row<roomid>;
-                                $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", roomid => %row<roomid>;
+                                $!state.database.remove-reminder: %row<reminder>, %row<end>, userid => %row<userid>, roomid => %row<roomid>;
+                                $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", roomid => %row<roomid>;
                             } else {
-                                $!state.database.remove-reminder: %row<name>, %row<time_ago>, %row<time>, %row<reminder>, userid => %row<userid>;
-                                $!connection.send: "%row<name>, you set a reminder %row<time_ago> ago: %row<reminder>", userid => %row<userid>;
+                                $!state.database.remove-reminder: %row<reminder>, %row<end>, userid => %row<userid>;
+                                $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", userid => %row<userid>;
                             }
-                        }, at => %row<time>.Num);
+                        }, at => %row<end>.Num);
                     }
                 }
             }
         }
         whenever signal(SIGINT) {
             try await $!connection.close: :force;
-            sleep 1;
-            $!state.database.dbh.dispose;
+            $!state.database.DESTROY;
             exit 0;
         }
 

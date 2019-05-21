@@ -435,9 +435,9 @@ BEGIN {
                 'A time (e.g. 30s, 10m, 2h) and a message must be given.',
                 $user, $room unless $target || $target.contains: ',';
 
-            my (Str $time-ago, Str $message) = $target.split(',').map(*.trim);
+            my (Str $duration, Str $reminder) = $target.split(',').map(*.trim);
             my Int $seconds;
-            given $time-ago {
+            given $duration {
                 when / ^ ( <[0..9]>+ ) [s | <.ws> seconds?] $ / { $seconds += $0.Int                               }
                 when / ^ ( <[0..9]>+ ) [m | <.ws> minutes?] $ / { $seconds += $0.Int * 60                          }
                 when / ^ ( <[0..9]>+ ) [h | <.ws> hours?  ] $ / { $seconds += $0.Int * 60 * 60                     }
@@ -448,23 +448,24 @@ BEGIN {
 
             my Str     $userid   = $user.id;
             my Str     $username = $user.name;
-            my Instant $time     = now + $seconds;
+            my Instant $begin    = now;
+            my Instant $end      = $begin + $seconds;
             if $room {
                 my Str $roomid = $room.id;
-                $state.database.add-reminder: $username, $time-ago, $time, $message, :$roomid;
+                $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, :$userid, :$roomid;
                 $*SCHEDULER.cue({
-                    $state.database.remove-reminder: $username, $time-ago, $time, $message, :$roomid;
-                    $connection.send: "$username, you set a reminder $time-ago ago: $message", :$roomid;
+                    $state.database.remove-reminder: $reminder, $end, :$userid, :$roomid;
+                    $connection.send: "$username, you set a reminder $duration ago: $reminder", :$roomid;
                 }, in => $seconds);
             } else {
-                $state.database.add-reminder: $username, $time-ago, $time, $message, :$userid;
+                $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, :$userid;
                 $*SCHEDULER.cue({
-                    $state.database.remove-reminder: $username, $time-ago, $time, $message, :$userid;
-                    $connection.send: "$username, you set a reminder $time-ago ago: $message", :$userid;
+                    $state.database.remove-reminder: $reminder, $end, :$userid;
+                    $connection.send: "$username, you set a reminder $duration ago: $reminder", :$userid;
                 }, in => $seconds);
             }
 
-            self.reply: "You set a reminder for $time-ago from now.", $user, $room
+            self.reply: "You set a reminder for $duration from now.", $user, $room
         };
 
     my PSBot::Command $reminderlist .= new:
@@ -504,7 +505,7 @@ BEGIN {
             if $state.has-user: $userid {
                 $connection.send: ("You received 1 message:", "[$userid] $message"), :$userid;
             } else {
-                $state.database.add-mail: $userid, $user.id, $message;
+                $state.database.add-mail: $user.id, $userid, $message;
             }
 
             self.reply: "Your mail has been delivered to $username.", $user, $room
@@ -517,9 +518,10 @@ BEGIN {
             my Str $userid = to-id $target;
             return self.reply: 'No valid user was given.', $user, $room unless $userid;
 
-            my Failable[DateTime] $time = $state.database.get-seen: $userid;
-            my Str                $res  = $time.defined
-                ?? "$target was last seen on {$time.yyyy-mm-dd} at {$time.hh-mm-ss} UTC."
+            my          %seen    = $state.database.get-seen: $userid;
+            my DateTime $moment .= new: %seen<time> if %seen<time>:exists;
+            my Str      $res     = $moment.defined
+                ?? "$target was last seen on {$moment.yyyy-mm-dd} at {$moment.hh-mm-ss} UTC."
                 !! "$target has never been seen before.";
             self.reply: $res, $user, $room
         };
@@ -627,8 +629,8 @@ BEGIN {
                 "{COMMAND}{$command.name} is an administrative command and thus can't be toggled.",
                 $user, $room if $command.administrative;
 
-            my Bool $enabled = $state.database.toggle-command: $room.id, $command.name;
-            self.reply: "{COMMAND}{$command.name} has been {$enabled ?? 'enabled' !! 'disabled'}.", $user, $room
+            my Bool $disabled = $state.database.toggle-command: $room.id, $command.name;
+            self.reply: "{COMMAND}{$command.name} has been {$disabled ?? 'disabled' !! 'enabled'}.", $user, $room
         };
 
     my PSBot::Command $settings .= new:
@@ -651,7 +653,7 @@ BEGIN {
                     my     $row    = %rows{$command.name};
                     my Str $key    = $command.name;
                     my Str $value = do if $row.defined {
-                        if !$row<enabled>.Int.Bool {
+                        if $row<disabled>.Int.Bool {
                             'disabled'
                         } elsif $row<rank> {
                             "requires rank $row<rank>"

@@ -170,15 +170,15 @@ method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
     }
 
     if $room {
-        my      $row     = $state.database.get-command: $room.id, self.name;
-        my Bool $enabled = $row.defined ?? $row<enabled>.Int.Bool !! True;
+        my      $command  := $state.database.get-command: $room.id, self.name;
+        my Bool $disabled  = $command<disabled>:exists ??  $command<disabled>.Bool !! False;
         return self.reply:
             "Permision denied. {COMMAND}{self.name} is disabled in {$room.title}.",
-            $user, PSBot::Room unless $enabled;
+            $user, PSBot::Room if $disabled;
 
         my Str $rank = %!ranks ∋ $room.id
             ?? self.get-rank($room.id)
-            !! self.set-rank($room.id, ($row.defined && $row<rank>.Str) || $!default-rank);
+            !! self.set-rank($room.id, $command<rank>:exists ?? $command<rank> !! $!default-rank);
         return self.reply:
             qq[Permission denied. {COMMAND}{self.name} requires at least rank "$rank".],
             $user, PSBot::Room unless self.can: $rank, $user.ranks{$room.id};

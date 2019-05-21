@@ -127,7 +127,8 @@ method parse-join(Str $roomid, Str $userinfo) {
     $!state.add-user: $userinfo, $roomid;
 
     my Str $userid = to-id $userinfo.substr: 1;
-    $!state.database.add-seen: $userid, now;
+    $!state.database.add-seen: $userid, now
+        unless $userid.starts-with: 'guest';
 
     with $!state.database.get-mail: $userid -> @mail {
         if +@mail {
@@ -149,8 +150,10 @@ method parse-rename(Str $roomid, Str $userinfo, Str $oldid) {
 
     my Str     $userid = to-id $userinfo.substr: 1;
     my Instant $time   = now;
-    $!state.database.add-seen: $oldid, $time;
-    $!state.database.add-seen: $userid, $time;
+    $!state.database.add-seen: $oldid, $time
+        unless $oldid.starts-with: 'guest';
+    $!state.database.add-seen: $userid, $time
+        unless $userid.starts-with: 'guest';
 
     with $!state.database.get-mail: $userid -> @mail {
         if +@mail {
@@ -168,7 +171,8 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
     return if $username === $!state.username;
 
     my Str $userid   = to-id $username;
-    $!state.database.add-seen: $userid, now;
+    $!state.database.add-seen: $userid, now
+        unless $userid.starts-with: 'guest';
 
     my Str $message = @message.join: '|';
     if $message.starts-with: COMMAND {
