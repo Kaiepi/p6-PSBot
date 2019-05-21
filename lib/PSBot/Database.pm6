@@ -4,8 +4,7 @@ use PSBot::Tools;
 unit class PSBot::Database;
 
 has DB::SQLite::Connection $!db;
-
-has Lock $!lock .= new;
+has Lock                   $!lock .= new;
 
 # These are caches of user/room IDs to row IDs. These are needed to avoid
 # having to make queries every single time get-user/get-room is called,
@@ -27,16 +26,15 @@ submethod BUILD(:$!db) {
 }
 
 submethod DESTROY() {
-    $!db.finish;
-    $!db.free;
+    $!db.DESTROY;
     %!userid-cache{*}:delete;
     %!roomid-cache{*}:delete;
 }
 
 method new() {
     my Str                    $filename  = %?RESOURCES<database.sqlite3>.Str;
-    my DB::SQLite             $s        .= new: :$filename;
-    my DB::SQLite::Connection $db        = $s.connect;
+    my DB::SQLite             $sqlite   .= new: :$filename;
+    my DB::SQLite::Connection $db        = $sqlite.connect;
     unless $db.conn.threadsafe {
         warn 'SQLite must be compiled to be threadsafe in order for PSBot to run properly. '
            ~ 'PSBot will continue to run, but do not expect it to be stable.'
@@ -94,10 +92,12 @@ method new() {
 
 method get-user(Str $name --> Int) {
     $!lock.protect({
+        my DB::SQLite::Result $res;
+
         my Str $userid = to-id $name;
         return %!userid-cache{$userid} if %!userid-cache{$userid}:exists;
 
-        my DB::SQLite::Result $res = $!db.query: q:to/STATEMENT/, $userid;
+        $res = $!db.query: q:to/STATEMENT/, $userid;
         SELECT (ROWID)
         FROM users
         WHERE id = ?;
@@ -111,26 +111,15 @@ method get-user(Str $name --> Int) {
 
 method add-user(Str $name --> Int) {
     $!lock.protect({
-        my DB::SQLite::Statement $sth;
-        my DB::SQLite::Result    $res;
-
-        # Check if the user's row ID is cached.
         my Str $userid = to-id $name;
         return %!userid-cache{$userid} if %!userid-cache{$userid}:exists;
 
-        # Attempt to get the user's row ID.
-        $res = $!db.query: q:to/STATEMENT/, $userid;
-        SELECT (ROWID)
-        FROM users
-        WHERE id = ?;
-        STATEMENT
-
-        # If we have the user's row ID cached, their row has already been
-        # added; there's no point in continuing. Just return the row ID.
-        my Int $rowid = $res.value;
+        my Failable[Int] $rowid = self.get-user: $name;
         return $rowid if $rowid.defined;
 
-        # Add the user to the database.
+        my DB::SQLite::Statement  $sth;
+        my DB::SQLite::Result     $res;
+
         $!db.begin;
         $sth = $!db.prepare: q:to/STATEMENT/, :nocache;
         INSERT INTO users (id)
@@ -139,16 +128,7 @@ method add-user(Str $name --> Int) {
         $sth.execute: $userid;
         $!db.commit;
 
-        # Get row ID for the user we just added to the database.
-        $res = $!db.query: q:to/STATEMENT/, $userid;
-        SELECT (ROWID)
-        FROM users
-        WHERE id = ?;
-        STATEMENT
-
-        # Cache our user's row ID.
-        $rowid = $res.value;
-        %!userid-cache{$userid} := $rowid;
+        self.get-user: $name;
     })
 }
 
@@ -164,6 +144,7 @@ method remove-user(Str $name --> Int) {
         STATEMENT
         $sth.execute: $userid;
         $!db.commit;
+
         %!userid-cache{$userid}:delete;
     })
 }
@@ -175,11 +156,13 @@ method get-room(Str $name --> Int) {
         my Str $roomid = to-roomid $name;
         return %!roomid-cache{$roomid} if %!roomid-cache{$roomid}:exists;
 
+        $!db.begin;
         $res = $!db.query: q:to/STATEMENT/, $roomid;
         SELECT (ROWID)
         FROM rooms
         WHERE id = ?;
         STATEMENT
+        $!db.commit;
 
         my Int $rowid = $res.value;
         fail "No ID was found for room $name." unless $rowid.defined;
@@ -189,26 +172,15 @@ method get-room(Str $name --> Int) {
 
 method add-room(Str $name --> Int) {
     $!lock.protect({
-        my DB::SQLite::Statement $sth;
-        my DB::SQLite::Result    $res;
-
-        # Check if the room's row ID is cached.
-        my Str $roomid = to-roomid $name;
+        my Str $roomid = to-id $name;
         return %!roomid-cache{$roomid} if %!roomid-cache{$roomid}:exists;
 
-        # Attempt to get the room's row ID.
-        $res = $!db.query: q:to/STATEMENT/, $roomid;
-        SELECT (ROWID)
-        FROM rooms
-        WHERE id = ?;
-        STATEMENT
+        my Failable[Int] $rowid = self.get-room: $name;
+        return $rowid if $rowid.defined;
 
-        # If we have the room's row ID cached, their row has already been
-        # added; there's no point in continuing. Just return the row ID.
-        my Int $rowid = $res.value;
-        return if $rowid.defined;
+        my DB::SQLite::Statement  $sth;
+        my DB::SQLite::Result     $res;
 
-        # Add the room to the database.
         $!db.begin;
         $sth = $!db.prepare: q:to/STATEMENT/, :nocache;
         INSERT INTO rooms (id)
@@ -217,22 +189,14 @@ method add-room(Str $name --> Int) {
         $sth.execute: $roomid;
         $!db.commit;
 
-        # Get row ID for the room we just added to the database.
-        $res = $!db.query: q:to/STATEMENT/, $roomid;
-        SELECT (ROWID)
-        FROM rooms
-        WHERE id = ?;
-        STATEMENT
-
-        # Cache our room's row ID.
-        $rowid = $res.value;
-        %!roomid-cache{$roomid} := $rowid;
+        self.get-room: $name;
     })
 }
 
 method remove-room(Str $name --> Int) {
     $!lock.protect({
         my Str $roomid = to-roomid $name;
+
         $!db.begin;
         $!db.prepare: q:to/STATEMENT/, :nocache;
         DELETE FROM rooms
@@ -240,6 +204,7 @@ method remove-room(Str $name --> Int) {
         STATEMENT
         $!db.execute: $roomid;
         $!db.commit;
+
         %!roomid-cache{$roomid}:delete
     })
 }
@@ -247,36 +212,30 @@ method remove-room(Str $name --> Int) {
 proto method get-reminders(Str $? --> List) {*}
 multi method get-reminders(--> Seq) {
     $!lock.protect({
-        my DB::SQLite::Result $res;
-
-        $res = $!db.query: q:to/STATEMENT/;
+        my DB::SQLite::Result $res = $!db.query: q:to/STATEMENT/;
         SELECT u.id AS userid, r.id AS roomid, rs.name, rs.reminder, rs.duration, rs.begin, rs.end
         FROM reminders AS rs
         INNER JOIN users AS u ON rs.userid = u.ROWID
-        INNER JOIN rooms AS r ON rs.roomid = r.ROWID;
+        LEFT JOIN rooms AS r ON rs.roomid = r.ROWID;
         STATEMENT
-
         $res.hashes;
     })
 }
-multi method get-reminders(Str $name --> Seq) {
+multi method get-reminders(Str $userid --> Seq) {
     $!lock.protect({
-        my DB::SQLite::Result $res;
-
-        $res = $!db.query: q:to/STATEMENT/, $name;
-        SELECT u.id AS userid, r.id AS rs.roomid, rs.name, rs.reminder, rs.duration, rs.begin, rs.end
+        my DB::SQLite::Result $res = $!db.query: q:to/STATEMENT/, $userid;
+        SELECT u.id AS userid, r.id AS roomid, rs.name, rs.reminder, rs.duration, rs.begin, rs.end
         FROM reminders AS rs
-        INNER JOIN users AS u ON rs.userid = users.ROWID
-        INNER JOIN rooms AS r ON rs.roomid = rooms.ROWID
-        WHERE name = ?;
+        INNER JOIN users AS u ON rs.userid = u.ROWID
+        LEFT JOIN rooms AS r ON rs.roomid = r.ROWID
+        WHERE u.id = ?;
         STATEMENT
-
         $res.hashes
     })
 }
 
-proto method add-reminder(Str, Str, Str,  Num(), Num(), Str :$!, Str :$? --> Nil) {*}
-multi method add-reminder(Str $name, Str $reminder, Str $duration, Num() $begin, Num() $end, Str :$userid! --> Nil) {
+proto method add-reminder(Str, Str, Str,  Num(), Num(), Str, Str $? --> Nil) {*}
+multi method add-reminder(Str $name, Str $reminder, Str $duration, Num() $begin, Num() $end, Str $userid --> Nil) {
     $!lock.protect({
         my DB::SQLite::Statement $sth;
 
@@ -291,7 +250,7 @@ multi method add-reminder(Str $name, Str $reminder, Str $duration, Num() $begin,
         $!db.commit;
     })
 }
-multi method add-reminder(Str $name, Str $reminder, Str $duration, Num() $begin, Num() $end, Str :$userid!, Str :$roomid! --> Nil) {
+multi method add-reminder(Str $name, Str $reminder, Str $duration, Num() $begin, Num() $end, Str $userid, Str $roomid --> Nil) {
     $!lock.protect({
         my DB::SQLite::Statement $sth;
 
@@ -300,7 +259,7 @@ multi method add-reminder(Str $name, Str $reminder, Str $duration, Num() $begin,
 
         $!db.begin;
         $sth = $!db.prepare: q:to/STATEMENT/, :nocache;
-        INSERT INTO reminders (userid, rooomid, name, reminder, duration, begin, end)
+        INSERT INTO reminders (userid, roomid, name, reminder, duration, begin, end)
         VALUES (?, ?, ?, ?, ?, ?, ?);
         STATEMENT
         $sth.execute: $user-rowid, $room-rowid, $name, $reminder, $duration, $begin, $end;
@@ -308,8 +267,8 @@ multi method add-reminder(Str $name, Str $reminder, Str $duration, Num() $begin,
     })
 }
 
-proto method remove-reminder(Str(), Num(), Str() :$!, Str() :$? --> Nil) {*}
-multi method remove-reminder(Str() $reminder, Num() $end, Str() :$userid! --> Nil) {
+proto method remove-reminder(Str(), Num(), Str(), Str() $? --> Nil) {*}
+multi method remove-reminder(Str() $reminder, Num() $end, Str() $userid --> Nil) {
     $!lock.protect({
         my DB::SQLite::Statement $sth;
 
@@ -324,7 +283,7 @@ multi method remove-reminder(Str() $reminder, Num() $end, Str() :$userid! --> Ni
         $!db.commit;
     })
 }
-multi method remove-reminder(Str() $reminder, Num() $end, Str() :$userid!, Str() :$roomid! --> Nil) {
+multi method remove-reminder(Str() $reminder, Num() $end, Str() $userid, Str() $roomid --> Nil) {
     $!lock.protect({
         my DB::SQLite::Statement $sth;
 
@@ -402,14 +361,12 @@ method remove-mail(Str() $target --> Nil) {
 method get-seen(Str $userid --> Hash) {
     $!lock.protect({
         my DB::SQLite::Result $res;
-
         $res = $!db.query: q:to/STATEMENT/, $userid;
         SELECT u.id AS userid, s.time
         FROM seen AS s
         INNER JOIN users AS u ON s.userid = u.ROWID
         WHERE u.id = ?
         STATEMENT
-
         $res.hash;
     })
 }
@@ -459,8 +416,7 @@ method get-command(Str $roomid, Str $command --> Hash) {
         SELECT r.id AS roomid, s.command, s.rank, s.disabled
         FROM settings AS s
         INNER JOIN rooms AS r ON r.ROWID = s.roomid
-        WHERE r.id = ? AND s.command = ?
-        LIMIT 1;
+        WHERE r.id = ? AND s.command = ?;
         STATEMENT
         $res.hash
     })
@@ -468,21 +424,21 @@ method get-command(Str $roomid, Str $command --> Hash) {
 
 method set-command(Str $roomid, Str $command, Str $rank --> Nil) {
     $!lock.protect({
+        my DB::SQLite::Statement  $sth;
+
         my Int $room-rowid = self.add-room: $roomid;
         my     %command    = self.get-command: $roomid, $command;
 
         $!db.begin;
         if %command.defined {
-            my DB::SQLite::Statement $sth = $!db.prepare:
-            q:to/STATEMENT/;
+            $sth = $!db.prepare: q:to/STATEMENT/, :nocache;
             UPDATE settings
             SET rank = ?
             WHERE roomid = ? AND command = ?;
             STATEMENT
             $sth.execute: $rank, $room-rowid, $command;
         } else {
-            my DB::SQLite::Statement $sth = $!db.prepare:
-            q:to/STATEMENT/;
+            $sth = $!db.prepare: q:to/STATEMENT/, :nocache;
             INSERT INTO settings (roomid, command, rank)
             VALUES (?, ?, ?);
             STATEMENT
@@ -494,8 +450,8 @@ method set-command(Str $roomid, Str $command, Str $rank --> Nil) {
 
 method toggle-command(Str $roomid, Str $command --> Bool) {
     $!lock.protect({
-        my DB::SQLite::Statement $sth;
-        my Bool                  $disabled;
+        my DB::SQLite::Statement  $sth;
+        my Bool                   $disabled;
 
         my Int $room-rowid = self.add-room: $roomid;
         my     %row        = self.get-command: $roomid, $command;

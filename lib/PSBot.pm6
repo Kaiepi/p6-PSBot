@@ -81,14 +81,14 @@ method start() {
                 with $!state.database.get-reminders -> @reminders {
                     for @reminders -> %row {
                         $*SCHEDULER.cue({
-                            if %row<roomid> {
-                                $!state.database.remove-reminder: %row<reminder>, %row<end>, userid => %row<userid>, roomid => %row<roomid>;
+                            if %row<roomid>.defined {
+                                $!state.database.remove-reminder: %row<reminder>, %row<end>, %row<userid>, %row<roomid>;
                                 $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", roomid => %row<roomid>;
                             } else {
-                                $!state.database.remove-reminder: %row<reminder>, %row<end>, userid => %row<userid>;
+                                $!state.database.remove-reminder: %row<reminder>, %row<end>, %row<userid>;
                                 $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", userid => %row<userid>;
                             }
-                        }, at => %row<end>.Num);
+                        }, at => %row<end>);
                     }
                 }
             }

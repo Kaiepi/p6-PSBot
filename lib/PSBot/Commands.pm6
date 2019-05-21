@@ -452,15 +452,15 @@ BEGIN {
             my Instant $end      = $begin + $seconds;
             if $room {
                 my Str $roomid = $room.id;
-                $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, :$userid, :$roomid;
+                $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, $userid, $roomid;
                 $*SCHEDULER.cue({
-                    $state.database.remove-reminder: $reminder, $end, :$userid, :$roomid;
+                    $state.database.remove-reminder: $reminder, $end, $userid, $roomid;
                     $connection.send: "$username, you set a reminder $duration ago: $reminder", :$roomid;
                 }, in => $seconds);
             } else {
-                $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, :$userid;
+                $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, $userid;
                 $*SCHEDULER.cue({
-                    $state.database.remove-reminder: $reminder, $end, :$userid;
+                    $state.database.remove-reminder: $reminder, $end, $userid;
                     $connection.send: "$username, you set a reminder $duration ago: $reminder", :$userid;
                 }, in => $seconds);
             }
@@ -470,19 +470,39 @@ BEGIN {
 
     my PSBot::Command $reminderlist .= new:
         :autoconfirmed,
-        :locale(Locale::PM),
         anon method reminderlist(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
-            my @reminders = $state.database.get-reminders: $user.name;
+            my @reminders = $state.database.get-reminders: $user.id;
             return self.reply: 'You have no reminders set.', $user, $room unless +@reminders;
 
-            my Str $table = @reminders.kv.map(-> $i, %reminder {
-                my Str      $location  = %reminder<roomid> ?? "in room %reminder<roomid>" !! 'in private';
-                my DateTime $time     .= new: %reminder<time>.Rat;
-                qq[{$i + 1}. "%reminder<reminder>" ($location, set for {$time.hh-mm-ss} UTC on {$time.yyyy-mm-dd})]
-            }).join("\n");
+            if $room.defined && self.can: '*', $state.get-user($state.userid).ranks{$room.id} {
+                my Str $list = '<details><summary>Reminder List</summary><ol>' ~ do for @reminders -> %reminder {
+                    my DateTime $begin .= new: %reminder<begin>;
+                    my DateTime $end   .= new: %reminder<end>;
+                    if %reminder<roomid>.defined {
+                        "<li><strong>{%reminder<reminder>}</strong></li>"
+                      ~ "Set in %reminder<roomid> at {$begin.hh-mm-ss} UTC on {$begin.yyyy-mm-dd} with a duration of {%reminder<duration>}.<br />"
+                      ~ "Expected to alert at {$end.hh-mm-ss} UTC on {$end.yyyy-mm-dd}."
+                    } else {
+                        '<li><strong>(private reminder)</strong></li>'
+                    }
+                }.join ~ '</ol></details>';
 
-            self.reply: $table, $user, $room, :paste
+                self.reply: "!addhtmlbox $list", $user, $room, :raw;
+            } else {
+                my Str $list = do for @reminders.kv -> $i, %reminder {
+                    my Str      $location  = %reminder<roomid>:exists ?? "room %reminder<roomid>" !! 'private';
+                    my DateTime $begin    .= new: %reminder<begin>;
+                    my DateTime $end      .= new: %reminder<end>;
+                    qq:to/END/;
+                    {$i + 1}. "%reminder<reminder>"
+                      Set in $location at {$begin.hh-mm-ss} UTC on {$begin.yyyy-mm-dd} with a duration of %reminder<duration>.
+                      Expected to alert at {$end.hh-mm-ss} UTC on {$end.yyyy-mm-dd}.
+                    END
+                }.join("\n\n");
+
+                self.reply: $list, $user, $room, :paste
+            }
         };
 
     my PSBot::Command $mail .= new:
