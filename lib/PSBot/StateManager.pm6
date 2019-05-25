@@ -37,6 +37,7 @@ has PSBot::Room %.rooms;
 has PSBot::Database    $.database;
 has PSBot::LoginServer $.login-server;
 has PSBot::Rules       $.rules;
+has Cancellation       %.reminders{Int};
 
 method propagated(--> Promise) {
     Promise.allof(

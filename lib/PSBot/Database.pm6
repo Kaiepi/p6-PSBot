@@ -44,14 +44,13 @@ method new() {
     $db.execute: q:to/STATEMENT/;
     PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS users (
-        id TEXT NOT NULL UNIQUE,
-        PRIMARY KEY (id)
+        id TEXT PRIMARY KEY NOT NULL
     );
     CREATE TABLE IF NOT EXISTS rooms (
-        id TEXT NOT NULL UNIQUE,
-        PRIMARY KEY (id)
+        id TEXT PRIMARY KEY NOT NULL
     );
     CREATE TABLE IF NOT EXISTS reminders (
+        id       INTEGER PRIMARY KEY AUTOINCREMENT,
         userid   INTEGER NOT NULL,
         roomid   INTEGER,
         name     TEXT    NOT NULL,
@@ -59,7 +58,6 @@ method new() {
         duration TEXT    NOT NULL,
         begin    DATE    NOT NULL,
         end      DATE    NOT NULL,
-        PRIMARY KEY(userid, reminder, end),
         FOREIGN KEY (userid) REFERENCES users(ROWID) ON DELETE CASCADE,
         FOREIGN KEY (roomid) REFERENCES rooms(ROWID) ON DELETE CASCADE
     );
@@ -71,9 +69,8 @@ method new() {
         FOREIGN KEY (target) REFERENCES users(ROWID) ON DELETE CASCADE
     );
     CREATE TABLE IF NOT EXISTS seen (
-        userid INTEGER NOT NULL UNIQUE,
-        time   DATE    NOT NULL,
-        PRIMARY KEY (userid),
+        userid INTEGER PRIMARY KEY NOT NULL,
+        time   DATE                NOT NULL,
         FOREIGN KEY (userid) REFERENCES users(ROWID) ON DELETE CASCADE
     );
     CREATE TABLE IF NOT EXISTS settings (
@@ -213,7 +210,7 @@ proto method get-reminders(Str $? --> List) {*}
 multi method get-reminders(--> Seq) {
     $!lock.protect({
         my DB::SQLite::Result $res = $!db.query: q:to/STATEMENT/;
-        SELECT u.id AS userid, r.id AS roomid, rs.name, rs.reminder, rs.duration, rs.begin, rs.end
+        SELECT rs.id, u.id AS userid, r.id AS roomid, rs.name, rs.reminder, rs.duration, rs.begin, rs.end
         FROM reminders AS rs
         INNER JOIN users AS u ON rs.userid = u.ROWID
         LEFT JOIN rooms AS r ON rs.roomid = r.ROWID;
@@ -224,7 +221,7 @@ multi method get-reminders(--> Seq) {
 multi method get-reminders(Str $userid --> Seq) {
     $!lock.protect({
         my DB::SQLite::Result $res = $!db.query: q:to/STATEMENT/, $userid;
-        SELECT u.id AS userid, r.id AS roomid, rs.name, rs.reminder, rs.duration, rs.begin, rs.end
+        SELECT rs.id, u.id AS userid, r.id AS roomid, rs.name, rs.reminder, rs.duration, rs.begin, rs.end
         FROM reminders AS rs
         INNER JOIN users AS u ON rs.userid = u.ROWID
         LEFT JOIN rooms AS r ON rs.roomid = r.ROWID
@@ -234,10 +231,11 @@ multi method get-reminders(Str $userid --> Seq) {
     })
 }
 
-proto method add-reminder(Str, Str, Str,  Num(), Num(), Str, Str $? --> Nil) {*}
-multi method add-reminder(Str $name, Str $reminder, Str $duration, Num() $begin, Num() $end, Str $userid --> Nil) {
+proto method add-reminder(Str, Str, Str,  Num(), Num(), Str, Str $? --> Int) {*}
+multi method add-reminder(Str $name, Str $reminder, Str $duration, Num() $begin, Num() $end, Str $userid --> Int) {
     $!lock.protect({
         my DB::SQLite::Statement $sth;
+        my DB::SQLite::Result    $res;
 
         my Int $user-rowid = self.add-user: $userid;
 
@@ -248,11 +246,21 @@ multi method add-reminder(Str $name, Str $reminder, Str $duration, Num() $begin,
         STATEMENT
         $sth.execute: $user-rowid, $name, $reminder, $duration, $begin, $end;
         $!db.commit;
+
+        $!db.begin;
+        $res = $!db.query: q:to/STATEMENT/, $user-rowid, $reminder, $end;
+        SELECT id FROM reminders
+        WHERE userid = ? AND roomid IS NULL AND reminder = ? AND end = ?;
+        STATEMENT
+        my Int $id = $res.value;
+        $!db.commit;
+        $id
     })
 }
-multi method add-reminder(Str $name, Str $reminder, Str $duration, Num() $begin, Num() $end, Str $userid, Str $roomid --> Nil) {
+multi method add-reminder(Str $name, Str $reminder, Str $duration, Num() $begin, Num() $end, Str $userid, Str $roomid --> Int) {
     $!lock.protect({
         my DB::SQLite::Statement $sth;
+        my DB::SQLite::Result    $res;
 
         my Int $user-rowid = self.add-user: $userid;
         my Int $room-rowid = self.add-room: $roomid;
@@ -264,11 +272,33 @@ multi method add-reminder(Str $name, Str $reminder, Str $duration, Num() $begin,
         STATEMENT
         $sth.execute: $user-rowid, $room-rowid, $name, $reminder, $duration, $begin, $end;
         $!db.commit;
+
+        $!db.begin;
+        $res = $!db.query: q:to/STATEMENT/, $user-rowid, $room-rowid, $reminder, $end;
+        SELECT id FROM reminders
+        WHERE userid = ? AND roomid = ? AND reminder = ? AND end = ?;
+        STATEMENT
+        my Int $id = $res.value;
+        $!db.commit;
+        $id
     })
 }
 
-proto method remove-reminder(Str(), Num(), Str(), Str() $? --> Nil) {*}
-multi method remove-reminder(Str() $reminder, Num() $end, Str() $userid --> Nil) {
+proto method remove-reminder(| --> Nil) {*}
+multi method remove-reminder(Int $id --> Nil) {
+    $!lock.protect({
+        my DB::SQLite::Statement $sth;
+
+        $!db.begin;
+        $sth = $!db.prepare: q:to/STATEMENT/, :nocache;
+        DELETE FROM reminders
+        WHERE id = ?;
+        STATEMENT
+        $sth.execute: $id;
+        $!db.commit;
+    })
+}
+multi method remove-reminder(Str $reminder, Num() $end, Str $userid --> Nil) {
     $!lock.protect({
         my DB::SQLite::Statement $sth;
 
@@ -277,13 +307,13 @@ multi method remove-reminder(Str() $reminder, Num() $end, Str() $userid --> Nil)
         $!db.begin;
         $sth = $!db.prepare:  q:to/STATEMENT/, :nocache;
         DELETE FROM reminders
-        WHERE userid = ? AND reminder = ? AND end = ?;
+        WHERE userid = ? AND roomid IS NULL AND reminder = ? AND end = ?;
         STATEMENT
         $sth.execute: $user-rowid, $reminder, $end;
         $!db.commit;
     })
 }
-multi method remove-reminder(Str() $reminder, Num() $end, Str() $userid, Str() $roomid --> Nil) {
+multi method remove-reminder(Str $reminder, Num() $end, Str $userid, Str $roomid --> Nil) {
     $!lock.protect({
         my DB::SQLite::Statement $sth;
 
@@ -342,7 +372,7 @@ method add-mail(Str $source, Str $target, Str $message --> Nil) {
     })
 }
 
-method remove-mail(Str() $target --> Nil) {
+method remove-mail(Str $target --> Nil) {
     $!lock.protect({
         my DB::SQLite::Statement $sth;
 

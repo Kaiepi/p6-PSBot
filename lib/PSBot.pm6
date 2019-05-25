@@ -80,7 +80,7 @@ method start() {
                 # Schedule user reminders.
                 with $!state.database.get-reminders -> @reminders {
                     for @reminders -> %row {
-                        $*SCHEDULER.cue({
+                        $!state.reminders{%row<id>} := $*SCHEDULER.cue({
                             if %row<roomid>.defined {
                                 $!state.database.remove-reminder: %row<reminder>, %row<end>, %row<userid>, %row<roomid>;
                                 $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", roomid => %row<roomid>;

@@ -174,8 +174,7 @@ BEGIN {
             $state.login-server.log-out: $state.username;
             $connection.send-raw: '/logout';
             try await $connection.close: :force;
-            sleep 1;
-            $state.database.dbh.dispose;
+            $state.database.DESTROY;
             exit 0;
         };
 
@@ -427,83 +426,110 @@ BEGIN {
             self.reply: $output, $user, $room
         };
 
-    my PSBot::Command $reminder .= new:
-        :autoconfirmed,
-        anon method reminder(Str $target, PSBot::User $user, PSBot::Room $room,
-                PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
-            return self.reply:
-                'A time (e.g. 30s, 10m, 2h) and a message must be given.',
-                $user, $room unless $target || $target.contains: ',';
+    my PSBot::Command $reminder = do {
+        my PSBot::Command @subcommands = (
+            PSBot::Command.new(
+                anon method set(Str $target, PSBot::User $user, PSBot::Room $room,
+                        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
+                    return self.reply:
+                        'A time (e.g. 30s, 10m, 2h) and a message must be given.',
+                        $user, $room unless $target || $target.contains: ',';
 
-            my (Str $duration, Str $reminder) = $target.split(',').map(*.trim);
-            my Int $seconds;
-            given $duration {
-                when / ^ ( <[0..9]>+ ) [s | <.ws> seconds?] $ / { $seconds += $0.Int                               }
-                when / ^ ( <[0..9]>+ ) [m | <.ws> minutes?] $ / { $seconds += $0.Int * 60                          }
-                when / ^ ( <[0..9]>+ ) [h | <.ws> hours?  ] $ / { $seconds += $0.Int * 60 * 60                     }
-                when / ^ ( <[0..9]>+ ) [d | <.ws> days?   ] $ / { $seconds += $0.Int * 60 * 60 * 24                }
-                when / ^ ( <[0..9]>+ ) [w | <.ws> weeks?  ] $ / { $seconds += $0.Int * 60 * 60 * 24 * 7            }
-                default                                         { return self.reply: 'Invalid time.', $user, $room }
-            }
-
-            my Str     $userid   = $user.id;
-            my Str     $username = $user.name;
-            my Instant $begin    = now;
-            my Instant $end      = $begin + $seconds;
-            if $room {
-                my Str $roomid = $room.id;
-                $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, $userid, $roomid;
-                $*SCHEDULER.cue({
-                    $state.database.remove-reminder: $reminder, $end, $userid, $roomid;
-                    $connection.send: "$username, you set a reminder $duration ago: $reminder", :$roomid;
-                }, in => $seconds);
-            } else {
-                $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, $userid;
-                $*SCHEDULER.cue({
-                    $state.database.remove-reminder: $reminder, $end, $userid;
-                    $connection.send: "$username, you set a reminder $duration ago: $reminder", :$userid;
-                }, in => $seconds);
-            }
-
-            self.reply: "You set a reminder for $duration from now.", $user, $room
-        };
-
-    my PSBot::Command $reminderlist .= new:
-        :autoconfirmed,
-        anon method reminderlist(Str $target, PSBot::User $user, PSBot::Room $room,
-                PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
-            my @reminders = $state.database.get-reminders: $user.id;
-            return self.reply: 'You have no reminders set.', $user, $room unless +@reminders;
-
-            if $room.defined && self.can: '*', $state.get-user($state.userid).ranks{$room.id} {
-                my Str $list = '<details><summary>Reminder List</summary><ol>' ~ do for @reminders -> %reminder {
-                    my DateTime $begin .= new: %reminder<begin>;
-                    my DateTime $end   .= new: %reminder<end>;
-                    if %reminder<roomid>.defined {
-                        "<li><strong>{%reminder<reminder>}</strong></li>"
-                      ~ "Set in %reminder<roomid> at {$begin.hh-mm-ss} UTC on {$begin.yyyy-mm-dd} with a duration of {%reminder<duration>}.<br />"
-                      ~ "Expected to alert at {$end.hh-mm-ss} UTC on {$end.yyyy-mm-dd}."
-                    } else {
-                        '<li><strong>(private reminder)</strong></li>'
+                    my (Str $duration, Str $reminder) = $target.split(',').map(*.trim);
+                    my Int $seconds;
+                    given $duration {
+                        when / ^ ( <[0..9]>+ ) [s | <.ws> seconds?] $ / { $seconds += $0.Int                               }
+                        when / ^ ( <[0..9]>+ ) [m | <.ws> minutes?] $ / { $seconds += $0.Int * 60                          }
+                        when / ^ ( <[0..9]>+ ) [h | <.ws> hours?  ] $ / { $seconds += $0.Int * 60 * 60                     }
+                        when / ^ ( <[0..9]>+ ) [d | <.ws> days?   ] $ / { $seconds += $0.Int * 60 * 60 * 24                }
+                        when / ^ ( <[0..9]>+ ) [w | <.ws> weeks?  ] $ / { $seconds += $0.Int * 60 * 60 * 24 * 7            }
+                        default                                         { return self.reply: 'Invalid time.', $user, $room }
                     }
-                }.join ~ '</ol></details>';
 
-                self.reply: "!addhtmlbox $list", $user, $room, :raw;
-            } else {
-                my Str $list = do for @reminders.kv -> $i, %reminder {
-                    my Str      $location  = %reminder<roomid>:exists ?? "room %reminder<roomid>" !! 'private';
-                    my DateTime $begin    .= new: %reminder<begin>;
-                    my DateTime $end      .= new: %reminder<end>;
-                    qq:to/END/;
-                    {$i + 1}. "%reminder<reminder>"
-                      Set in $location at {$begin.hh-mm-ss} UTC on {$begin.yyyy-mm-dd} with a duration of %reminder<duration>.
-                      Expected to alert at {$end.hh-mm-ss} UTC on {$end.yyyy-mm-dd}.
-                    END
-                }.join("\n\n");
+                    my Str     $userid   = $user.id;
+                    my Str     $username = $user.name;
+                    my Instant $begin    = now;
+                    my Instant $end      = $begin + $seconds;
+                    if $room {
+                        my Str $roomid = $room.id;
+                        my Int $id     = $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, $userid, $roomid;
+                        $state.reminders{$id} := $*SCHEDULER.cue({
+                            $state.reminders{$id}:delete;
+                            $state.database.remove-reminder: $reminder, $end, $userid, $roomid;
+                            $connection.send: "$username, you set a reminder $duration ago: $reminder", :$roomid;
+                        }, in => $seconds);
+                    } else {
+                        my Int $id = $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, $userid;
+                        $state.reminders{$id} = $*SCHEDULER.cue({
+                            $state.reminders{$id}:delete;
+                            $state.database.remove-reminder: $reminder, $end, $userid;
+                            $connection.send: "$username, you set a reminder $duration ago: $reminder", :$userid;
+                        }, in => $seconds);
+                    }
 
-                self.reply: $list, $user, $room, :paste
-            }
-        };
+                    self.reply: "You set a reminder for $duration from now.", $user, $room
+                }
+            ),
+            PSBot::Command.new(
+                anon method unset(Str $target, PSBot::User $user, PSBot::Room $room,
+                        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
+                    my Int $id = try +$target;
+                    return self.reply: 'A valid reminder ID must be given.', $user, $room unless $id.defined;
+
+                    my @reminders = $state.database.get-reminders: $user.id;
+                    return self.reply: "You have no reminder with ID $id set.",
+                        $user, $room unless @reminders.first({ $_<id> == $id });
+
+                    $state.reminders{$id}.cancel;
+                    $state.reminders{$id}:delete;
+                    $state.database.remove-reminder: $id;
+                    self.reply: "Unset reminder $id.", $user, $room
+                }
+            ),
+            PSBot::Command.new(
+                anon method list(Str $target, PSBot::User $user, PSBot::Room $room,
+                        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
+                    my @reminders = $state.database.get-reminders: $user.id;
+                    return self.reply: 'You have no reminders set.', $user, $room unless +@reminders;
+
+                    if $room.defined && self.can: '*', $state.get-user($state.userid).ranks{$room.id} {
+                        my Str $list = '<details><summary>Reminder List</summary><ol>' ~ do for @reminders -> %reminder {
+                            my DateTime $begin .= new: %reminder<begin>;
+                            my DateTime $end   .= new: %reminder<end>;
+                            if %reminder<roomid>.defined {
+                                "<li><strong>{%reminder<reminder>}</strong></li>"
+                              ~ "ID: {%reminder<id>}<br />"
+                              ~ "Set in %reminder<roomid> at {$begin.hh-mm-ss} UTC on {$begin.yyyy-mm-dd} with a duration of {%reminder<duration>}.<br />"
+                              ~ "Expected to alert at {$end.hh-mm-ss} UTC on {$end.yyyy-mm-dd}."
+                            } else {
+                                '<li><strong>(private reminder)</strong></li>'
+                            }
+                        }.join ~ '</ol></details>';
+
+                        self.reply: "!addhtmlbox $list", $user, $room, :raw;
+                    } else {
+                        my Str $list = do for @reminders.kv -> $i, %reminder {
+                            my Str      $location  = %reminder<roomid>:exists ?? "room %reminder<roomid>" !! 'private';
+                            my DateTime $begin    .= new: %reminder<begin>;
+                            my DateTime $end      .= new: %reminder<end>;
+                            qq:to/END/;
+                            {$i + 1}. "%reminder<reminder>"
+                              ID: %reminder<id>
+                              Set in $location at {$begin.hh-mm-ss} UTC on {$begin.yyyy-mm-dd} with a duration of %reminder<duration>.
+                              Expected to alert at {$end.hh-mm-ss} UTC on {$end.yyyy-mm-dd}.
+                            END
+                        }.join("\n\n");
+
+                        self.reply: $list, $user, $room, :paste
+                    }
+                }
+            )
+        );
+
+        my PSBot::Command $command .= new: :autoconfirmed, :name<reminder>, @subcommands;
+        .set-root: $command for @subcommands;
+        $command
+    };
 
     my PSBot::Command $mail .= new:
         :autoconfirmed,
@@ -841,14 +867,13 @@ BEGIN {
                       Runs the given query through Google Translate 10 times using random languages before translating back to English.
                       Requires at least rank + by default.
 
-                    - reminder <time>, <message>
-                      Sets a reminder with the given message to be sent in the given time.
-                      Requires autoconfirmed status.
-
-                    - reminderlist
-                      Returns a list of reminders you currently have set.
-                      This command can only be used in PMs.
-                      Requires autoconfirmed status.
+                    - reminder
+                      - set <time>, <message>  Sets a reminder with the given message to be sent in the given time.
+                                               Requires autoconfirmed status.
+                      - unset <id>             Unsets a reminder with the given ID.
+                                               Requires autoconfirmed status.
+                      - list                   Returns a list of reminders you currently have set.
+                                               Requires autoconfirmed status.
 
                     - mail <username>, <message>
                       Mails the given message to the given user once they log on.
