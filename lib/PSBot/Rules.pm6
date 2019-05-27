@@ -50,15 +50,12 @@ method new() {
                 [ https? '://' ]?
                 [
                 | 'www.'? 'youtube.com/watch?v=' $<id>=<-[&\s]>+ [ '&' <-[=\s]>+ '=' <-[&\s]>+ ]*
-                | 'youtu.be/' $<id>=<-[\s]>+
+                | 'youtu.be/' $<id>=<-[?\s]>+ [ '?' <-[=\s]>+ '=' <-[&\s]>+ [ '&' <-[=\s]>+ '=' <-[&\s]>+ ]* ]?
                 ]
                 >>
             },
             -> $/, $room, $user, $state, $connection {
-                my Bool $do-fetch = YOUTUBE_API_KEY && $user.name ne $state.username;
-                $do-fetch = $user.ranks{$room.id} ~~ '%' | '@' | '&' | '~'
-                    if $do-fetch && SERVERID eq 'showdown' && $room.id eq 'lobby';
-                if $do-fetch {
+                if YOUTUBE_API_KEY && $user.name ne $state.username {
                     my Str             $id    = ~$<id>;
                     my Failable[Video] $video = get-video $id;
                     $video.defined
