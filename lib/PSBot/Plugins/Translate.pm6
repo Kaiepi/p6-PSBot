@@ -7,8 +7,6 @@ use PSBot::Tools;
 use URI::Encode;
 unit module PSBot::Plugins::Translate;
 
-
-
 my Set $languages;
 
 sub get-languages(--> Set) is export {

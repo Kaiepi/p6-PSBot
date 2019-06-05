@@ -36,7 +36,11 @@
 		"PSBot::Plugins::Translate" : "lib/PSBot/Plugins/Translate.pm6",
 		"PSBot::Plugins::YouTube" : "lib/PSBot/Plugins/YouTube.pm6"
 	},
-	"resources" : [ "database.sqlite3", "dictionary" ],
+	"resources" : [
+		"test/config.json",
+		"database.sqlite3",
+		"dictionary"
+	],
 	"source-url" : "https://github.com/Kaiepi/p6-PSBot.git",
 	"tags" : [ ],
 	"test-depends" : [ ],
