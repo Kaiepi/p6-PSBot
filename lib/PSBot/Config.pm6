@@ -6,7 +6,7 @@ unit module PSBot::Config;
 my Str $path = do if %*ENV<TESTING> {
     %?RESOURCES<test/config.json>.Str
 } elsif $*DISTRO.is-win {
-    Qs[$*ENV<LOCALAPPDATA>\PSBot\config.json]
+    Qh[%*ENV<LOCALAPPDATA>\PSBot\config.json]
 } else {
     "$*HOME/.config/PSBot/config.json"
 };
