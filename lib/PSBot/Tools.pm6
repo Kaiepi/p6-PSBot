@@ -52,6 +52,13 @@ sub debug(**@data) is export {
 sub paste(Str $data --> Str) is export {
     state Pastebin::Shadowcat $pastebin .= new;
     my $url = $pastebin.paste: $data;
-    return $url unless defined $url;
+    return $url unless $url.defined;
     "$url?tx=on"
+}
+
+sub fetch(Str $url --> Str) is export {
+    state Pastebin::Shadowcat $pastebin .= new;
+    my @paste = $pastebin.fetch: $url;
+    return @paste unless @paste.defined;
+    @paste[0]
 }

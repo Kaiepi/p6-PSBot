@@ -46,13 +46,13 @@ method new() {
             [],
             [],
             token {
-                <<
+                «
                 [ https? '://' ]?
                 [
                 | 'www.'? 'youtube.com/watch?v=' $<id>=<-[&\s]>+ [ '&' <-[=\s]>+ '=' <-[&\s]>+ ]*
                 | 'youtu.be/' $<id>=<-[?\s]>+ [ '?' <-[=\s]>+ '=' <-[&\s]>+ [ '&' <-[=\s]>+ '=' <-[&\s]>+ ]* ]?
                 ]
-                >>
+                »
             },
             -> $/, $room, $user, $state, $connection {
                 if YOUTUBE_API_KEY && $user.name ne $state.username {
@@ -61,6 +61,53 @@ method new() {
                     $video.defined
                         ?? qq[{$user.name} posted a video: "{$video.title}"]
                         !! "Failed to get the video {$user.name} posted: {$video.exception.message}"
+                }
+            }
+        ),
+        Rule.new(
+            [],
+            [],
+            token {
+                ^
+                '!' $<command>=[ \S+ ] \s
+                [
+                | $<url>=[ [ 'http' 's'? '://' ]? 'fpaste.scsys.co.uk/' \d+ ] [ .* ]
+                | $<args>=[ .+ ]
+                ]
+                $
+            },
+            -> $/, $room, $user, $state, $connection {
+                my Str                   $roomid  = $room.id;
+                my PSBot::User::RoomInfo $ri      = $user.rooms{$roomid};
+                my Instant               $timeout = $ri.broadcast-timeout;
+                my Str                   $command = $ri.broadcast-command;
+                if $timeout.defined {
+                    $ri.broadcast-command = Nil;
+                    $ri.broadcast-timeout = Nil;
+
+                    my Str $input   = $<command>.defined ?? to-id(~$<command>) !! Nil;
+                    if $input === $command {
+                        if now > $timeout - 5 * 60 {
+                            my Str $url  = $<url>.defined  ?? ~$<url>  !! Nil;
+                            my Str $args = $<args>.defined ?? ~$<args> !! Nil;
+                            if $url.defined {
+                                my Failable[Str] $paste = fetch $url;
+                                $paste.defined
+                                    ?? "!$input $paste"
+                                    !! "Failed to fetch Pastebin link: {$paste.exception.message}"
+                            } elsif $args.defined {
+                                "!$input $args"
+                            } else {
+                                "The permitted command's arguments were malformed. Please try again.";
+                            }
+                        } else {
+                            # The permit timed out so now the user has a permit to
+                            # shut the hell up instead.
+                            "Your permission to use !$input expired."
+                        }
+                    } else {
+                        "This is not the command you have permission to use.";
+                    }
                 }
             }
         ),

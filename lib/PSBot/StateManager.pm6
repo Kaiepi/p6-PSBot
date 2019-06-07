@@ -162,10 +162,10 @@ method add-room(Str $roomid) {
 method delete-room(Str $roomid) {
     $!chat-mux.protect({
         my PSBot::Room $room = %!rooms{$roomid}:delete;
-        for $room.ranks.kv -> $userid, $rank {
+        for $room.users.keys -> $userid {
             my PSBot::User $user = %!users{$userid};
             $user.on-leave: $roomid;
-            %!users{$userid}:delete unless +$user.ranks;
+            %!users{$userid}:delete unless +$user.rooms;
         }
     })
 }
@@ -201,7 +201,7 @@ method delete-user(Str $userinfo, Str $roomid) {
         if %!users ∋ $userid {
             %!rooms{$roomid}.leave: $userinfo;
             %!users{$userid}.on-leave: $roomid;
-            %!users{$userid}:delete if none(%!rooms.values).ranks ∋ $userid;
+            %!users{$userid}:delete if none(%!rooms.keys) ∋ $userid;
         }
     })
 }

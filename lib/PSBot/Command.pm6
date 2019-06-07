@@ -181,7 +181,7 @@ method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
             !! self.set-rank($room.id, $command<rank>:exists ?? $command<rank> !! $!default-rank);
         return self.reply:
             qq[Permission denied. {COMMAND}{self.name} requires at least rank "$rank".],
-            $user, PSBot::Room unless self.can: $rank, $user.ranks{$room.id};
+            $user, PSBot::Room unless self.can: $rank, $user.rooms{$room.id}.rank;
     }
 
     return &!command(self, $target, $user, $room, $state, $connection) if &!command;

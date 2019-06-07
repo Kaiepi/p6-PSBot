@@ -5,6 +5,14 @@ unit class PSBot::Room;
 
 subset Modjoin where Str | True;
 
+class UserInfo {
+    has Str $.rank;
+
+    method new(Str $rank) {
+        self.bless: :$rank;
+    }
+}
+
 has Str         $.id;
 has Str         $.title;
 has Str         $.type;
@@ -12,7 +20,7 @@ has Visibility  $.visibility;
 has Str         $.modchat;
 has Modjoin     $.modjoin;
 has Array[Str]  %.auth;
-has Str         %.ranks;
+has UserInfo    %.users;
 has Bool        $.propagated = False;
 has PSBot::Game $.game;
 
@@ -25,7 +33,7 @@ method modjoin(--> Str) {
 }
 
 method set-rank(Str $userid, Str $rank) {
-    %!ranks{$userid} = $rank;
+    %!users{$userid} = UserInfo.new($rank);
 }
 
 method set-visibility(Str $visibility) {
@@ -44,10 +52,10 @@ method on-room-info(%data) {
     %!auth       = %data<auth>.kv.map(-> $rank, @userids {
         $rank => Array[Str].new: @userids
     });
-    %!ranks      = %data<users>.map(-> $userinfo {
+    %!users      = %data<users>.map(-> $userinfo {
         my Str $rank   = $userinfo.substr: 0, 1;
         my Str $userid = to-id $userinfo.substr: 1;
-        $userid => $rank
+        $userid => UserInfo.new($rank)
     });
     cas $!propagated, { True };
 }
@@ -55,25 +63,20 @@ method on-room-info(%data) {
 method join(Str $userinfo) {
     my Str $rank   = $userinfo.substr: 0, 1;
     my Str $userid = to-id $userinfo.substr: 1;
-    %!ranks{$userid} = $rank;
+    %!users{$userid} = UserInfo.new($rank);
 }
 
 method leave(Str $userinfo) {
     my Str $userid = to-id $userinfo.substr: 1;
-    %!ranks{$userid}:delete;
+    %!users{$userid}:delete;
 }
 
 method on-rename(Str $oldid, Str $userinfo) {
     my Str $rank   = $userinfo.substr: 0, 1;
     my Str $userid = to-id $userinfo.substr: 1;
-    when $userid eq $oldid {
-        # User was promoted/demoted.
-        %!ranks{$userid} = $rank;
-    }
-    when $oldid ne $userid || %!ranks{$oldid} ne $rank {
-        %!ranks{$oldid}:delete;
-        %!ranks{$userid} = $rank;
-    }
+
+    my UserInfo $olduserinfo = %!users{$oldid}:delete;
+    %!users{$userid} = $olduserinfo.rank eq $rank ?? $olduserinfo !! UserInfo.new($rank);
 }
 
 method add-game(PSBot::Game $game) {

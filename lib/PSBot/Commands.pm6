@@ -44,7 +44,7 @@ BEGIN {
             my Str $res = await $p;
             if $room {
                 await $state.propagated;
-                my Bool $raw = self.can('+', $state.get-user($state.userid).ranks{$room.id})
+                my Bool $raw = self.can('+', $state.get-user($state.userid).rooms{$room.id}.rank)
                         && ($res.contains("\n") || 150 < $res.codes < 8194);
                 $res = $raw ?? "!code $res" !! "``$res``";
                 self.reply: $res, $user, $room, :$raw;
@@ -115,7 +115,7 @@ BEGIN {
             my Str $res = await $p;
             if $room {
                 await $state.propagated;
-                my Bool $raw = self.can('+', $state.get-user($state.userid).ranks{$room.id})
+                my Bool $raw = self.can('+', $state.get-user($state.userid).rooms{$room.id}.rank)
                         && ($res.contains("\n") || 150 < $res.codes < 8192);
                 $res = $raw ?? "!code $res" !! "``$res``";
                 self.reply: $res, $user, $room, :$raw;
@@ -280,7 +280,7 @@ BEGIN {
                 .map(*.head);
             return self.reply:
                 "/addhtmlbox <ol>{@definitions.map({ "<li>{$_}</li>" })}</ol>",
-                $user, $room, :raw if self.can: '*', $state.get-user($state.userid).ranks{$room.id};
+                $user, $room, :raw if self.can: '*', $state.get-user($state.userid).rooms{$room.id}.rank;
 
             my Failable[Str] $url = paste @definitions.kv.map(-> $i, $definition { "$i. $definition" }).join;
             my Str           $res = $url.defined
@@ -492,7 +492,7 @@ BEGIN {
                     my @reminders = $state.database.get-reminders: $user.id;
                     return self.reply: 'You have no reminders set.', $user, $room unless +@reminders;
 
-                    if $room.defined && self.can: '*', $state.get-user($state.userid).ranks{$room.id} {
+                    if $room.defined && self.can: '*', $state.get-user($state.userid).rooms{$room.id}.rank {
                         my Str $list = '<details><summary>Reminder List</summary><ol>' ~ do for @reminders -> %reminder {
                             my DateTime $begin .= new: %reminder<begin>;
                             my DateTime $end   .= new: %reminder<end>;
@@ -715,7 +715,7 @@ BEGIN {
                 })
                 .sort({ $^a.key cmp $^b.key });
 
-            if self.can: '*', $state.get-user($state.userid).ranks{$room.id} {
+            if self.can: '*', $state.get-user($state.userid).rooms{$room.id}.rank {
                 my Str $res = do {
                     my Str $rows = @requirements.map(-> $p {
                         my Str $name        = $p.key;
@@ -733,6 +733,30 @@ BEGIN {
                 "$name: $requirement"
             }).join("\n");
             self.reply: $res, $user, $room, :paste
+        };
+
+    my PSBot::Command $permit .= new:
+        :default-rank<%>,
+        anon method permit(Str $target, PSBot::User $user, PSBot::Room $room,
+                PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
+            my Map $ranks = Rank.enums;
+            return self.reply:
+                "{$state.username} must be able to broadcast commands in order for {COMMAND}permit to be used.",
+                $user, $room if $ranks{$state.get-user($state.userid).rooms{$room.id}.rank} < $ranks<+>;
+
+            my (Str $userid, Str $command) = $target.split(',').map(&to-id);
+            return self.reply: 'No valid userid was given.', $user, $room unless $userid;
+            return self.reply: 'No valid command was given.', $user, $room unless $userid;
+
+            my PSBot::User $permitted = $state.get-user: $userid;
+            return self.reply: qq[User "$userid" not found.], $user, $room unless $permitted.defined;
+
+            $permitted.rooms{$room.id}.broadcast-command = $command;
+            $permitted.rooms{$room.id}.broadcast-timeout = now + 5 * 60;
+
+            my Str $res = "{$permitted.name} is now permitted to use !$command once within the next 5 minutes. "
+                        ~ qq[The next message or link to http://fpaste.scsys.co.uk/ will be broadcasted as a command if preceded by the command name.];
+            self.reply: $res, $user, $room;
         };
 
     my PSBot::Command $hangman = do {
@@ -909,6 +933,12 @@ BEGIN {
                     - settings
                       Returns the list of commands and their usability in the room.
                       This command can only be used in rooms.
+                      Requires at least rank % by default.
+
+                    - permit <userid>, <PS command>
+                      Grants permission to a user for 5 minutes to use a command
+                      they normally don't have permission to use one time. This
+                      is particularly useful for !code and !roll.
                       Requires at least rank % by default.
 
                 Game commands:
