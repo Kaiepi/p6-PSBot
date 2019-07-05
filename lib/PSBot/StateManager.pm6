@@ -9,11 +9,12 @@ use PSBot::User;
 unit class PSBot::StateManager;
 
 has Str  $.challstr;
+has Str  $.group;
 has Str  $.guest-username;
 has Str  $.username;
 has Str  $.userid;
+has Str  $.status;
 has Str  $.avatar;
-has Str  $.group;
 has Bool $.autoconfirmed;
 has Bool $.is-guest;
 has Bool $.is-staff;
@@ -62,11 +63,13 @@ method authenticate(Str $username, Str $password?, Str $challstr? --> Str) {
     $!login-server.log-in: $username, $password, $!challstr
 }
 
-method on-update-user(Str $username, Str $is-named, Str $avatar, %data) {
+method on-update-user(Str $group, Str $username, Str $status, Str $is-named, Str $avatar, %data) {
+    $!group                = $group;
+    $!guest-username       = $username if $!is-guest;
     $!username             = $username;
     $!userid               = to-id $username;
+    $!status               = $status;
     $!is-guest             = $is-named eq '0';
-    $!guest-username       = $username if $!is-guest;
     $!avatar               = $avatar;
     $!is-staff             = %data<isStaff>         // False;
     $!is-sysop             = %data<isSysop>         // False;
@@ -120,6 +123,7 @@ method on-room-info(%data) {
                 %!users{$userid} = $user;
                 $user.on-join: $userinfo, $roomid;
             }
+            $!user-joined.emit: $userid;
         }
 
         for %data<auth>.kv -> $rank, @userids {
@@ -206,11 +210,11 @@ method delete-user(Str $userinfo, Str $roomid) {
     })
 }
 
-method rename-user(Str $userinfo, Str $oldid, Str $roomid) {
+method rename-user(Str $userinfo, Str $status, Str $oldid, Str $roomid) {
     $!chat-mux.protect({
         my Str $userid = to-id $userinfo.substr: 1;
         if %!users ∋ $oldid {
-            %!users{$oldid}.rename: $userinfo, $roomid;
+            %!users{$oldid}.rename: $userinfo, $status, $roomid;
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
             %!users{$userid} = %!users{$oldid}:delete;
             $!user-joined.emit: $userid;

@@ -2,6 +2,14 @@ use v6.d;
 use Pastebin::Shadowcat;
 unit module PSBot::Tools;
 
+grammar UserData is export {
+    token TOP      { <userinfo> [ '@' <status> ]? }
+    token userinfo { <group> <username> }
+    token group    { . }
+    token username { <-[@]>+ }
+    token status   { <-[|]>+ }
+}
+
 class Failable is export {
     my %cache;
 

@@ -66,9 +66,13 @@ method parse(Str $text) {
     }
 }
 
-method parse-update-user(Str $roomid, Str $username, Str $is-named, Str $avatar, Str $data) {
+method parse-update-user(Str $roomid, Str $userinfo-with-status, Str $is-named, Str $avatar, Str $data) {
     my %data = from-json $data;
-    $!state.on-update-user: $username, $is-named, $avatar, %data;
+    UserData.parse: $userinfo-with-status;
+    my Str $group    = ~$<userinfo><group>;
+    my Str $username = ~$<userinfo><username>;
+    my Str $status   = $<status> ?? ~$<status> !! '';
+    $!state.on-update-user: $group, $username, $status, $is-named, $avatar, %data;
 }
 
 method parse-challstr(Str $roomid, Str $type, Str $nonce) {
@@ -145,11 +149,15 @@ method parse-leave(Str $roomid, Str $userinfo) {
     $!state.delete-user: $userinfo, $roomid;
 }
 
-method parse-rename(Str $roomid, Str $userinfo, Str $oldid) {
-    $!state.rename-user: $userinfo, $oldid, $roomid;
+method parse-rename(Str $roomid, Str $userinfo-with-status, Str $oldid) {
+    UserData.parse: $userinfo-with-status;
+    my Str $userinfo = ~$<userinfo>;
+    my Str $status   = $<status> ?? ~$<status> !! '';
+    $!state.rename-user: $userinfo, $status, $oldid, $roomid;
 
-    my Str     $userid = to-id $userinfo.substr: 1;
-    my Instant $time   = now;
+    my Str     $username = ~$<userinfo><username>;
+    my Str     $userid   = to-id $username.substr: 1;
+    my Instant $time     = now;
     $!state.database.add-seen: $oldid, $time
         unless $oldid.starts-with: 'guest';
     $!state.database.add-seen: $userid, $time
