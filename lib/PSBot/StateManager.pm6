@@ -28,8 +28,9 @@ has Channel  $.pending-rename   .= new;
 has Channel  $.logged-in        .= new;
 has Supplier $.room-joined      .= new;
 has Supplier $.user-joined      .= new;
-has Promise  $.rooms-propagated .= new;
-has Promise  $.users-propagated .= new;
+has Supplier $.rooms-propagated .= new;
+has Supplier $.users-propagated .= new;
+has Promise  $.propagated       .= new;
 
 has Lock::Async $!chat-mux .= new;
 has PSBot::User %.users;
@@ -39,13 +40,6 @@ has PSBot::Database    $.database;
 has PSBot::LoginServer $.login-server;
 has PSBot::Rules       $.rules;
 has Cancellation       %.reminders{Int};
-
-method propagated(--> Promise) {
-    Promise.allof(
-        $!rooms-propagated,
-        $!users-propagated
-    )
-}
 
 method new(Str $serverid!) {
     my PSBot::Database    $database     .= new;
@@ -101,9 +95,9 @@ method on-user-details(%data) {
             $!autoconfirmed = %data<autoconfirmed>;
         }
 
-        $!users-propagated.keep
-            if $!users-propagated.status ~~ Planned
-            && all %!users.values.map({ .propagated || .is-guest });
+        $!users-propagated.emit: True
+            if $!propagated.status ~~ Planned
+            && all(%!users.values).propagated;
     });
 }
 
@@ -136,8 +130,8 @@ method on-room-info(%data) {
             }
         }
 
-        $!rooms-propagated.keep
-            if $!rooms-propagated.status ~~ Planned
+        $!rooms-propagated.emit: True
+            if $!propagated.status ~~ Planned
             && (ROOMS.keys ∖ %!rooms.keys === ∅)
             && all(%!rooms.values).propagated;
     });
@@ -152,6 +146,12 @@ method has-room(Str $roomid --> Bool) {
 method get-room(Str $roomid --> PSBot::Room) {
     $!chat-mux.protect({
         %!rooms{$roomid}
+    })
+}
+
+method get-rooms(--> Hash[PSBot::Room]) {
+    $!chat-mux.protect(-> {
+        %!rooms
     })
 }
 
@@ -183,6 +183,12 @@ method has-user(Str $userid --> Bool) {
 method get-user(Str $userid --> PSBot::User) {
     $!chat-mux.protect({
         %!users{$userid}
+    })
+}
+
+method get-users(--> Hash[PSBot::User]) {
+    $!chat-mux.protect(-> {
+        %!users
     })
 }
 
@@ -226,21 +232,20 @@ method rename-user(Str $userinfo, Str $status, Str $oldid, Str $roomid) {
 }
 
 method reset() {
-    $!guest-username     = Nil;
-    $!username           = Nil;
-    $!userid             = Nil;
-    $!avatar             = Nil;
-    $!group              = Nil;
-    $!autoconfirmed      = False;
-    $!is-guest           = True;
-    $!is-staff           = False;
-    $!is-sysop           = False;
-    $!pms-blocked        = False;
-    $!challenges-blocked = False;
-
-    $!inited            = False;
-    $!rooms-propagated .= new;
-    $!users-propagated .= new;
+    $!guest-username      = Nil;
+    $!username            = Nil;
+    $!userid              = Nil;
+    $!status              = Nil;
+    $!group               = Nil;
+    $!avatar              = Nil;
+    $!autoconfirmed       = False;
+    $!is-guest            = True;
+    $!is-staff            = False;
+    $!is-sysop            = False;
+    $!pms-blocked         = False;
+    $!challenges-blocked  = False;
+    $!inited              = False;
+    $!propagated         .= new;
 
     $!chat-mux.protect({
         %!users .= new;

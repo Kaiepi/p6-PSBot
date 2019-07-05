@@ -85,7 +85,7 @@ method new() {
                     $ri.broadcast-command = Nil;
                     $ri.broadcast-timeout = Nil;
 
-                    my Str $input   = $<command>.defined ?? to-id(~$<command>) !! Nil;
+                    my Str $input = $<command> ?? to-id(~$<command>) !! Nil;
                     if $input === $command {
                         if now > $timeout - 5 * 60 {
                             my Str $url  = $<url>.defined  ?? ~$<url>  !! Nil;

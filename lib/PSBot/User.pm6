@@ -20,7 +20,7 @@ has Str      $.group;
 has Str      $.avatar;
 has Bool     $.autoconfirmed;
 has RoomInfo %.rooms;
-has Bool     $.propagated = False;
+has Promise  $.propagated .= new;
 
 proto method new(Str, Str $?) {*}
 multi method new(Str $userinfo) {
@@ -48,7 +48,7 @@ method on-user-details(%data) {
     $!group         = %data<group>;
     $!avatar        = ~%data<avatar>;
     $!autoconfirmed = %data<autoconfirmed>;
-    cas $!propagated, { True };
+    $!propagated.keep unless $!propagated.status ~~ Kept;
 }
 
 method on-join(Str $userinfo, Str $roomid) {
@@ -66,4 +66,8 @@ method rename(Str $userinfo, Str $status, Str $roomid) {
     $!name           = $userinfo.substr: 1;
     $!id             = to-id $!name;
     $!status         = $status;
+}
+
+method propagated(--> Bool) {
+    self.is-guest || $!propagated.status ~~ Kept
 }
