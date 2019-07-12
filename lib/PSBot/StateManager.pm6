@@ -8,20 +8,21 @@ use PSBot::Tools;
 use PSBot::User;
 unit class PSBot::StateManager;
 
-has Str  $.challstr;
-has Str  $.group;
-has Str  $.guest-username;
-has Str  $.username;
-has Str  $.userid;
-has Str  $.status;
-has Str  $.avatar;
-has Bool $.autoconfirmed;
-has Bool $.is-guest;
-has Bool $.is-staff;
-has Bool $.is-sysop;
-has Bool $.pms-blocked;
-has Bool $.challenges-blocked;
-has Bool $.help-tickets-ignored;
+has Str    $.challstr;
+has Str    $.group;
+has Str    $.guest-username;
+has Str    $.username;
+has Str    $.userid;
+has Status $.status;
+has Str    $.message;
+has Str    $.avatar;
+has Bool   $.autoconfirmed;
+has Bool   $.is-guest;
+has Bool   $.is-staff;
+has Bool   $.is-sysop;
+has Bool   $.pms-blocked;
+has Bool   $.challenges-blocked;
+has Bool   $.help-tickets-ignored;
 
 has Bool     $.inited            = False;
 has Channel  $.pending-rename   .= new;
@@ -57,12 +58,13 @@ method authenticate(Str $username, Str $password?, Str $challstr? --> Str) {
     $!login-server.log-in: $username, $password, $!challstr
 }
 
-method on-update-user(Str $group, Str $username, Str $status, Str $is-named, Str $avatar, %data) {
+method on-update-user(Str $group, Str $username, Status $status, Str $message, Str $is-named, Str $avatar, %data) {
     $!group                = $group;
     $!guest-username       = $username if $!is-guest;
     $!username             = $username;
     $!userid               = to-id $username;
     $!status               = $status;
+    $!message              = $message;
     $!is-guest             = $is-named eq '0';
     $!avatar               = $avatar;
     $!is-staff             = %data<isStaff>         // False;
@@ -216,17 +218,22 @@ method delete-user(Str $userinfo, Str $roomid) {
     })
 }
 
-method rename-user(Str $userinfo, Str $status, Str $oldid, Str $roomid) {
+method rename-user(Str $userinfo, Status $status, Str $message, Str $oldid, Str $roomid) {
     $!chat-mux.protect({
         my Str $userid = to-id $userinfo.substr: 1;
         if %!users ∋ $oldid {
-            %!users{$oldid}.rename: $userinfo, $status, $roomid;
+            %!users{$oldid}.rename: $userinfo, $status, $message, $roomid;
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
             %!users{$userid} = %!users{$oldid}:delete;
             $!user-joined.emit: $userid;
         } else {
             # Already received a rename message from another room.
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
+        }
+
+        if $userid === $!userid {
+            $!status  = $status;
+            $!message = $message;
         }
     })
 }
@@ -236,6 +243,7 @@ method reset() {
     $!username            = Nil;
     $!userid              = Nil;
     $!status              = Nil;
+    $!message             = Nil;
     $!group               = Nil;
     $!avatar              = Nil;
     $!autoconfirmed       = False;

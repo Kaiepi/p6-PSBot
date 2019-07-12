@@ -15,7 +15,8 @@ class RoomInfo {
 
 has Str      $.id;
 has Str      $.name;
-has Str      $.status;
+has Status   $.status;
+has Str      $.message;
 has Str      $.group;
 has Str      $.avatar;
 has Bool     $.autoconfirmed;
@@ -60,12 +61,13 @@ method on-leave(Str $roomid) {
     %!rooms{$roomid}:delete;
 }
 
-method rename(Str $userinfo, Str $status, Str $roomid) {
+method rename(Str $userinfo, Status $status, Str $message, Str $roomid) {
     my Str $rank = $userinfo.substr: 0, 1;
     %!rooms{$roomid} = RoomInfo.new($rank);
     $!name           = $userinfo.substr: 1;
     $!id             = to-id $!name;
     $!status         = $status;
+    $!message        = $message;
 }
 
 method propagated(--> Bool) {

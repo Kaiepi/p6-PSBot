@@ -3,12 +3,22 @@ use Pastebin::Shadowcat;
 unit module PSBot::Tools;
 
 grammar UserData is export {
-    token TOP      { <userinfo> [ '@' <status> ]? }
+    token TOP      { <userinfo> [ '@' [ '!'? [ '(' <status> ')' [ <.ws> <message> ]? ]? ]? ]? }
     token userinfo { <group> <username> }
     token group    { . }
-    token username { <-[@]>+ }
-    token status   { <-[|]>+ }
+    token username { <-[@|]>+ }
+    token status   { 'Online' | 'Idle' | 'BRB' | 'AFK' | 'Away' | 'Busy' }
+    token message  { <-[|]>+ }
 }
+
+enum Status is export (
+    Online => 'Online',
+    Idle   => 'Idle',
+    BRB    => 'BRB',
+    AFK    => 'AFK',
+    Away   => 'Away',
+    Busy   => 'Busy'
+);
 
 class Failable is export {
     my %cache;

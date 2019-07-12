@@ -69,10 +69,11 @@ method parse(Str $text) {
 method parse-update-user(Str $roomid, Str $userinfo-with-status, Str $is-named, Str $avatar, Str $data) {
     my %data = from-json $data;
     UserData.parse: $userinfo-with-status;
-    my Str $group    = ~$<userinfo><group>;
-    my Str $username = ~$<userinfo><username>;
-    my Str $status   = $<status> ?? ~$<status> !! '';
-    $!state.on-update-user: $group, $username, $status, $is-named, $avatar, %data;
+    my Str    $group    = ~$<userinfo><group>;
+    my Str    $username = ~$<userinfo><username>;
+    my Status $status   = $<status>.defined  ?? Status(~$<status>) !! Online;
+    my Str    $message  = $<message>.defined ?? ~$<message> !! '';
+    $!state.on-update-user: $group, $username, $status, $message, $is-named, $avatar, %data;
 }
 
 method parse-challstr(Str $roomid, Str $type, Str $nonce) {
@@ -151,9 +152,10 @@ method parse-leave(Str $roomid, Str $userinfo) {
 
 method parse-rename(Str $roomid, Str $userinfo-with-status, Str $oldid) {
     UserData.parse: $userinfo-with-status;
-    my Str $userinfo = ~$<userinfo>;
-    my Str $status   = $<status> ?? ~$<status> !! '';
-    $!state.rename-user: $userinfo, $status, $oldid, $roomid;
+    my Str    $userinfo = ~$<userinfo>;
+    my Status $status   = $<status>.defined ?? Status(~$<status>) !! Online;
+    my Str    $message  = $<message>.defined ?? ~$<message> !! '';
+    $!state.rename-user: $userinfo, $status, $message, $oldid, $roomid;
 
     my Str     $username = ~$<userinfo><username>;
     my Str     $userid   = to-id $username.substr: 1;
@@ -185,6 +187,7 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
     my Str $message = @message.join: '|';
     if $message.starts-with: COMMAND {
         return unless $message ~~ $command-matcher;
+        return unless $<command>.defined;
 
         my Str $command-name = ~$<command>;
         return unless $command-name;
@@ -222,6 +225,7 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
     my Str $message  = @message.join: '|';
     if $message.starts-with: COMMAND {
         return unless $message ~~ $command-matcher;
+        return unless $<command>.defined;
 
         my Str $command-name = ~$<command>;
         return unless $command-name;

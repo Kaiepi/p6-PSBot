@@ -355,7 +355,9 @@ multi method get-mail(Str $target --> Seq) {
     $!lock.protect({
         my DB::SQLite::Result $res;
 
-        $res = $!db.query: q:to/STATEMENT/, $target;
+        my Int $target-id = self.add-user: $target;
+
+        $res = $!db.query: q:to/STATEMENT/, $target-id;
         SELECT u1.id AS source, u2.id AS target, m.message AS message
         FROM mailbox AS m
         INNER JOIN users AS u1 ON m.source = u1.ROWID
