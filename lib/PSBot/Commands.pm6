@@ -536,7 +536,9 @@ BEGIN {
         anon method mail(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             my Int $idx = $target.index: ',';
-            return self.reply: 'A username and a message must be included.', $user, $room unless $idx.defined;
+            return self.reply:
+                'A username and a message must be included.',
+                $user, $room unless $idx.defined;
 
             my Str   $username = $target.substr: 0, $idx;
             my Str   $userid   = to-id $username;
@@ -545,15 +547,16 @@ BEGIN {
             return self.reply: 'No message was given.', $user, $room  unless $message;
 
             with $state.database.get-mail: $userid -> @mail {
-                return self.reply: "{$username}'s mailbox is full.", $user, $room if @mail.defined && +@mail >= 5;
+                return self.reply:
+                    "{$username}'s mailbox is full.",
+                    $user, $room if @mail.defined && +@mail >= 5;
             }
 
-            if $state.has-user: $userid {
-                $connection.send: ("You received 1 message:", "[$userid] $message"), :$userid;
-            } else {
-                $state.database.add-mail: $user.id, $userid, $message;
-            }
+            return self.reply:
+                "{$username} is already online. PM them yourself.",
+                $user, $room if $state.has-user: $userid;
 
+            $state.database.add-mail: $user.id, $userid, $message;
             self.reply: "Your mail has been delivered to $username.", $user, $room
         };
 

@@ -209,24 +209,30 @@ method remove-room(Str $name --> Int) {
 proto method get-reminders(Str $? --> List) {*}
 multi method get-reminders(--> Seq) {
     $!lock.protect({
-        my DB::SQLite::Result $res = $!db.query: q:to/STATEMENT/;
+        my DB::SQLite::Result $res;
+
+        $res = $!db.query: q:to/STATEMENT/;
         SELECT rs.id, u.id AS userid, r.id AS roomid, rs.name, rs.reminder, rs.duration, rs.begin, rs.end
         FROM reminders AS rs
         INNER JOIN users AS u ON rs.userid = u.ROWID
         LEFT JOIN rooms AS r ON rs.roomid = r.ROWID;
         STATEMENT
+
         $res.hashes;
     })
 }
 multi method get-reminders(Str $userid --> Seq) {
     $!lock.protect({
-        my DB::SQLite::Result $res = $!db.query: q:to/STATEMENT/, $userid;
+        my DB::SQLite::Result $res;
+
+        $res = $!db.query: q:to/STATEMENT/, $userid;
         SELECT rs.id, u.id AS userid, r.id AS roomid, rs.name, rs.reminder, rs.duration, rs.begin, rs.end
         FROM reminders AS rs
         INNER JOIN users AS u ON rs.userid = u.ROWID
         LEFT JOIN rooms AS r ON rs.roomid = r.ROWID
         WHERE u.id = ?;
         STATEMENT
+
         $res.hashes
     })
 }
@@ -333,24 +339,30 @@ multi method remove-reminder(Str $reminder, Num() $end, Str $userid, Str $roomid
 proto method get-mail(Str $? --> Seq) {*}
 multi method get-mail(--> Seq) {
     $!lock.protect({
-        my DB::SQLite::Result $res = $!db.query: q:to/STATEMENT/;
+        my DB::SQLite::Result $res;
+
+        $res = $!db.query: q:to/STATEMENT/;
         SELECT u1.id AS source, u2.id AS target, m.message AS message
         FROM mailbox AS m
         INNER JOIN users AS u1 ON m.source = u1.ROWID
         INNER JOIN users AS u2 ON m.target = u2.ROWID;
         STATEMENT
+
         $res.hashes
     })
 }
 multi method get-mail(Str $target --> Seq) {
     $!lock.protect({
-        my DB::SQLite::Result $res = $!db.query: q:to/STATEMENT/;
+        my DB::SQLite::Result $res;
+
+        $res = $!db.query: q:to/STATEMENT/, $target;
         SELECT u1.id AS source, u2.id AS target, m.message AS message
         FROM mailbox AS m
         INNER JOIN users AS u1 ON m.source = u1.ROWID
         INNER JOIN users AS u2 ON m.target = u2.ROWID
         WHERE target = ?;
         STATEMENT
+
         $res.hashes
     })
 }
@@ -364,7 +376,7 @@ method add-mail(Str $source, Str $target, Str $message --> Nil) {
 
         $!db.begin;
         $sth = $!db.prepare: q:to/STATEMENT/, :nocache;
-        INSERT INTO mailbox (source, target, smessage)
+        INSERT INTO mailbox (source, target, message)
         VALUES (?, ?, ?);
         STATEMENT
         $sth.execute: $sourceid, $targetid, $message;
@@ -430,24 +442,30 @@ method add-seen(Str $userid, Num() $time --> Nil) {
 
 method get-commands(Str $roomid --> Seq) {
     $!lock.protect({
-        my DB::SQLite::Result $res = $!db.query: q:to/STATEMENT/, $roomid;
+        my DB::SQLite::Result $res;
+
+        $res = $!db.query: q:to/STATEMENT/, $roomid;
         SELECT r.id AS roomid, s.command, s.rank, s.disabled
         FROM settings AS s
         INNER JOIN rooms AS r ON r.id = s.roomid
         WHERE r.id = ?;
         STATEMENT
+
         $res.hashes
     })
 }
 
 method get-command(Str $roomid, Str $command --> Hash) {
     $!lock.protect({
-        my DB::SQLite::Result $res = $!db.query: q:to/STATEMENT/, $roomid, $command;
+        my DB::SQLite::Result $res;
+
+        $res = $!db.query: q:to/STATEMENT/, $roomid, $command;
         SELECT r.id AS roomid, s.command, s.rank, s.disabled
         FROM settings AS s
         INNER JOIN rooms AS r ON r.ROWID = s.roomid
         WHERE r.id = ? AND s.command = ?;
         STATEMENT
+
         $res.hash
     })
 }
