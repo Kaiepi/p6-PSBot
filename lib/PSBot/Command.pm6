@@ -164,9 +164,10 @@ method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
     }
 
     if self.autoconfirmed {
+        my Bool $is-unlocked = self.can: ' ', $room ?? $user.rooms{$room.id}.rank !! $user.group;
         return self.reply:
             "Permission denied. {COMMAND}{self.name} requires your account to be autoconfirmed.",
-            $user, PSBot::Room unless $user.autoconfirmed;
+            $user, PSBot::Room unless $user.autoconfirmed && $is-unlocked;
     }
 
     if $room {
