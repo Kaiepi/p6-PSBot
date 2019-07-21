@@ -46,30 +46,41 @@ method is-guest(--> Bool) {
 }
 
 method on-user-details(%data) {
-    $!group         = %data<group>;
+    $!group         = %data<group> // ' ';
     $!avatar        = ~%data<avatar>;
     $!autoconfirmed = %data<autoconfirmed>;
+
+    if %data<status>:exists {
+        my Str $status = %data<status>;
+        my Int $lidx   = $status.index: '(';
+        my Int $ridx   = $status.index: ')';
+        $!status  = $lidx.defined ?? Status($status.substr: $lidx + 1, $ridx - $lidx - 1) !! Online;
+        $!message = $ridx.defined ?? $status.substr($ridx + 1) !! $status;
+    } else {
+        $!status  = Online;
+        $!message = '';
+    }
+
     $!propagated.keep unless $!propagated.status ~~ Kept;
 }
 
 method on-join(Str $userinfo, Str $roomid) {
-    my Str $rank = $userinfo.substr: 0, 1;
-    %!rooms{$roomid} = RoomInfo.new($rank);
+    my Str $group = $userinfo.substr: 0, 1;
+    %!rooms{$roomid} = RoomInfo.new: $group;
 }
 
 method on-leave(Str $roomid) {
     %!rooms{$roomid}:delete;
 }
 
-method rename(Str $userinfo, Status $status, Str $message, Str $roomid) {
-    my Str $rank = $userinfo.substr: 0, 1;
-    %!rooms{$roomid} = RoomInfo.new($rank);
-    $!name           = $userinfo.substr: 1;
+method rename(Str $userinfo, Str $roomid) {
+    my Str $group = $userinfo.substr: 0, 1;
+    my Int $idx   = $userinfo.rindex('@!') // $userinfo.codes;
+    %!rooms{$roomid} = RoomInfo.new: $group;
+    $!name           = $userinfo.substr: 1, $idx;
     $!id             = to-id $!name;
-    $!status         = $status;
-    $!message        = $message;
 }
 
 method propagated(--> Bool) {
-    self.is-guest || $!propagated.status ~~ Kept
+    $!propagated.status ~~ Kept
 }

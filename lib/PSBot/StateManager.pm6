@@ -58,13 +58,11 @@ method authenticate(Str $username, Str $password?, Str $challstr? --> Str) {
     $!login-server.log-in: $username, $password, $!challstr
 }
 
-method on-update-user(Str $group, Str $username, Status $status, Str $message, Str $is-named, Str $avatar, %data) {
+method on-update-user(Str $group, Str $username, Str $is-named, Str $avatar, %data) {
     $!group                = $group;
     $!guest-username       = $username if $!is-guest;
     $!username             = $username;
     $!userid               = to-id $username;
-    $!status               = $status;
-    $!message              = $message;
     $!is-guest             = $is-named eq '0';
     $!avatar               = $avatar;
     $!is-staff             = %data<isStaff>         // False;
@@ -85,7 +83,6 @@ method on-update-user(Str $group, Str $username, Status $status, Str $message, S
 method on-user-details(%data) {
     $!chat-mux.protect({
         my Str $userid = %data<userid>;
-
         if %!users ∋ $userid {
             my PSBot::User $user = %!users{$userid};
             $user.on-user-details: %data;
@@ -95,10 +92,18 @@ method on-user-details(%data) {
             $!group         = %data<group>;
             $!avatar        = ~%data<avatar>;
             $!autoconfirmed = %data<autoconfirmed>;
+            if %data<status>:exists {
+                my Str $status = %data<status>;
+                my Int $lidx   = $status.index: '(';
+                my Int $ridx   = $status.index: ')';
+                $!status  = $lidx.defined ?? Status($status.substr: $lidx + 1, $ridx - $lidx - 1) !! Online;
+                $!message = $ridx.defined ?? $status.substr($ridx + 1) !! $status;
+            }
         }
 
         $!users-propagated.emit: True
             if $!propagated.status ~~ Planned
+            && (ROOMS.keys ∖ %!rooms.keys === ∅)
             && all(%!users.values).propagated;
     });
 }
@@ -218,22 +223,17 @@ method delete-user(Str $userinfo, Str $roomid) {
     })
 }
 
-method rename-user(Str $userinfo, Status $status, Str $message, Str $oldid, Str $roomid) {
+method rename-user(Str $userinfo, Str $oldid, Str $roomid) {
     $!chat-mux.protect({
         my Str $userid = to-id $userinfo.substr: 1;
         if %!users ∋ $oldid {
-            %!users{$oldid}.rename: $userinfo, $status, $message, $roomid;
+            %!users{$oldid}.rename: $userinfo, $roomid;
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
             %!users{$userid} = %!users{$oldid}:delete;
             $!user-joined.emit: $userid;
         } else {
             # Already received a rename message from another room.
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
-        }
-
-        if $userid === $!userid {
-            $!status  = $status;
-            $!message = $message;
         }
     })
 }

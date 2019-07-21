@@ -44,7 +44,7 @@ method start() {
         whenever $!state.rooms-propagated.Supply.schedule-on($*SCHEDULER) {
             # Awaits any users waiting to get propagated, ignoring guests.
             $!connection.send-raw: $!state.get-users.values
-                .grep({ !.is-guest && !.propagated })
+                .grep({ !.propagated })
                 .map({ "/cmd userdetails " ~ .id });
         }
         whenever $!state.users-propagated.Supply.schedule-on($*SCHEDULER) {

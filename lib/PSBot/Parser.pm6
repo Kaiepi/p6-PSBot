@@ -66,14 +66,12 @@ method parse(Str $text) {
     }
 }
 
-method parse-update-user(Str $roomid, Str $userinfo-with-status, Str $is-named, Str $avatar, Str $data) {
+method parse-update-user(Str $roomid, Str $userinfo, Str $is-named, Str $avatar, Str $data) {
     my %data = from-json $data;
-    UserData.parse: $userinfo-with-status;
-    my Str    $group    = ~$<userinfo><group>;
-    my Str    $username = ~$<userinfo><username>;
-    my Status $status   = $<status>.defined  ?? Status(~$<status>) !! Online;
-    my Str    $message  = $<message>.defined ?? ~$<message> !! '';
-    $!state.on-update-user: $group, $username, $status, $message, $is-named, $avatar, %data;
+    my Int $idx      = $userinfo.rindex('@!') // $userinfo.codes;
+    my Str $group    = $userinfo.substr: 0, 1;
+    my Str $username = $userinfo.substr: 1, $idx;
+    $!state.on-update-user: $group, $username, $is-named, $avatar, %data;
 }
 
 method parse-challstr(Str $roomid, Str $type, Str $nonce) {
@@ -104,7 +102,7 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
 
             if $!state.userid === %data<userid> {
                 my Map $ranks    = Rank.enums;
-                my Rat $throttle = $ranks{%data<group>} >= $ranks<+> ?? 0.301 !! 0.601;
+                my Rat $throttle = $ranks{%data<group>} >= $ranks<+> ?? 0.3 !! 0.6;
                 $!connection.set-throttle: $throttle;
             }
         }
@@ -150,15 +148,12 @@ method parse-leave(Str $roomid, Str $userinfo) {
     $!state.delete-user: $userinfo, $roomid;
 }
 
-method parse-rename(Str $roomid, Str $userinfo-with-status, Str $oldid) {
-    UserData.parse: $userinfo-with-status;
-    my Str    $userinfo = ~$<userinfo>;
-    my Status $status   = $<status>.defined ?? Status(~$<status>) !! Online;
-    my Str    $message  = $<message>.defined ?? ~$<message> !! '';
-    $!state.rename-user: $userinfo, $status, $message, $oldid, $roomid;
+method parse-rename(Str $roomid, Str $userinfo, Str $oldid) {
+    $!state.rename-user: $userinfo, $oldid, $roomid;
 
-    my Str     $username = ~$<userinfo><username>;
-    my Str     $userid   = to-id $username.substr: 1;
+    my Int     $idx      = $userinfo.rindex('@!') // $userinfo.codes;
+    my Str     $username = $userinfo.substr: 1, $idx;
+    my Str     $userid   = to-id $username;
     my Instant $time     = now;
     $!state.database.add-seen: $oldid, $time
         unless $oldid.starts-with: 'guest';
