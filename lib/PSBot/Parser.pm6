@@ -1,4 +1,5 @@
 use v6.d;
+use Failable;
 use JSON::Fast;
 use PSBot::Command;
 use PSBot::Commands;

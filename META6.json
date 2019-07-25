@@ -7,6 +7,7 @@
 		"Cro::HTTP",
 		"Cro::WebSocket",
 		"DB::SQLite",
+		"Failable",
 		"HTML::Entity",
 		"JSON::Fast",
 		"Pastebin::Shadowcat",

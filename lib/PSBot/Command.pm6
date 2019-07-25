@@ -1,4 +1,5 @@
 use v6.d;
+use Failable;
 use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Room;

@@ -11,22 +11,6 @@ enum Status is export (
     Busy   => 'Busy'
 );
 
-class Failable is export {
-    my %cache;
-
-    method ^parameterize($, Mu:U \T) {
-        my Str $name = T.^name;
-        return %cache{$name} if %cache{$name}:exists;
-
-        my $type := Metamodel::SubsetHOW.new_type:
-            :name("Failable[$name]"),
-            :refinee(T =:= Junction ?? Mu !! Any),
-            :refinement(T | Failure);
-        %cache{$name} := $type;
-        $type
-    }
-}
-
 subset Result is export where Str | Positional | Sequence | Awaitable | Nil;
 
 enum Rank is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;

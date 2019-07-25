@@ -1,5 +1,6 @@
 use v6.d;
 use DB::SQLite;
+use Failable;
 use PSBot::Tools;
 unit class PSBot::Database;
 

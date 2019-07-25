@@ -1,6 +1,7 @@
 use v6.d;
 use Cro::HTTP::Client;
 use Cro::HTTP::Response;
+use Failable;
 use PSBot::Command;
 use PSBot::Config;
 use PSBot::Connection;
