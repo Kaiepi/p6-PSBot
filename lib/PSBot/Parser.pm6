@@ -81,10 +81,7 @@ method parse-challstr(Str $roomid, Str $type, Str $nonce) {
     my Str           $challstr  = "$type|$nonce";
     my Failable[Str] $assertion = $!state.authenticate: USERNAME // '', PASSWORD // '', $challstr;
     $assertion.throw if $assertion ~~ Failure:D;
-    if defined $assertion {
-        $!connection.send-raw: "/trn {USERNAME},0,$assertion";
-        await $!state.pending-rename;
-    }
+    $!connection.send-raw: "/trn {USERNAME},0,$assertion" if $assertion.defined;
 }
 
 method parse-name-taken(Str $roomid, Str $username, Str $reason) {
@@ -95,8 +92,10 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
     given $type {
         when 'userdetails' {
             my %data = from-json $data;
-            if %data<autoconfirmed> ~~ Nil {
+            unless %data<autoconfirmed>:exists {
                 note "This server must support user autoconfirmed metadata in /cmd userdetails in order for {USERNAME} to run properly! Contact a server administrator and ask them to update the server.";
+                try await $!connection.close: :force;
+                $!state.database.DESTROY;
                 exit 1;
             }
             $!state.on-user-details: %data;
@@ -108,8 +107,10 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
             }
         }
         when 'roominfo' {
-            if $data eq 'null' && $!state.has-room: $roomid {
+            if $data eq 'null' {
                 note "This server must support /cmd roominfo in order for {USERNAME} to run properly! Contact a server administrator and ask them to update the server.";
+                try await $!connection.close: :force;
+                $!state.database.DESTROY;
                 exit 1;
             }
 
@@ -130,45 +131,67 @@ method parse-deinit(Str $roomid) {
 method parse-join(Str $roomid, Str $userinfo) {
     $!state.add-user: $userinfo, $roomid;
 
-    my Str $userid = to-id $userinfo.substr: 1;
-    $!state.database.add-seen: $userid, now
-        unless $userid.starts-with: 'guest';
+    my Int $idx      = $userinfo.rindex('@!') // $userinfo.codes;
+    my Str $username = $userinfo.substr: 1, $idx;
+    return if $username === $!state.username;
 
-    with $!state.database.get-mail: $userid -> @mail {
-        if +@mail {
-            $!state.database.remove-mail: $userid;
-            $!connection.send:
-                "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-                @mail.map(-> %row { "[%row<source>] %row<message>" }),
-                :$userid;
-        }
+    my Str $userid = to-id $username;
+    return if $userid.starts-with: 'guest';
+
+    $!state.database.add-seen: $userid, now;
+    return unless $!state.has-user: $userid;
+
+    if $!state.database.get-mail: $userid -> @mail {
+        $!state.database.remove-mail: $userid;
+        $!connection.send:
+            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
+            @mail.map(-> %row { "[%row<source>] %row<message>" }),
+            :$userid;
     }
 }
 
 method parse-leave(Str $roomid, Str $userinfo) {
     $!state.delete-user: $userinfo, $roomid;
+
+    # There is no user status included with user info on leave.
+    my Str $username = $userinfo.substr: 1;
+    return if $username === $!state.username;
+
+    my Str $userid = to-id $username;
+    return if $userid.starts-with: 'guest';
+
+    $!state.database.add-seen: $userid, now;
+    return unless $!state.has-user: $userid;
+
+    if $!state.database.get-mail: $userid -> @mail {
+        $!state.database.remove-mail: $userid;
+        $!connection.send:
+            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
+            @mail.map(-> %row { "[%row<source>] %row<message>" }),
+            :$userid;
+    }
 }
 
 method parse-rename(Str $roomid, Str $userinfo, Str $oldid) {
     $!state.rename-user: $userinfo, $oldid, $roomid;
 
-    my Int     $idx      = $userinfo.rindex('@!') // $userinfo.codes;
-    my Str     $username = $userinfo.substr: 1, $idx;
-    my Str     $userid   = to-id $username;
-    my Instant $time     = now;
-    $!state.database.add-seen: $oldid, $time
-        unless $oldid.starts-with: 'guest';
-    $!state.database.add-seen: $userid, $time
-        unless $userid.starts-with: 'guest';
+    my Int $idx      = $userinfo.rindex('@!') // $userinfo.codes;
+    my Str $username = $userinfo.substr: 1, $idx;
+    return if $username === $!state.username;
 
-    with $!state.database.get-mail: $userid -> @mail {
-        if +@mail {
-            $!state.database.remove-mail: $userid;
-            $!connection.send:
-                "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-                @mail.map(-> %row { "[%row<source>] %row<message>" }),
-                :$userid;
-        }
+    my Str $userid = to-id $username;
+    return if $userid.starts-with: 'guest';
+
+    my Instant $time = now;
+    $!state.database.add-seen: $oldid, $time;
+    $!state.database.add-seen: $userid, $time unless $userid eq $oldid;
+
+    if $!state.database.get-mail: $userid -> @mail {
+        $!state.database.remove-mail: $userid;
+        $!connection.send:
+            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
+            @mail.map(-> %row { "[%row<source>] %row<message>" }),
+            :$userid;
     }
 }
 
