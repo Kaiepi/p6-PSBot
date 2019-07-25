@@ -33,7 +33,7 @@ method modjoin(--> Str) {
 }
 
 method set-rank(Str $userid, Str $rank) {
-    %!users{$userid} = UserInfo.new($rank);
+    %!users{$userid} = UserInfo.new: $rank;
 }
 
 method set-visibility(Str $visibility) {
@@ -75,8 +75,10 @@ method on-rename(Str $oldid, Str $userinfo) {
     my Str $rank   = $userinfo.substr: 0, 1;
     my Str $userid = to-id $userinfo.substr: 1;
 
-    my UserInfo $olduserinfo = %!users{$oldid}:delete;
-    %!users{$userid} = $olduserinfo.rank eq $rank ?? $olduserinfo !! UserInfo.new($rank);
+    my UserInfo $old-userinfo = %!users{$oldid}:delete;
+    %!users{$userid} = $old-userinfo.?rank === $rank
+        ?? $old-userinfo
+        !! UserInfo.new: $rank;
 }
 
 method add-game(PSBot::Game $game) {
