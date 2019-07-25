@@ -203,7 +203,18 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
     $!state.database.add-seen: $userid, now
         unless $userid.starts-with: 'guest';
 
-    my Str $message = @message.join: '|';
+    await $!state.propagated;
+
+    my Str         $message = @message.join: '|';
+    my PSBot::User $user    = $!state.get-user: $userid;
+    my PSBot::Room $room    = $!state.get-room: $roomid;
+    for $!state.rules.chat -> $rule {
+        my Result \output = $rule.match: $message, $room, $user, $!state, $!connection;
+        output = await output while output ~~ Awaitable:D;
+        $!connection.send-raw: output, :$roomid if output;
+        return if output;
+    }
+
     if $message.starts-with: COMMAND {
         return unless $message ~~ $command-matcher;
         return unless $<command>.defined;
@@ -222,26 +233,32 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
             :$roomid unless $replier.defined;
         return $replier($!connection);
     }
-
-    await $!state.propagated;
-
-    my PSBot::User $user = $!state.get-user: $userid;
-    my PSBot::Room $room = $!state.get-room: $roomid;
-    for $!state.rules.chat -> $rule {
-        my Result \output = $rule.match: $message, $room, $user, $!state, $!connection;
-        output = await output while output ~~ Awaitable:D;
-        $!connection.send-raw: output, :$roomid if output;
-        last if output;
-    }
 }
 
 method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
     my Str $username = $from.substr: 1;
     return if $username === $!state.username;
 
-    my Str $group    = $from.substr: 0, 1;
-    my Str $userid   = to-id $username;
-    my Str $message  = @message.join: '|';
+    await $!state.propagated;
+
+    my Str         $group   = $from.substr: 0, 1;
+    my Str         $userid  = to-id $username;
+    my Str         $message = @message.join: '|';
+    my PSBot::User $user    = $!state.get-user: $userid;
+    my PSBot::Room $room;
+    if $user {
+        $user.set-group: $group unless $user.group === $group;
+    } else {
+        $user .= new: $from;
+    }
+
+    for $!state.rules.pm -> $rule {
+        my Result \output = $rule.match: $message, $room, $user, $!state, $!connection;
+        output = await output while output ~~ Awaitable:D;
+        $!connection.send-raw: output, :$userid if output;
+        return if output;
+    }
+
     if $message.starts-with: COMMAND {
         return unless $message ~~ $command-matcher;
         return unless $<command>.defined;
@@ -260,23 +277,6 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
             :$userid unless $replier.defined;
         return $replier($!connection);
     }
-
-    await $!state.propagated;
-
-    my PSBot::User $user = $!state.get-user: $userid;
-    my PSBot::Room $room;
-    if $user {
-        $user.set-group: $group unless $user.group === $group;
-    } else {
-        $user .= new: $from;
-    }
-
-    for $!state.rules.pm -> $rule {
-        my Result \output = $rule.match: $message, $room, $user, $!state, $!connection;
-        output = await output while output ~~ Awaitable:D;
-        $!connection.send-raw: output, :$userid if output;
-        last if output;
-    }
 }
 
 method parse-html(Str $roomid, *@html) {
@@ -289,7 +289,7 @@ method parse-html(Str $roomid, *@html) {
         my Result \output = $rule.match: $html, $room, $user, $!state, $!connection;
         output = await output while output ~~ Awaitable:D;
         $!connection.send-raw: output, :$roomid if output;
-        last if output;
+        return if output;
     }
 }
 
@@ -303,7 +303,7 @@ method parse-popup(Str $roomid, *@popup) {
         my Result \output = $rule.match: $popup, $room, $user, $!state, $!connection;
         output = await output while output ~~ Awaitable:D;
         $!connection.send-raw: output, :$roomid if output;
-        last if output;
+        return if output;
     }
 }
 
@@ -317,6 +317,6 @@ method parse-raw(Str $roomid, *@html) {
         my Result \output = $rule.match: $html, $room, $user, $!state, $!connection;
         output = await output while output ~~ Awaitable:D;
         $!connection.send-raw: output, :$roomid if output;
-        last if output;
+        return if output;
     }
 }

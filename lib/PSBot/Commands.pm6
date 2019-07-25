@@ -44,7 +44,6 @@ BEGIN {
 
             my Str $res = await $p;
             if $room {
-                await $state.propagated;
                 my Bool $raw = self.can('+', $state.get-user($state.userid).rooms{$room.id}.rank)
                         && ($res.contains("\n") || 150 < $res.codes < 8194);
                 $res = $raw ?? "!code $res" !! "``$res``";
@@ -115,7 +114,6 @@ BEGIN {
 
             my Str $res = await $p;
             if $room {
-                await $state.propagated;
                 my Bool $raw = self.can('+', $state.get-user($state.userid).rooms{$room.id}.rank)
                         && ($res.contains("\n") || 150 < $res.codes < 8192);
                 $res = $raw ?? "!code $res" !! "``$res``";
