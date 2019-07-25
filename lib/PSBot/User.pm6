@@ -7,10 +7,6 @@ class RoomInfo {
 
     has Str     $.broadcast-command is rw;
     has Instant $.broadcast-timeout is rw;
-
-    method new(Str $rank) {
-        self.bless: :$rank;
-    }
 }
 
 has Str      $.id;
@@ -33,12 +29,12 @@ multi method new(Str $userinfo, Str $roomid) {
     my Str      $rank  = $userinfo.substr: 0, 1;
     my Str      $name  = $userinfo.substr: 1;
     my Str      $id    = to-id $name;
-    my RoomInfo %rooms = %($roomid => RoomInfo.new($rank));
-    self.bless: :$id, :$name, :%rooms;
+    my RoomInfo %rooms = %($roomid => RoomInfo.new: :$rank);
+    self.bless: :$id, :$name, :%rooms
 }
 
 method set-rank(Str $roomid, Str $rank) {
-    %!rooms{$roomid} = RoomInfo.new($rank);
+    %!rooms{$roomid} = RoomInfo.new: :$rank;
 }
 
 method is-guest(--> Bool) {
@@ -65,8 +61,8 @@ method on-user-details(%data) {
 }
 
 method on-join(Str $userinfo, Str $roomid) {
-    my Str $group = $userinfo.substr: 0, 1;
-    %!rooms{$roomid} = RoomInfo.new: $group;
+    my Str $rank = $userinfo.substr: 0, 1;
+    %!rooms{$roomid} = RoomInfo.new: :$rank;
 }
 
 method on-leave(Str $roomid) {
@@ -74,9 +70,9 @@ method on-leave(Str $roomid) {
 }
 
 method rename(Str $userinfo, Str $roomid) {
-    my Str $group = $userinfo.substr: 0, 1;
-    my Int $idx   = $userinfo.rindex('@!') // $userinfo.codes;
-    %!rooms{$roomid} = RoomInfo.new: $group;
+    my Str $rank = $userinfo.substr: 0, 1;
+    my Int $idx  = $userinfo.rindex('@!') // $userinfo.codes;
+    %!rooms{$roomid} = RoomInfo.new: :$rank;
     $!name           = $userinfo.substr: 1, $idx;
     $!id             = to-id $!name;
 }

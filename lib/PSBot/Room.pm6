@@ -7,10 +7,6 @@ subset Modjoin where Str | True;
 
 class UserInfo {
     has Str $.rank;
-
-    method new(Str $rank) {
-        self.bless: :$rank;
-    }
 }
 
 has Str         $.id;
@@ -33,7 +29,7 @@ method modjoin(--> Str) {
 }
 
 method set-rank(Str $userid, Str $rank) {
-    %!users{$userid} = UserInfo.new: $rank;
+    %!users{$userid} = UserInfo.new: :$rank;
 }
 
 method set-visibility(Str $visibility) {
@@ -55,7 +51,7 @@ method on-room-info(%data) {
     %!users      = %data<users>.flat.map(-> $userinfo {
         my Str $rank   = $userinfo.substr: 0, 1;
         my Str $userid = to-id $userinfo.substr: 1;
-        $userid => UserInfo.new($rank)
+        $userid => UserInfo.new: :$rank
     });
     $!propagated.keep unless $!propagated.status ~~ Kept;
 }
@@ -63,7 +59,7 @@ method on-room-info(%data) {
 method join(Str $userinfo) {
     my Str $rank   = $userinfo.substr: 0, 1;
     my Str $userid = to-id $userinfo.substr: 1;
-    %!users{$userid} = UserInfo.new($rank);
+    %!users{$userid} = UserInfo.new: :$rank;
 }
 
 method leave(Str $userinfo) {
@@ -72,13 +68,12 @@ method leave(Str $userinfo) {
 }
 
 method on-rename(Str $oldid, Str $userinfo) {
-    my Str $rank   = $userinfo.substr: 0, 1;
-    my Str $userid = to-id $userinfo.substr: 1;
-
+    my Str      $rank         = $userinfo.substr: 0, 1;
+    my Str      $userid       = to-id $userinfo.substr: 1;
     my UserInfo $old-userinfo = %!users{$oldid}:delete;
-    %!users{$userid} = $old-userinfo.?rank === $rank
+    %!users{$userid} = ($old-userinfo.defined && $old-userinfo.rank eq $rank)
         ?? $old-userinfo
-        !! UserInfo.new: $rank;
+        !! UserInfo.new: :$rank;
 }
 
 method add-game(PSBot::Game $game) {
