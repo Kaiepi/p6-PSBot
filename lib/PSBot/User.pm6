@@ -50,8 +50,13 @@ method on-user-details(%data) {
         my Str $status = %data<status>;
         my Int $lidx   = $status.index: '(';
         my Int $ridx   = $status.index: ')';
-        $!status  = $lidx.defined ?? Status($status.substr: $lidx + 1, $ridx - $lidx - 1) !! Online;
-        $!message = $ridx.defined ?? $status.substr($ridx + 1) !! $status;
+        if $lidx.defined && $ridx.defined {
+            $!status  = Status($status.substr: $lidx + 1, $ridx - $lidx - 1);
+            $!message = $status.substr: $ridx + 1;
+        } else {
+            $!status  = Online;
+            $!message = $status;
+        }
     } else {
         $!status  = Online;
         $!message = '';
