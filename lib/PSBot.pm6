@@ -53,6 +53,7 @@ method start() {
             $!connection.send-raw: '/unblockpms' if $!state.pms-blocked;
             $!connection.send-raw: '/ht ignore', :roomid<staff>
                 if $!state.has-room('staff') && !$!state.help-tickets-ignored;
+            $!connection.send-raw: "/status {STATUS}" if STATUS;
             $!state.propagated.keep;
 
             # Send user mail if the recipient is online. If not, wait until
@@ -145,6 +146,10 @@ The password the bot should use. Set to null if no password is needed.
 =item Str I<avatar>
 
 The avatar the bot should use. Set to null if a random avatar should be used.
+
+=item Str I<status>
+
+The status the bot should use. Set to null if no status should be used.
 
 =item Str I<host>
 

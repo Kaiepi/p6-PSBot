@@ -36,6 +36,10 @@ The password the bot should use. Set to null if no password is needed.
 
 The avatar the bot should use. Set to null if a random avatar should be used.
 
+  * Str *status*
+
+The status the bot should use. Set to null if no status should be used.
+
   * Str *host*
 
 The URL of the server you wish to connect to.

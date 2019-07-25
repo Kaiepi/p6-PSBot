@@ -2,6 +2,7 @@
     "username":               null,
     "password":               null,
     "avatar":                 null,
+    "status":                 "PM me $help",
     "host":                   "sim2.psim.us",
     "port":                   443,
     "ssl":                    true,
