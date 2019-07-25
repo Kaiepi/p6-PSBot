@@ -172,6 +172,7 @@ BEGIN {
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
             $state.login-server.log-out: $state.username;
             $connection.send-raw: '/logout';
+            await $state.pending-rename;
             try await $connection.close: :force;
             $state.database.DESTROY;
             exit 0;
