@@ -604,13 +604,6 @@ BEGIN {
             self.reply: $res, $user, $room
         };
 
-    my PSBot::Command $shrug .= new:
-        :autoconfirmed,
-        anon method shrug(Str $target, PSBot::User $user, PSBot::Room $room,
-                PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
-            self.reply: '¯\_(ツ)_/¯', $user, $room
-        };
-
     my PSBot::Command $thinking .= new:
         :autoconfirmed,
         anon method thinking(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -941,10 +934,6 @@ BEGIN {
 
                     - seen <username>
                       Returns the last time the given user was seen.
-                      Requires autoconfirmed status.
-
-                    - shrug.
-                      Returns "¯\_(ツ)_/¯".
                       Requires autoconfirmed status.
 
                     - thinking
