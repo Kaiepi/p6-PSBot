@@ -178,6 +178,35 @@ BEGIN {
             exit 0;
         };
 
+    my PSBot::Command $uptime .= new:
+        :administrative,
+        anon method uptime(Str $target, PSBot::User $user, PSBot::Room $room,
+                PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
+            my Int $diff = (now - $*INIT-INSTANT).Int;
+            my Str @res  = (
+                (),
+                'second' => 60,
+                'minute' => 60,
+                'hour'   => 24,
+                'day'    => 7,
+                'week'   => 1
+            ).reduce(-> @times, $time {
+                if $diff {
+                    my @ret = (($diff % $time.value) ~ ' ' ~ $time.key ~ ($diff % $time.value == 1 ?? '' !! 's'), |@times);
+                    $diff div= $time.value;
+                    @ret
+                } else {
+                    @times
+                }
+            });
+            my Str $res   = $state.username ~ "'s uptime is " ~ do given +@res {
+                when 1  { @res.head                                      }
+                when 2  { @res.join: ' and '                             }
+                default { @res[0..*-2].join(', ') ~ ', and ' ~ @res[*-1] }
+            } ~ '.';
+            self.reply: $res, $user, $room;
+        };
+
     my PSBot::Command $git .= new:
         :default-rank<+>,
         anon method git(Str $target, PSBot::User $user, PSBot::Room $room,
@@ -862,6 +891,10 @@ BEGIN {
                 In PMs, you can use any command as long as you're not locked or semilocked, unless stated otherwise.
 
                 Regular commands:
+                    - git
+                      Returns the GitHub repo for the bot.
+                      Requires at least rank + by default.
+
                     - 8ball <question>
                       Returns an 8ball message in response to the given question.
                       Requires at least rank + by default.
@@ -983,9 +1016,9 @@ BEGIN {
                       Kills the bot.
                       Requires admin access to the bot.
 
-                    - git
-                      Returns the GitHub repo for the bot.
-                      Requires at least rank + by default.
+                    - uptime
+                      Returns the bot's uptime.
+                      Requires admin access to the bot.
                 END
 
             my Failable[Str] $url = paste $help;
