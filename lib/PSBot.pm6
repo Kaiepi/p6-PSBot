@@ -59,21 +59,20 @@ method start() {
             # Send user mail if the recipient is online. If not, wait until
             # they join a room the bot's in.
             with $!state.database.get-mail -> @mail {
-                my Array %mail = ({}, |@mail).reduce({
-                    my Str $userid = $^b<target>;
-                    $^a{$userid}:exists
-                        ?? $^a{$userid}.push($^b)
-                        !! $^a{$userid} = [$^b];
-                    $^a
-                }) if +@mail;
-
+                my List %mail = (%(), |@mail).reduce(-> %data, %row {
+                    my Str $userid  = %row<target>;
+                    my Str $message = "[%row<source>] %row<message>";
+                    %data{$userid} = %data{$userid}:exists
+                        ?? (|%data{$userid}, $message)
+                        !! ($message,);
+                    %data
+                });
                 for %mail.kv -> $userid, @messages {
                     if $!state.has-user: $userid {
                         $!state.database.remove-mail: $userid;
                         $!connection.send:
-                            "You received {+@messages} message{+@mail == 1 ?? '' !! 's'}:",
-                            @messages.map(-> %row { "[%row<source>] %row<message>" }),
-                            :$userid;
+                            "You received {+@messages} message{+@messages == 1 ?? '' !! 's'}:",
+                            @messages, :$userid;
                     }
                 }
             }
