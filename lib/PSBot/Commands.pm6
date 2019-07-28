@@ -182,7 +182,7 @@ BEGIN {
         :administrative,
         anon method uptime(Str $target, PSBot::User $user, PSBot::Room $room,
                 PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-            my Int $diff = (now - $*INIT-INSTANT).Int;
+            my Int $remainder = (now - $*INIT-INSTANT).Int;
             my Str @res  = (
                 (),
                 'second' => 60,
@@ -191,9 +191,10 @@ BEGIN {
                 'day'    => 7,
                 'week'   => 1
             ).reduce(-> @times, $time {
+                my Int $diff = $remainder % $time.value;
                 if $diff {
-                    my @ret = (($diff % $time.value) ~ ' ' ~ $time.key ~ ($diff % $time.value == 1 ?? '' !! 's'), |@times);
-                    $diff div= $time.value;
+                    my @ret = ($diff ~ ' ' ~ $time.key ~ ($diff == 1 ?? '' !! 's'), |@times);
+                    $remainder div= $time.value;
                     @ret
                 } else {
                     @times
