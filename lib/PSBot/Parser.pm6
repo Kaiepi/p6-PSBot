@@ -92,18 +92,22 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
     given $type {
         when 'userdetails' {
             my %data = from-json $data;
-            unless %data<autoconfirmed>:exists {
+            if !%data<rooms> {
+                # Sometimes we pick up users that are offline. Do nothing when
+                # this happens.
+            } elsif !(%data<autoconfirmed>:exists) {
                 note "This server must support user autoconfirmed metadata in /cmd userdetails in order for {USERNAME} to run properly! Contact a server administrator and ask them to update the server.";
                 try await $!connection.close: :force;
                 $!state.database.DESTROY;
                 exit 1;
-            }
-            $!state.on-user-details: %data;
+            } else {
+                $!state.on-user-details: %data;
 
-            if $!state.userid === %data<userid> {
-                my Map $ranks    = Rank.enums;
-                my Rat $throttle = $ranks{%data<group>} >= $ranks<+> ?? 0.3 !! 0.6;
-                $!connection.set-throttle: $throttle;
+                if $!state.userid === %data<userid> {
+                    my Map $ranks    = Rank.enums;
+                    my Rat $throttle = $ranks{%data<group>} >= $ranks<+> ?? 0.3 !! 0.6;
+                    $!connection.set-throttle: $throttle;
+                }
             }
         }
         when 'roominfo' {
