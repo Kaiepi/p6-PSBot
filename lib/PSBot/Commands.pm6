@@ -197,6 +197,7 @@ BEGIN {
                     $remainder div= $time.value;
                     @ret
                 } else {
+                    $remainder div= $time.value;
                     @times
                 }
             });
