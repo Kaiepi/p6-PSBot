@@ -8,6 +8,7 @@ unit class PSBot::LoginServer;
 
 has Cro::HTTP::Client $.client            .= new: :cookie-jar;
 has Str               $.serverid;
+has Lock::Async       $!account-mux       .= new;
 has Str               $.account            = '';
 has Cancellation      $!login-expiration;
 
@@ -19,6 +20,17 @@ submethod BUILD(Str :$!serverid) {
             .name ne any self.^attributes.map({ .name.substr: 2 })
         });
     }
+}
+
+method account(--> Str) is rw {
+    Proxy.new(
+        FETCH => -> $ {
+            $!account-mux.protect({ $!account })
+        },
+        STORE => -> $, Str $account {
+            $!account-mux.protect({ $!account = $account })
+        }
+    )
 }
 
 method get-assertion(Str $username!, Str $challstr! --> Str) {
@@ -53,9 +65,9 @@ method log-in(Str $username!, Str $password!, Str $challstr! --> Str) {
     # %data<curuser><logintime>, which could be up to a day off instead of
     # a few hundred milliseconds.
     my Instant $at = now + (14 * 24 * 60 + 30) * 60;
-    $!account = $username;
+    $.account = $username;
     $!login-expiration.cancel if $!login-expiration;
-    $!login-expiration = $*SCHEDULER.cue({ $!account = '' }, :$at);
+    $!login-expiration = $*SCHEDULER.cue({ $.account = '' }, :$at);
 
     %data<assertion>
 }
@@ -70,7 +82,7 @@ method log-out(Str $username --> Bool) {
     my Str                 $data     = await $response.body-text;
     return False unless $data;
 
-    $!account = '';
+    $.account = '';
     $!login-expiration.cancel;
 
     my %data = from-json $data.substr: 1;
