@@ -228,7 +228,7 @@ method delete-user(Str $userinfo, Str $roomid) {
         if %!users ∋ $userid {
             %!rooms{$roomid}.leave: $userinfo;
             %!users{$userid}.on-leave: $roomid;
-            %!users{$userid}:delete if none(%!rooms.keys) ∋ $userid;
+            %!users{$userid}:delete if none(%!rooms.values).users ∋ $userid;
         }
     })
 }
@@ -264,7 +264,6 @@ method reset() {
     $!challenges-blocked  = False;
     $!inited              = False;
     $!propagated         .= new;
-
     $!chat-mux.protect({
         %!users .= new;
         %!rooms .= new;
