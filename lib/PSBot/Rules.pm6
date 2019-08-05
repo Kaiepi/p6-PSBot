@@ -78,36 +78,37 @@ method new() {
                 $
             },
             -> $/, $room, $user, $state, $connection {
-                my Str                   $roomid  = $room.id;
-                my PSBot::User::RoomInfo $ri      = $user.rooms{$roomid};
-                my Instant               $timeout = $ri.broadcast-timeout;
-                my Str                   $command = $ri.broadcast-command;
-                if $timeout.defined {
-                    $ri.broadcast-command = Nil;
-                    $ri.broadcast-timeout = Nil;
-
-                    my Str $input = $<command> ?? to-id(~$<command>) !! Nil;
-                    if $input === $command {
-                        if now > $timeout - 5 * 60 {
-                            my Str $url  = $<url>.defined  ?? ~$<url>  !! Nil;
-                            my Str $args = $<args>.defined ?? ~$<args> !! Nil;
-                            if $url.defined {
-                                my Failable[Str] $paste = fetch $url;
-                                $paste.defined
-                                    ?? "!$input $paste"
-                                    !! "Failed to fetch Pastebin link: {$paste.exception.message}"
-                            } elsif $args.defined {
-                                "!$input $args"
+                my Str                   $roomid = $room.id;
+                my PSBot::User::RoomInfo $ri     = $user.rooms{$roomid};
+                if $ri.defined {
+                    my Instant $timeout = $ri.broadcast-timeout;
+                    my Str     $command = $ri.broadcast-command;
+                    if $timeout.defined && $command.defined {
+                        my Str $input = $<command> ?? to-id(~$<command>) !! Nil;
+                        if $input === $command {
+                            $ri.broadcast-command = Nil;
+                            $ri.broadcast-timeout = Nil;
+                            if now > $timeout - 5 * 60 {
+                                my Str $url  = $<url>.defined  ?? ~$<url>  !! Nil;
+                                my Str $args = $<args>.defined ?? ~$<args> !! Nil;
+                                if $url.defined {
+                                    my Failable[Str] $paste = fetch $url;
+                                    $paste.defined
+                                        ?? "!$input $paste"
+                                        !! "Failed to fetch Pastebin link: {$paste.exception.message}"
+                                } elsif $args.defined {
+                                    "!$input $args"
+                                } else {
+                                    "The permitted command's arguments were malformed. Please try again.";
+                                }
                             } else {
-                                "The permitted command's arguments were malformed. Please try again.";
+                                # The permit timed out so now the user has a permit to
+                                # shut the hell up instead.
+                                "Your permission to use !$input expired."
                             }
                         } else {
-                            # The permit timed out so now the user has a permit to
-                            # shut the hell up instead.
-                            "Your permission to use !$input expired."
+                            "This is not the command you have permission to use.";
                         }
-                    } else {
-                        "This is not the command you have permission to use.";
                     }
                 }
             }
