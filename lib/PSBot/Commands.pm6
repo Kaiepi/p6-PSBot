@@ -457,110 +457,105 @@ BEGIN {
             self.reply: $output, $user, $room
         };
 
-    my PSBot::Command $reminder = do {
-        my PSBot::Command @subcommands = (
-            PSBot::Command.new(
-                anon method set(Str $target, PSBot::User $user, PSBot::Room $room,
-                        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
-                    return self.reply:
-                        'A time (e.g. 30s, 10m, 2h) and a message must be given.',
-                        $user, $room unless $target || $target.contains: ',';
+    my PSBot::Command $reminder .= new:
+        :name<reminder>,
+        :autoconfirmed,
+        PSBot::Command.new(
+            anon method set(Str $target, PSBot::User $user, PSBot::Room $room,
+                    PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
+                return self.reply:
+                    'A time (e.g. 30s, 10m, 2h) and a message must be given.',
+                    $user, $room unless $target || $target.contains: ',';
 
-                    my (Str $duration, Str $reminder) = $target.split(',').map(*.trim);
-                    my Int $seconds;
-                    given $duration {
-                        when / ^ ( <[0..9]>+ ) [s | <.ws> seconds?] $ / { $seconds += $0.Int                               }
-                        when / ^ ( <[0..9]>+ ) [m | <.ws> minutes?] $ / { $seconds += $0.Int * 60                          }
-                        when / ^ ( <[0..9]>+ ) [h | <.ws> hours?  ] $ / { $seconds += $0.Int * 60 * 60                     }
-                        when / ^ ( <[0..9]>+ ) [d | <.ws> days?   ] $ / { $seconds += $0.Int * 60 * 60 * 24                }
-                        when / ^ ( <[0..9]>+ ) [w | <.ws> weeks?  ] $ / { $seconds += $0.Int * 60 * 60 * 24 * 7            }
-                        default                                         { return self.reply: 'Invalid time.', $user, $room }
-                    }
-
-                    my Str     $userid   = $user.id;
-                    my Str     $username = $user.name;
-                    my Instant $begin    = now;
-                    my Instant $end      = $begin + $seconds;
-                    if $room {
-                        my Str $roomid = $room.id;
-                        my Int $id     = $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, $userid, $roomid;
-                        $state.reminders{$id} := $*SCHEDULER.cue({
-                            $state.reminders{$id}:delete;
-                            $state.database.remove-reminder: $reminder, $end, $userid, $roomid;
-                            $connection.send: "$username, you set a reminder $duration ago: $reminder", :$roomid;
-                        }, in => $seconds);
-                    } else {
-                        my Int $id = $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, $userid;
-                        $state.reminders{$id} = $*SCHEDULER.cue({
-                            $state.reminders{$id}:delete;
-                            $state.database.remove-reminder: $reminder, $end, $userid;
-                            $connection.send: "$username, you set a reminder $duration ago: $reminder", :$userid;
-                        }, in => $seconds);
-                    }
-
-                    self.reply: "You set a reminder for $duration from now.", $user, $room
+                my (Str $duration, Str $reminder) = $target.split(',').map(*.trim);
+                my Int $seconds;
+                given $duration {
+                    when / ^ ( <[0..9]>+ ) [s | <.ws> seconds?] $ / { $seconds += $0.Int                               }
+                    when / ^ ( <[0..9]>+ ) [m | <.ws> minutes?] $ / { $seconds += $0.Int * 60                          }
+                    when / ^ ( <[0..9]>+ ) [h | <.ws> hours?  ] $ / { $seconds += $0.Int * 60 * 60                     }
+                    when / ^ ( <[0..9]>+ ) [d | <.ws> days?   ] $ / { $seconds += $0.Int * 60 * 60 * 24                }
+                    when / ^ ( <[0..9]>+ ) [w | <.ws> weeks?  ] $ / { $seconds += $0.Int * 60 * 60 * 24 * 7            }
+                    default                                         { return self.reply: 'Invalid time.', $user, $room }
                 }
-            ),
-            PSBot::Command.new(
-                anon method unset(Str $target, PSBot::User $user, PSBot::Room $room,
-                        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
-                    my Int $id = try +$target;
-                    return self.reply: 'A valid reminder ID must be given.', $user, $room unless $id.defined;
 
-                    my @reminders = $state.database.get-reminders: $user.id;
-                    return self.reply: "You have no reminder with ID $id set.",
-                        $user, $room unless @reminders.first({ $_<id> == $id });
-
-                    $state.reminders{$id}.cancel;
-                    $state.reminders{$id}:delete;
-                    $state.database.remove-reminder: $id;
-                    self.reply: "Unset reminder $id.", $user, $room
+                my Str     $userid   = $user.id;
+                my Str     $username = $user.name;
+                my Instant $begin    = now;
+                my Instant $end      = $begin + $seconds;
+                if $room {
+                    my Str $roomid = $room.id;
+                    my Int $id     = $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, $userid, $roomid;
+                    $state.reminders{$id} := $*SCHEDULER.cue({
+                        $state.reminders{$id}:delete;
+                        $state.database.remove-reminder: $reminder, $end, $userid, $roomid;
+                        $connection.send: "$username, you set a reminder $duration ago: $reminder", :$roomid;
+                    }, in => $seconds);
+                } else {
+                    my Int $id = $state.database.add-reminder: $username, $reminder, $duration, $begin, $end, $userid;
+                    $state.reminders{$id} = $*SCHEDULER.cue({
+                        $state.reminders{$id}:delete;
+                        $state.database.remove-reminder: $reminder, $end, $userid;
+                        $connection.send: "$username, you set a reminder $duration ago: $reminder", :$userid;
+                    }, in => $seconds);
                 }
-            ),
-            PSBot::Command.new(
-                anon method list(Str $target, PSBot::User $user, PSBot::Room $room,
-                        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
-                    my @reminders = $state.database.get-reminders: $user.id;
-                    return self.reply: 'You have no reminders set.', $user, $room unless +@reminders;
 
-                    if $room.defined && self.can: '*', $state.get-user($state.userid).rooms{$room.id}.rank {
-                        my Str $list = '<details><summary>Reminder List</summary><ol>' ~ do for @reminders -> %reminder {
-                            my DateTime $begin .= new: %reminder<begin>;
-                            my DateTime $end   .= new: %reminder<end>;
-                            if %reminder<roomid>.defined {
-                                "<li><strong>{%reminder<reminder>}</strong></li>"
-                              ~ "ID: {%reminder<id>}<br />"
-                              ~ "Set in %reminder<roomid> at {$begin.hh-mm-ss} UTC on {$begin.yyyy-mm-dd} with a duration of {%reminder<duration>}.<br />"
-                              ~ "Expected to alert at {$end.hh-mm-ss} UTC on {$end.yyyy-mm-dd}."
-                            } else {
-                                '<li><strong>(private reminder)</strong></li>'
-                            }
-                        }.join ~ '</ol></details>';
+                self.reply: "You set a reminder for $duration from now.", $user, $room
+            }
+        ),
+        PSBot::Command.new(
+            anon method unset(Str $target, PSBot::User $user, PSBot::Room $room,
+                    PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
+                my Int $id = try +$target;
+                return self.reply: 'A valid reminder ID must be given.', $user, $room unless $id.defined;
 
-                        self.reply: "!addhtmlbox $list", $user, $room, :raw;
-                    } else {
-                        my Str $list = do for @reminders.kv -> $i, %reminder {
-                            my Str      $location  = %reminder<roomid>:exists ?? "room %reminder<roomid>" !! 'private';
-                            my DateTime $begin    .= new: %reminder<begin>;
-                            my DateTime $end      .= new: %reminder<end>;
-                            qq:to/END/;
-                            {$i + 1}. "%reminder<reminder>"
-                              ID: %reminder<id>
-                              Set in $location at {$begin.hh-mm-ss} UTC on {$begin.yyyy-mm-dd} with a duration of %reminder<duration>.
-                              Expected to alert at {$end.hh-mm-ss} UTC on {$end.yyyy-mm-dd}.
-                            END
-                        }.join("\n\n");
+                my @reminders = $state.database.get-reminders: $user.id;
+                return self.reply: "You have no reminder with ID $id set.",
+                    $user, $room unless @reminders.first({ $_<id> == $id });
 
-                        self.reply: $list, $user, $room, :paste
-                    }
+                $state.reminders{$id}.cancel;
+                $state.reminders{$id}:delete;
+                $state.database.remove-reminder: $id;
+                self.reply: "Unset reminder $id.", $user, $room
+            }
+        ),
+        PSBot::Command.new(
+            anon method list(Str $target, PSBot::User $user, PSBot::Room $room,
+                    PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
+                my @reminders = $state.database.get-reminders: $user.id;
+                return self.reply: 'You have no reminders set.', $user, $room unless +@reminders;
+
+                if $room.defined && self.can: '*', $state.get-user($state.userid).rooms{$room.id}.rank {
+                    my Str $list = '<details><summary>Reminder List</summary><ol>' ~ do for @reminders -> %reminder {
+                        my DateTime $begin .= new: %reminder<begin>;
+                        my DateTime $end   .= new: %reminder<end>;
+                        if %reminder<roomid>.defined {
+                            "<li><strong>{%reminder<reminder>}</strong></li>"
+                          ~ "ID: {%reminder<id>}<br />"
+                          ~ "Set in %reminder<roomid> at {$begin.hh-mm-ss} UTC on {$begin.yyyy-mm-dd} with a duration of {%reminder<duration>}.<br />"
+                          ~ "Expected to alert at {$end.hh-mm-ss} UTC on {$end.yyyy-mm-dd}."
+                        } else {
+                            '<li><strong>(private reminder)</strong></li>'
+                        }
+                    }.join ~ '</ol></details>';
+
+                    self.reply: "!addhtmlbox $list", $user, $room, :raw;
+                } else {
+                    my Str $list = do for @reminders.kv -> $i, %reminder {
+                        my Str      $location  = %reminder<roomid>:exists ?? "room %reminder<roomid>" !! 'private';
+                        my DateTime $begin    .= new: %reminder<begin>;
+                        my DateTime $end      .= new: %reminder<end>;
+                        qq:to/END/;
+                        {$i + 1}. "%reminder<reminder>"
+                          ID: %reminder<id>
+                          Set in $location at {$begin.hh-mm-ss} UTC on {$begin.yyyy-mm-dd} with a duration of %reminder<duration>.
+                          Expected to alert at {$end.hh-mm-ss} UTC on {$end.yyyy-mm-dd}.
+                        END
+                    }.join("\n\n");
+
+                    self.reply: $list, $user, $room, :paste
                 }
-            )
+            }
         );
-
-        my PSBot::Command $command .= new: :autoconfirmed, :name<reminder>, @subcommands;
-        .set-root: $command for @subcommands;
-        $command
-    };
 
     my PSBot::Command $mail .= new:
         :autoconfirmed,
@@ -786,96 +781,90 @@ BEGIN {
             self.reply: $res, $user, $room;
         };
 
-    my PSBot::Command $hangman = do {
-        my PSBot::Command @subcommands = (
-            PSBot::Command.new(
-                :default-rank<+>,
-                anon method new(Str $target, PSBot::User $user, PSBot::Room $room,
-                        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-                    return self.reply:
-                        "There is already a game of {$room.game.name} in progress.",
-                        $user, $room if $room.game;
+    my PSBot::Command $hangman .= new:
+        :name<hangman>,
+        PSBot::Command.new(
+            :default-rank<+>,
+            anon method new(Str $target, PSBot::User $user, PSBot::Room $room,
+                    PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
+                return self.reply:
+                    "There is already a game of {$room.game.name} in progress.",
+                    $user, $room if $room.game;
 
-                    $room.add-game: PSBot::Games::Hangman.new: $user, :allow-late-joins;
-                    self.reply: "A game of {$room.game.name} has been created.", $user, $room
-                }
-            ),
-            PSBot::Command.new(
-                anon method join(Str $target, PSBot::User $user, PSBot::Room $room,
-                        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-                    return self.reply:
-                        'There is no game of Hangman in progress.',
-                        $user, $room unless $room.game ~~ PSBot::Games::Hangman;
+                $room.add-game: PSBot::Games::Hangman.new: $user, :allow-late-joins;
+                self.reply: "A game of {$room.game.name} has been created.", $user, $room
+            }
+        ),
+        PSBot::Command.new(
+            anon method join(Str $target, PSBot::User $user, PSBot::Room $room,
+                    PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
+                return self.reply:
+                    'There is no game of Hangman in progress.',
+                    $user, $room unless $room.game ~~ PSBot::Games::Hangman;
 
-                    self.reply: $room.game.join($user), $user, $room
-                }
-            ),
-            PSBot::Command.new(
-                anon method leave(Str $target, PSBot::User $user, PSBot::Room $room,
-                        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-                    return self.reply:
-                        'There is no game of Hangman in progress.',
-                        $user, $room unless $room.game ~~ PSBot::Games::Hangman;
+                self.reply: $room.game.join($user), $user, $room
+            }
+        ),
+        PSBot::Command.new(
+            anon method leave(Str $target, PSBot::User $user, PSBot::Room $room,
+                    PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
+                return self.reply:
+                    'There is no game of Hangman in progress.',
+                    $user, $room unless $room.game ~~ PSBot::Games::Hangman;
 
-                    self.reply: $room.game.leave($user), $user, $room
-                }
-            ),
-            PSBot::Command.new(
-                :default-rank<+>,
-                anon method players(Str $target, PSBot::User $user, PSBot::Room $room,
-                        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-                    return self.reply:
-                        'There is no game of Hangman in progress.',
-                        $user, $room unless $room.game ~~ PSBot::Games::Hangman;
+                self.reply: $room.game.leave($user), $user, $room
+            }
+        ),
+        PSBot::Command.new(
+            :default-rank<+>,
+            anon method players(Str $target, PSBot::User $user, PSBot::Room $room,
+                    PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
+                return self.reply:
+                    'There is no game of Hangman in progress.',
+                    $user, $room unless $room.game ~~ PSBot::Games::Hangman;
 
-                    self.reply: $room.game.players, $user, $room
-                }
-            ),
-            PSBot::Command.new(
-                :default-rank<+>,
-                anon method start(Str $target, PSBot::User $user, PSBot::Room $room,
-                        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-                    return self.reply:
-                        'There is no game of Hangman in progress.',
-                        $user, $room unless $room.game ~~ PSBot::Games::Hangman;
+                self.reply: $room.game.players, $user, $room
+            }
+        ),
+        PSBot::Command.new(
+            :default-rank<+>,
+            anon method start(Str $target, PSBot::User $user, PSBot::Room $room,
+                    PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
+                return self.reply:
+                    'There is no game of Hangman in progress.',
+                    $user, $room unless $room.game ~~ PSBot::Games::Hangman;
 
-                    self.reply: $room.game.start, $user, $room
-                }
-            ),
-            PSBot::Command.new(
-                anon method guess(Str $target, PSBot::User $user, PSBot::Room $room,
-                        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-                    return self.reply:
-                        'There is no game of Hangman in progress.',
-                        $user, $room unless $room.game ~~ PSBot::Games::Hangman;
+                self.reply: $room.game.start, $user, $room
+            }
+        ),
+        PSBot::Command.new(
+            anon method guess(Str $target, PSBot::User $user, PSBot::Room $room,
+                    PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
+                return self.reply:
+                    'There is no game of Hangman in progress.',
+                    $user, $room unless $room.game ~~ PSBot::Games::Hangman;
 
-                    my Str $guess = to-id $target;
-                    return self.reply: 'No valid guess was given.', $user, $room unless $guess;
+                my Str $guess = to-id $target;
+                return self.reply: 'No valid guess was given.', $user, $room unless $guess;
 
-                    my @res = $room.game.guess: $user, $guess;
-                    $room.remove-game if $room.game.finished;
-                    self.reply: @res, $user, $room
-                }
-            ),
-            PSBot::Command.new(
-                :default-rank<+>,
-                anon method end(Str $target, PSBot::User $user, PSBot::Room $room,
-                        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-                    return self.reply:
-                        'There is no game of Hangman in progress.',
-                        $user, $room unless $room.game ~~ PSBot::Games::Hangman;
+                my @res = $room.game.guess: $user, $guess;
+                $room.remove-game if $room.game.finished;
+                self.reply: @res, $user, $room
+            }
+        ),
+        PSBot::Command.new(
+            :default-rank<+>,
+            anon method end(Str $target, PSBot::User $user, PSBot::Room $room,
+                    PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
+                return self.reply:
+                    'There is no game of Hangman in progress.',
+                    $user, $room unless $room.game ~~ PSBot::Games::Hangman;
 
-                    my Str $res = $room.game.end;
-                    $room.remove-game;
-                    self.reply: $res, $user, $room
-                }
-            )
+                my Str $res = $room.game.end;
+                $room.remove-game;
+                self.reply: $res, $user, $room
+            }
         );
-
-        my PSBot::Command $command .= new: :name<hangman>, :locale(Locale::Room), @subcommands;
-        .set-root: $command for @subcommands;
-        $command
-    };
 
     my PSBot::Command $help .= new:
         :autoconfirmed,

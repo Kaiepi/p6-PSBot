@@ -42,10 +42,12 @@ multi method new(&command, Str :$name = &command.name, Bool :$administrative = F
         Bool :$autoconfirmed = False, Str :$default-rank = ' ', Locale :$locale = Everywhere) {
     self.bless: :$name, :$administrative, :$autoconfirmed, :$default-rank, :$locale, :&command;
 }
-multi method new(@subcommands, Str :$name!, Bool :$administrative = False,
+multi method new(+@subcommands, Str :$name!, Bool :$administrative = False,
         Bool :$autoconfirmed = False, Str :$default-rank = ' ', Locale :$locale = Everywhere) {
-    my Map $subcommands .= new: @subcommands.map(-> $sc { $sc.name => $sc });
-    self.bless: :$name, :$administrative, :$autoconfirmed, :$default-rank, :$locale, :$subcommands;
+    my Map            $subcommands .= new: @subcommands.map(-> $sc { $sc.name => $sc });
+    my PSBot::Command $command      = self.bless: :$name, :$administrative, :$autoconfirmed, :$default-rank, :$locale, :$subcommands;
+    .set-root: $command for @subcommands;
+    $command
 }
 
 method name(--> Str) {

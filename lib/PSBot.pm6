@@ -41,13 +41,13 @@ method start() {
             # is in case any of them have modjoin set.
             $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
         }
-        whenever $!state.rooms-propagated.Supply.schedule-on($*SCHEDULER) {
+        whenever $!state.rooms-propagated.Supply.schedule-on: $*SCHEDULER {
             # Awaits any users waiting to get propagated, ignoring guests.
             $!connection.send-raw: $!state.get-users.values
                 .grep({ !.propagated })
                 .map({ "/cmd userdetails " ~ .id });
         }
-        whenever $!state.users-propagated.Supply.schedule-on($*SCHEDULER) {
+        whenever $!state.users-propagated.Supply.schedule-on: $*SCHEDULER {
             # Setup epilogue.
             $!connection.send-raw: '/blockchallenges' unless $!state.challenges-blocked;
             $!connection.send-raw: '/unblockpms' if $!state.pms-blocked;
