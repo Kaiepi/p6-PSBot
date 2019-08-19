@@ -93,8 +93,7 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
         when 'userdetails' {
             my %data = from-json $data;
             if !%data<rooms> {
-                # Sometimes we pick up users that are offline. Do nothing when
-                # this happens.
+                $!state.destroy-user: %data<userid>;
             } elsif !(%data<autoconfirmed>:exists) {
                 note "This server must support user autoconfirmed metadata in /cmd userdetails in order for {USERNAME} to run properly! Contact a server administrator and ask them to update the server.";
                 try await $!connection.close: :force;

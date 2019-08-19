@@ -113,7 +113,7 @@ method on-user-details(%data) {
             if $!propagated.status ~~ Planned
             && (ROOMS.keys ∖ %!rooms.keys === ∅)
             && all(%!users.values).propagated;
-    });
+    })
 }
 
 method on-room-info(%data) {
@@ -174,8 +174,9 @@ method add-room(Str $roomid) {
     $!chat-mux.protect({
         my PSBot::Room $room .= new: $roomid;
         %!rooms{$roomid} = $room;
-        $!room-joined.emit: $roomid;
-    })
+    });
+
+    $!room-joined.emit: $roomid;
 }
 
 method delete-room(Str $roomid) {
@@ -210,21 +211,24 @@ method get-users(--> Hash[PSBot::User]) {
 }
 
 method add-user(Str $userinfo, Str $roomid) {
+    my Str $userid = to-id $userinfo.substr: 1;
+
     $!chat-mux.protect({
-        my Str $userid = to-id $userinfo.substr: 1;
         if %!users ∌ $userid {
             my PSBot::User $user .= new: $userinfo, $roomid;
             %!users{$userid} = $user;
         }
         %!rooms{$roomid}.join: $userinfo;
         %!users{$userid}.on-join: $userinfo, $roomid;
-        $!user-joined.emit: $userid;
-    })
+    });
+
+    $!user-joined.emit: $userid;
 }
 
 method delete-user(Str $userinfo, Str $roomid) {
+    my Str $userid = to-id $userinfo.substr: 1;
+
     $!chat-mux.protect({
-        my Str $userid = to-id $userinfo.substr: 1;
         if %!users ∋ $userid {
             %!rooms{$roomid}.leave: $userinfo;
             %!users{$userid}.on-leave: $roomid;
@@ -233,9 +237,19 @@ method delete-user(Str $userinfo, Str $roomid) {
     })
 }
 
-method rename-user(Str $userinfo, Str $oldid, Str $roomid) {
+method destroy-user(Str $userid) {
     $!chat-mux.protect({
-        my Str $userid = to-id $userinfo.substr: 1;
+        %!users{$userid}:delete if %!users{$userid}:exists;
+        for %!rooms.values -> $room {
+            $room.users{$userid}:delete if $room.users{$userid}:exists;
+        }
+    })
+}
+
+method rename-user(Str $userinfo, Str $oldid, Str $roomid) {
+    my Str $userid = to-id $userinfo.substr: 1;
+
+    $!chat-mux.protect({
         if %!users ∋ $oldid {
             %!users{$oldid}.rename: $userinfo, $roomid;
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
