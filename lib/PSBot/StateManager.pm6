@@ -122,19 +122,6 @@ method on-room-info(%data) {
         my PSBot::Room $room   = %!rooms{$roomid};
         $room.on-room-info: %data;
 
-        for %data<users>.flat -> $userinfo {
-            my Str $userid = to-id $userinfo.substr: 1;
-            if %!users ∋ $userid {
-                my PSBot::User $user = %!users{$userid};
-                $user.on-join: $userinfo, $roomid;
-            } else {
-                my PSBot::User $user .= new: $userinfo, $roomid;
-                %!users{$userid} = $user;
-                $user.on-join: $userinfo, $roomid;
-            }
-            $!user-joined.emit: $userid;
-        }
-
         for %data<auth>.kv -> $rank, @userids {
             for @userids -> $userid {
                 if %!users ∋ $userid {
@@ -143,6 +130,11 @@ method on-room-info(%data) {
                     $room.set-rank: $userid, $rank;
                 }
             }
+        }
+
+        for %data<users>.flat -> $userinfo {
+            my Str $userid = to-id $userinfo.substr: 1;
+            $!user-joined.emit: $userid;
         }
 
         $!rooms-propagated.emit: True
@@ -183,11 +175,8 @@ method delete-room(Str $roomid) {
     $!chat-mux.protect({
         my PSBot::Room $room = %!rooms{$roomid}:delete;
         for $room.users.keys -> $userid {
-            my PSBot::User $user = %!users{$userid};
-            if $user.defined {
-                $user.on-leave: $roomid;
-                %!users{$userid}:delete unless +$user.rooms;
-            }
+            %!users{$userid}.on-leave: $roomid;
+            %!users{$userid}:delete unless +%!users{$userid}.rooms;
         }
     })
 }
@@ -232,17 +221,15 @@ method delete-user(Str $userinfo, Str $roomid) {
         if %!users ∋ $userid {
             %!rooms{$roomid}.leave: $userinfo;
             %!users{$userid}.on-leave: $roomid;
-            %!users{$userid}:delete if none(%!rooms.values).users ∋ $userid;
+            %!users{$userid}:delete unless +%!users{$userid}.rooms;
         }
     })
 }
 
 method destroy-user(Str $userid) {
     $!chat-mux.protect({
-        %!users{$userid}:delete if %!users{$userid}:exists;
-        for %!rooms.values -> $room {
-            $room.users{$userid}:delete if $room.users{$userid}:exists;
-        }
+        %!users{$userid}:delete;
+        $_.users{$userid}:delete for %!rooms.values;
     })
 }
 
