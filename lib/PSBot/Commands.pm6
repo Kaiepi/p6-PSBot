@@ -42,9 +42,12 @@ BEGIN {
                 })
             );
 
-            my Str $res = await $p;
-            if $room {
-                my Bool $raw = self.can('+', $state.get-user($state.userid).rooms{$room.id}.rank)
+            my Str         $res = await $p;
+            my PSBot::User $bot = $state.get-user($state.userid);
+            return unless $bot.defined;
+
+            if $room.defined {
+                my Bool $raw = self.can('+', $bot.rooms{$room.id}.rank)
                         && ($res.contains("\n") || 150 < $res.codes < 8194);
                 $res = $raw ?? "!code $res" !! "``$res``";
                 self.reply: $res, $user, $room, :$raw;
@@ -112,9 +115,12 @@ BEGIN {
                 })
             );
 
-            my Str $res = await $p;
-            if $room {
-                my Bool $raw = self.can('+', $state.get-user($state.userid).rooms{$room.id}.rank)
+            my Str         $res = await $p;
+            my PSBot::User $bot = $state.get-user($state.userid);
+            return unless $bot.defined;
+
+            if $room.defined {
+                my Bool $raw = self.can('+', $bot.rooms{$room.id}.rank)
                         && ($res.contains("\n") || 150 < $res.codes < 8192);
                 $res = $raw ?? "!code $res" !! "``$res``";
                 self.reply: $res, $user, $room, :$raw;
@@ -783,86 +789,117 @@ BEGIN {
 
     my PSBot::Command $hangman .= new:
         :name<hangman>,
+        :locale(Locale::Room),
         PSBot::Command.new(
             :default-rank<+>,
             anon method new(Str $target, PSBot::User $user, PSBot::Room $room,
                     PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
                 return self.reply:
-                    "There is already a game of {$room.game.name} in progress.",
-                    $user, $room if $room.game;
+                    "Only one game of {PSBot::Games::Hangman.name} can run at a time in this room.",
+                    $user, $room if $room.has-game-type: PSBot::Games::Hangman.type;
 
-                $room.add-game: PSBot::Games::Hangman.new: $user, :allow-late-joins;
-                self.reply: "A game of {$room.game.name} has been created.", $user, $room
+                my PSBot::Games::Hangman $game .= new: :allow-late-joins;
+                $game.add-room: $room;
+                $room.add-game: $game.id, $game.type;
+                $state.add-game: $game;
+                self.reply: "A game of {$game.name} has been created.", $user, $room
             }
         ),
         PSBot::Command.new(
             anon method join(Str $target, PSBot::User $user, PSBot::Room $room,
                     PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-                return self.reply:
-                    'There is no game of Hangman in progress.',
-                    $user, $room unless $room.game ~~ PSBot::Games::Hangman;
-
-                self.reply: $room.game.join($user), $user, $room
+                my Symbol      $game-type = PSBot::Games::Hangman.type;
+                my Int         $gameid    = $room.get-game-id: $game-type;
+                my PSBot::Game $game      = $state.get-game: $gameid;
+                my Str         $message   = do if $game.defined {
+                    my PSBot::Games::Hangman $hangman = $game;
+                    $hangman.join($user, $room)
+                } else {
+                    "No game of {PSBot::Games::Hangman.name} is running in this room."
+                };
+                self.reply: $message, $user, $room
             }
         ),
         PSBot::Command.new(
             anon method leave(Str $target, PSBot::User $user, PSBot::Room $room,
                     PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-                return self.reply:
-                    'There is no game of Hangman in progress.',
-                    $user, $room unless $room.game ~~ PSBot::Games::Hangman;
-
-                self.reply: $room.game.leave($user), $user, $room
+                my Symbol      $game-type = PSBot::Games::Hangman.type;
+                my Int         $gameid    = $room.get-game-id: $game-type;
+                my PSBot::Game $game      = $state.get-game: $gameid;
+                my Str         $message   = do if $game.defined {
+                    my PSBot::Games::Hangman $hangman = $game;
+                    $hangman.leave($user, $room)
+                } else {
+                    "No game of {PSBot::Games::Hangman.name} is running in this room."
+                };
+                self.reply: $message, $user, $room
             }
         ),
         PSBot::Command.new(
             :default-rank<+>,
             anon method players(Str $target, PSBot::User $user, PSBot::Room $room,
                     PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-                return self.reply:
-                    'There is no game of Hangman in progress.',
-                    $user, $room unless $room.game ~~ PSBot::Games::Hangman;
-
-                self.reply: $room.game.players, $user, $room
+                my Symbol      $game-type = PSBot::Games::Hangman.type;
+                my Int         $gameid    = $room.get-game-id: $game-type;
+                my PSBot::Game $game      = $state.get-game: $gameid;
+                my Str         $message   = do if $game.defined {
+                    my PSBot::Games::Hangman $hangman = $game;
+                    $hangman.players
+                } else {
+                    "No game of {PSBot::Games::Hangman.name} is running in this room."
+                };
+                self.reply: $message, $user, $room
             }
         ),
         PSBot::Command.new(
             :default-rank<+>,
             anon method start(Str $target, PSBot::User $user, PSBot::Room $room,
                     PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-                return self.reply:
-                    'There is no game of Hangman in progress.',
-                    $user, $room unless $room.game ~~ PSBot::Games::Hangman;
-
-                self.reply: $room.game.start, $user, $room
+                my Symbol      $game-type = PSBot::Games::Hangman.type;
+                my Int         $gameid    = $room.get-game-id: $game-type;
+                my PSBot::Game $game      = $state.get-game: $gameid;
+                my             @messages  = do if $game.defined {
+                    my PSBot::Games::Hangman $hangman = $game;
+                    $hangman.start
+                } else {
+                    ("No game of {PSBot::Games::Hangman.name} is running in this room.",)
+                };
+                self.reply: @messages, $user, $room
             }
         ),
         PSBot::Command.new(
             anon method guess(Str $target, PSBot::User $user, PSBot::Room $room,
                     PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-                return self.reply:
-                    'There is no game of Hangman in progress.',
-                    $user, $room unless $room.game ~~ PSBot::Games::Hangman;
-
-                my Str $guess = to-id $target;
-                return self.reply: 'No valid guess was given.', $user, $room unless $guess;
-
-                my @res = $room.game.guess: $user, $guess;
-                $room.remove-game if $room.game.finished;
-                self.reply: @res, $user, $room
+                my Symbol      $game-type = PSBot::Games::Hangman.type;
+                my Int         $gameid    = $room.get-game-id: $game-type;
+                my PSBot::Game $game      = $state.get-game: $gameid;
+                my             @messages  = do if $game.defined {
+                    my PSBot::Games::Hangman $hangman = $game;
+                    $_ := $hangman.guess: $user, $target;
+                    $room.delete-game: $hangman.id if $hangman.finished;
+                    $_
+                } else {
+                    ("No game of {PSBot::Games::Hangman.name} is running in this room.",)
+                };
+                self.reply: @messages, $user, $room
             }
         ),
         PSBot::Command.new(
             :default-rank<+>,
             anon method end(Str $target, PSBot::User $user, PSBot::Room $room,
                     PSBot::StateManager $state, PSBot::Connection $connection --> Replier) is pure {
-                return self.reply:
-                    'There is no game of Hangman in progress.',
-                    $user, $room unless $room.game ~~ PSBot::Games::Hangman;
-
-                my Str $res = $room.game.end;
-                $room.remove-game;
-                self.reply: $res, $user, $room
+                my Symbol      $game-type = PSBot::Games::Hangman.type;
+                my Int         $gameid    = $room.get-game-id: $game-type;
+                my PSBot::Game $game      = $state.get-game: $gameid;
+                my Str         $message   = do if $game.defined {
+                    my PSBot::Games::Hangman $hangman = $game;
+                    $_ := $hangman.end;
+                    $room.delete-game: $hangman.id;
+                    $_
+                } else {
+                    ("No game of {PSBot::Games::Hangman.name} is running in this room.",)
+                };
+                self.reply: $message, $user, $room
             }
         );
 
@@ -958,6 +995,8 @@ BEGIN {
                       Requires at least rank % by default.
 
                 Game commands:
+                    All of the following commands can only be used in rooms.
+
                     - hangman
                         - hangman new             Starts a new hangman game.
                                                   Requires at least rank + by default.

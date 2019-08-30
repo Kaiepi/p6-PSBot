@@ -17,6 +17,7 @@ has Str      $.group;
 has Str      $.avatar;
 has Bool     $.autoconfirmed;
 has RoomInfo %.rooms;
+has Symbol   %.games{Int};
 has Promise  $.propagated .= new;
 
 proto method new(Str, Str $?) {*}
@@ -80,6 +81,32 @@ method rename(Str $userinfo, Str $roomid) {
     %!rooms{$roomid} = RoomInfo.new: :$rank;
     $!name           = $userinfo.substr: 1, $idx;
     $!id             = to-id $!name;
+}
+
+method has-game-id(Int $gameid --> Bool) {
+    %!games{$gameid}:exists
+}
+
+method has-game-type(Symbol $game-type --> Bool) {
+    return True if $_ === $game-type for %!games.values;
+    False
+}
+
+method get-game-id(Symbol $game-type --> Int) {
+    return .key if .value === $game-type for %!games;
+    Nil
+}
+
+method get-game-type(Int $gameid --> Symbol) {
+    %!games{$gameid}
+}
+
+method join-game(Int $gameid, Symbol $game-type --> Nil) {
+    %!games{$gameid} = $game-type;
+}
+
+method leave-game(Int $gameid --> Nil) {
+    %!games{$gameid}:delete;
 }
 
 method propagated(--> Bool) {

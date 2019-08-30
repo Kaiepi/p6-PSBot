@@ -2,7 +2,7 @@ use v6.d;
 use Pastebin::Shadowcat;
 unit module PSBot::Tools;
 
-enum Status is export (
+my enum Status is export (
     Online => 'Online',
     Idle   => 'Idle',
     BRB    => 'BRB',
@@ -11,15 +11,51 @@ enum Status is export (
     Busy   => 'Busy'
 );
 
-subset Result is export where Str | Positional | Sequence | Awaitable | Nil;
+my subset Result is export where Str | Positional | Sequence | Awaitable | Nil;
 
-enum Rank is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
+my enum Rank is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
 
-enum Visibility is export (
+my enum Visibility is export (
     Public => 'public',
     Hidden => 'hidden',
     Secret => 'secret'
 );
+
+# Yes, a CPAN module exists for this already. We don't use it because it has
+# unnecessary dependencies.
+my class Symbol is export {
+    has Str $.description;
+
+    method CALL-ME(Symbol:U: Str $description? --> Symbol:D) {
+        self.new: :$description
+    }
+
+    my ::?CLASS %for;
+    method for(Symbol:U: Str $description? --> Symbol:D) {
+        if %for{$description}:exists {
+            %for{$description}
+        } else {
+            my ::?CLASS $symbol .= new: :$description;
+            %for{$description} := $symbol;
+            $symbol
+        }
+    }
+
+    method !stringify(Symbol:D: --> Str:D) {
+        $!description.defined
+            ?? "Symbol($!description)"
+            !! "Symbol()"
+    }
+    multi method gist(Symbol:D: --> Str:D) {
+        self!stringify
+    }
+    multi method Str(Symbol:D: --> Str:D) {
+        self!stringify
+    }
+    multi method perl(Symbol:D: --> Str:D) {
+        self!stringify
+    }
+}
 
 sub to-id(Str $data! --> Str) is export {
     $data.lc.samemark(' ').subst(/ <-[a..z 0..9]>+ /, '', :g)

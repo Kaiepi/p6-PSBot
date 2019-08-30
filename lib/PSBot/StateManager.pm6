@@ -1,6 +1,7 @@
 use v6.d;
 use PSBot::Config;
 use PSBot::Database;
+use PSBot::Game;
 use PSBot::LoginServer;
 use PSBot::Room;
 use PSBot::Rules;
@@ -29,13 +30,13 @@ has Channel  $.pending-rename   .= new;
 has Channel  $.logged-in        .= new;
 has Supplier $.room-joined      .= new;
 has Supplier $.user-joined      .= new;
-has Supplier $.rooms-propagated .= new;
-has Supplier $.users-propagated .= new;
-has Promise  $.propagated       .= new;
+has Promise  $.rooms-propagated .= new;
+has Promise  $.users-propagated .= new;
 
 has Lock::Async $!chat-mux .= new;
 has PSBot::User %.users;
 has PSBot::Room %.rooms;
+has PSBot::Game %.games{Int};
 
 has PSBot::Database    $.database;
 has PSBot::LoginServer $.login-server;
@@ -109,17 +110,18 @@ method on-user-details(%data) {
             }
         }
 
-        $!users-propagated.emit: True
-            if $!propagated.status ~~ Planned
-            && (ROOMS.keys ∖ %!rooms.keys === ∅)
-            && all(%!users.values).propagated;
+        $!users-propagated.keep
+            if $!users-propagated.status ~~ Planned
+            && !%!users.values.first(!*.propagated);
     })
 }
 
 method on-room-info(%data) {
     $!chat-mux.protect({
-        my Str         $roomid = to-roomid %data<title>;
+        my Str         $roomid = %data<roomid>;
         my PSBot::Room $room   = %!rooms{$roomid};
+        return unless $room.defined;
+
         $room.on-room-info: %data;
 
         for %data<auth>.kv -> $rank, @userids {
@@ -134,13 +136,17 @@ method on-room-info(%data) {
 
         for %data<users>.flat -> $userinfo {
             my Str $userid = to-id $userinfo.substr: 1;
-            $!user-joined.emit: $userid;
+            if %!users ∌ $userid {
+                my PSBot::User $user .= new: $userinfo, $roomid;
+                %!users{$userid} = $user;
+                $!user-joined.emit: $userid;
+            }
         }
 
-        $!rooms-propagated.emit: True
-            if $!propagated.status ~~ Planned
+        $!rooms-propagated.keep
+            if $!rooms-propagated.status ~~ Planned
             && (ROOMS.keys ∖ %!rooms.keys === ∅)
-            && all(%!rooms.values).propagated;
+            && !%!rooms.values.first(!*.propagated);
     });
 }
 
@@ -165,6 +171,7 @@ method get-rooms(--> Hash[PSBot::Room]) {
 method add-room(Str $roomid) {
     $!chat-mux.protect({
         my PSBot::Room $room .= new: $roomid;
+        $room.add-game: .id, .type for %!games.values.grep: *.has-room: $room;
         %!rooms{$roomid} = $room;
     });
 
@@ -205,6 +212,7 @@ method add-user(Str $userinfo, Str $roomid) {
     $!chat-mux.protect({
         if %!users ∌ $userid {
             my PSBot::User $user .= new: $userinfo, $roomid;
+            $user.games{.id} = .value for %!games.values.grep(*.has-player: $user);
             %!users{$userid} = $user;
         }
         %!rooms{$roomid}.join: $userinfo;
@@ -249,6 +257,36 @@ method rename-user(Str $userinfo, Str $oldid, Str $roomid) {
     })
 }
 
+method has-game(Int $gameid --> Bool) {
+    $!chat-mux.protect({
+        %!games ∋ $gameid
+    })
+}
+
+method get-game(Int $gameid --> PSBot::Game) {
+    $!chat-mux.protect({
+        %!games{$gameid}
+    })
+}
+
+method get-games(--> Hash[PSBot::Game, Int]) {
+    $!chat-mux.protect(-> {
+        %!games
+    })
+}
+
+method add-game(PSBot::Game $game) {
+    $!chat-mux.protect({
+        %!games{$game.id} = $game;
+    })
+}
+
+method delete-game(Int $gameid) {
+    $!chat-mux.protect({
+        %!games{$gameid}:delete;
+    })
+}
+
 method reset() {
     $!guest-username      = Nil;
     $!username            = Nil;
@@ -264,7 +302,8 @@ method reset() {
     $!pms-blocked         = False;
     $!challenges-blocked  = False;
     $!inited              = False;
-    $!propagated         .= new;
+    $!users-propagated   .= new;
+    $!rooms-propagated   .= new;
     $!chat-mux.protect({
         %!users .= new;
         %!rooms .= new;

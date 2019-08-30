@@ -9,14 +9,14 @@ unit class PSBot::Connection;
 has Cro::WebSocket::Client             $!client;
 has Cro::WebSocket::Client::Connection $.connection;
 
-has Int         $.timeout        = 1;
-has Bool        $.force-closed   = False;
-has Channel     $.on-connect    .= new;
-has Channel     $.on-disconnect .= new;
+has Int     $.timeout        = 1;
+has Bool    $.force-closed   = False;
+has Channel $.on-connect    .= new;
+has Channel $.on-disconnect .= new;
 
-has Supplier $!receiver;
-has Supply   $!receiver-supply;
-has Tap      $!receiver-tap;
+has Supplier::Preserving $!receiver;
+has Supply               $!receiver-supply;
+has Tap                  $!receiver-tap;
 
 has Lock::Async $!sender-mux;
 has Supplier    $!sender;

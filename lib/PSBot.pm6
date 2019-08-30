@@ -11,98 +11,99 @@ method new(Str $host = HOST, Int $port = PORT, Str $serverid = SERVERID) {
     self.bless: :$connection, :$state;
 }
 
+# Runs the bot. This blocks a thread until the process exits.
 method start() {
-    react {
-        whenever $!connection.on-connect {
-            # Setup prologue.
-            $!connection.send-raw: "/avatar {AVATAR}" if AVATAR;
+    $!connection.connect;
 
-            my Str @rooms     = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
-            my Str $autojoin  = @rooms.join: ',';
-            $!connection.send-raw: "/autojoin $autojoin";
-        }
-        whenever $!connection.receiver -> $message {
-            self.parse: $message;
-        }
-        whenever $!connection.on-disconnect {
-            $!state.reset unless $!connection.force-closed;
-        }
-        whenever $!state.room-joined.Supply -> $roomid {
-            # Propagate room state on join.
-            $!connection.send-raw: "/cmd roominfo $roomid";
-        }
-        whenever $!state.user-joined.Supply -> $userid {
-            # Propagate user state on join or rename.
-            $!connection.send-raw: "/cmd userdetails $userid"
-                if $!state.propagated.status ~~ Kept;
-        }
-        whenever $!state.logged-in {
-            # Now that we're logged in, join any remaining rooms manually. This
-            # is in case any of them have modjoin set.
-            $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
-        }
-        whenever $!state.rooms-propagated.Supply.schedule-on: $*SCHEDULER {
-            # Awaits any users waiting to get propagated, ignoring guests.
-            $!connection.send-raw: $!state.get-users.values
-                .grep({ !.propagated })
-                .map({ "/cmd userdetails " ~ .id });
-        }
-        whenever $!state.users-propagated.Supply.schedule-on: $*SCHEDULER {
-            # Setup epilogue.
-            $!connection.send-raw: '/blockchallenges' unless $!state.challenges-blocked;
-            $!connection.send-raw: '/unblockpms' if $!state.pms-blocked;
-            $!connection.send-raw: '/ht ignore', :roomid<staff>
-                if $!state.has-room('staff') && !$!state.help-tickets-ignored;
-            $!connection.send-raw: "/status {STATUS}" if STATUS;
-            $!state.propagated.keep;
+    loop {
+        react {
+            whenever $!connection.on-connect {
+                # Setup prologue.
+                $!connection.send-raw: "/avatar {AVATAR}" if AVATAR;
 
-            # Send user mail if the recipient is online. If not, wait until
-            # they join a room the bot's in.
-            with $!state.database.get-mail -> @mail {
-                my List %mail = (%(), |@mail).reduce(-> %data, %row {
+                my Str @rooms     = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
+                my Str $autojoin  = @rooms.join: ',';
+                $!connection.send-raw: "/autojoin $autojoin";
+            }
+            whenever $!connection.receiver -> $message {
+                self.parse: $message;
+            }
+            whenever $!connection.on-disconnect {
+                $!state.reset unless $!connection.force-closed;
+                done;
+            }
+            whenever $!state.room-joined.Supply -> $roomid {
+                # Propagate room state on join.
+                $!connection.send-raw: "/cmd roominfo $roomid";
+            }
+            whenever $!state.user-joined.Supply -> $userid {
+                # Propagate user state on join or rename.
+                $!connection.send-raw: "/cmd userdetails $userid"
+                    if $!state.users-propagated.status ~~ Kept;
+            }
+            whenever $!state.logged-in {
+                # Now that we're logged in, join any remaining rooms manually. This
+                # is in case any of them have modjoin set.
+                $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
+            }
+            whenever $!state.rooms-propagated {
+                # Awaits any users waiting to get propagated, ignoring guests.
+                if $!state.get-users.values.grep(!*.propagated) -> @unpropagated-users {
+                    $!connection.send-raw: @unpropagated-users.map({ "/cmd userdetails " ~ .id });
+                } else {
+                    $!state.users-propagated.keep if $!state.users-propagated.status ~~ Planned;
+                }
+            }
+            whenever $!state.users-propagated {
+                # Setup epilogue.
+                $!connection.send-raw: '/blockchallenges' unless $!state.challenges-blocked;
+                $!connection.send-raw: '/unblockpms' if $!state.pms-blocked;
+                $!connection.send-raw: '/ht ignore', :roomid<staff>
+                    if $!state.has-room('staff') && !$!state.help-tickets-ignored;
+                $!connection.send-raw: "/status {STATUS}" if STATUS;
+
+                # Send user mail if the recipient is online. If not, wait until
+                # they join a room the bot's in.
+                with $!state.database.get-mail -> @mail {
+                    my List %mail = (%(), |@mail).reduce(-> %data, %row {
                     my Str $userid  = %row<target>;
-                    my Str $message = "[%row<source>] %row<message>";
-                    %data{$userid} = %data{$userid}:exists
-                        ?? (|%data{$userid}, $message)
-                        !! ($message,);
-                    %data
-                });
-                for %mail.kv -> $userid, @messages {
-                    if $!state.has-user: $userid {
-                        $!state.database.remove-mail: $userid;
-                        $!connection.send:
-                            "You received {+@messages} message{+@messages == 1 ?? '' !! 's'}:",
-                            @messages, :$userid;
+                        my Str $message = "[%row<source>] %row<message>";
+                        %data{$userid} = %data{$userid}:exists
+                            ?? (|%data{$userid}, $message)
+                            !! ($message,);
+                        %data
+                    });
+                    for %mail.kv -> $userid, @messages {
+                        if $!state.has-user: $userid {
+                            $!state.database.remove-mail: $userid;
+                            $!connection.send:
+                                "You received {+@messages} message{+@messages == 1 ?? '' !! 's'}:",
+                                @messages, :$userid;
+                        }
+                    }
+                }
+
+                # Schedule user reminders.
+                with $!state.database.get-reminders -> @reminders {
+                    for @reminders -> %row {
+                        $!state.reminders{%row<id>} := $*SCHEDULER.cue({
+                            if %row<roomid>.defined {
+                                $!state.database.remove-reminder: %row<reminder>, %row<end>, %row<userid>, %row<roomid>;
+                                $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", roomid => %row<roomid>;
+                            } else {
+                                $!state.database.remove-reminder: %row<reminder>, %row<end>, %row<userid>;
+                                $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", userid => %row<userid>;
+                            }
+                        }, at => %row<end>);
                     }
                 }
             }
-
-            # Schedule user reminders.
-            with $!state.database.get-reminders -> @reminders {
-                for @reminders -> %row {
-                    $!state.reminders{%row<id>} := $*SCHEDULER.cue({
-                        if %row<roomid>.defined {
-                            $!state.database.remove-reminder: %row<reminder>, %row<end>, %row<userid>, %row<roomid>;
-                            $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", roomid => %row<roomid>;
-                        } else {
-                            $!state.database.remove-reminder: %row<reminder>, %row<end>, %row<userid>;
-                            $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", userid => %row<userid>;
-                        }
-                    }, at => %row<end>);
-                }
+            whenever signal(SIGINT) {
+                try await $!connection.close: :force;
+                $!state.database.DESTROY;
+                exit 0;
             }
         }
-        whenever signal(SIGINT) {
-            try await $!connection.close: :force;
-            $!state.database.DESTROY;
-            exit 0;
-        }
-
-        # PSBot::Connection.receiver is not a Supplier::Preserving instance, so
-        # we need to ensure the connection only starts after the whenever block
-        # that handles it is defined so we don't miss any messages (especially
-        # the first |userupdate|).
-        LEAVE $!connection.connect;
     }
 }
 

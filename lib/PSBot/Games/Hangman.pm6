@@ -1,5 +1,6 @@
 use v6.d;
 use PSBot::Game;
+use PSBot::Tools;
 use PSBot::User;
 unit class PSBot::Games::Hangman does PSBot::Game;
 
@@ -10,9 +11,13 @@ has Set     $.letters;
 has SetHash $.guessed-letters .= new;
 has Int     $.limbs            = 6;
 
-submethod TWEAK(Str :$!name = 'Hangman') {}
+my Str $name = 'Hangman';
+method name(PSBot::Games::Hangman:_: --> Str:D) { $name }
 
-method !display(--> Str) {
+my Symbol:D $type = Symbol($name);
+method type(PSBot::Games::Hangman:_: --> Symbol:D) { $type }
+
+method !display(PSBot::Games::Hangman:D: --> Str:D) {
     my Str @letters = '-' xx $!word.chars;
     for $!word.comb.kv -> $i, $letter {
         @letters[$i] = $letter if $!guessed-letters ∋ $letter;
@@ -23,19 +28,24 @@ method !display(--> Str) {
     "Current word: $progress. Limbs: $!limbs. Guessed letters: $guessed-letters";
 }
 
-method start() {
-    return "The game of $!name has already started!" if $!started;
-    $!started = True;
+multi method start(PSBot::Games::Hangman:D: --> List:D) {
     $!word    = WORDS[floor rand * WORDS.elems];
     $!letters = set($!word.comb.grep({ m:i/<[a..z]>/ }));
-    ["The game of $!name has started!", self!display]
+    ("The game of {self.name} has started!", self!display)
 }
 
-method guess(PSBot::User $player, Str $guess --> List) {
+multi method end(PSBot::Games::Hangman:D: --> Str:D) {
+    my Str $ret = 'The game has ended.';
+    $ret ~= " The word was $!word." if $!started;
+    $ret
+}
+
+method guess(PSBot::Games::Hangman:D: PSBot::User:D $player, Str:D $target --> List:D) {
     return ("The game hasn't started yet.",) unless $!started;
-    return ('You are not a player in this game.',) unless $!players ∋ $player;
-    return ('There is no guess.',) unless $guess;
-    return ('Invalid guess.',) if $guess ~~ rx:i/ <-[a..z]> /;
+    return ('You are not a player in this game.',) unless $!players ∋ $player.id;
+
+    my Str $guess = to-id $target;
+    return ('No valid guess was given.',) unless $guess;
 
     if $guess.chars > 1 {
         my Str $word = $guess.uc;
@@ -63,12 +73,4 @@ method guess(PSBot::User $player, Str $guess --> List) {
             ('Your guess is incorrect.', self.end)
         }
     }
-}
-
-method end(--> Str) {
-    $!finished = True;
-
-    my Str $ret = 'The game has ended.';
-    $ret ~= " The word was $!word." if $!started;
-    $ret
 }

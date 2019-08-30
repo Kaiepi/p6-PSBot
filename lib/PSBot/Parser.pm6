@@ -100,13 +100,12 @@ method parse-query-response(Str $roomid, Str $type, Str $data) {
                 $!state.database.DESTROY;
                 exit 1;
             } else {
-                $!state.on-user-details: %data;
-
                 if $!state.userid === %data<userid> {
                     my Map $ranks    = Rank.enums;
                     my Rat $throttle = $ranks{%data<group>} >= $ranks<+> ?? 0.3 !! 0.6;
                     $!connection.set-throttle: $throttle;
                 }
+                $!state.on-user-details: %data;
             }
         }
         when 'roominfo' {
@@ -206,7 +205,8 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
     $!state.database.add-seen: $userid, now
         unless $userid.starts-with: 'guest';
 
-    await $!state.propagated;
+    await $!state.rooms-propagated;
+    await $!state.users-propagated;
 
     my Str         $message = @message.join: '|';
     my PSBot::User $user    = $!state.get-user: $userid;
@@ -218,6 +218,7 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
         return if output;
     }
 
+    # TODO: this should be a rule
     if $message.starts-with: COMMAND {
         return unless $message ~~ $command-matcher;
         return unless $<command>.defined;
@@ -231,10 +232,13 @@ method parse-chat(Str $roomid, Str $timestamp, Str $userinfo, *@message) {
         my PSBot::User       $user    = $!state.get-user: $userid;
         my PSBot::Room       $room    = $!state.get-room: $roomid;
         my Failable[Replier] $replier = $command($target, $user, $room, $!state, $!connection);
-        return $!connection.send:
-            "Invalid subcommand: {COMMAND}{$replier.exception.message}",
-            :$roomid unless $replier.defined;
-        return $replier($!connection);
+        if $replier.defined {
+            $replier($!connection)
+        } elsif $replier ~~ Failure {
+            $!connection.send:
+                "Invalid subcommand: {COMMAND}{$replier.exception.message}",
+                :$roomid unless $replier.defined;
+        }
     }
 }
 
@@ -242,7 +246,8 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
     my Str $username = $from.substr: 1;
     return if $username === $!state.username;
 
-    await $!state.propagated;
+    await $!state.rooms-propagated;
+    await $!state.users-propagated;
 
     my Str         $group   = $from.substr: 0, 1;
     my Str         $userid  = to-id $username;
@@ -262,6 +267,7 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
         return if output;
     }
 
+    # TODO: this should be a rule
     if $message.starts-with: COMMAND {
         return unless $message ~~ $command-matcher;
         return unless $<command>.defined;
@@ -275,15 +281,19 @@ method parse-pm(Str $roomid, Str $from, Str $to, *@message) {
         my PSBot::User       $user    = $!state.get-user: $userid;
         my PSBot::Room       $room;
         my Failable[Replier] $replier = $command($target, $user, $room, $!state, $!connection);
-        return $!connection.send:
-            "Invalid subcommand: {COMMAND}{$replier.exception.message}",
-            :$userid unless $replier.defined;
-        return $replier($!connection);
+        if $replier.defined {
+            $replier($!connection)
+        } elsif $replier ~~ Failure {
+            $!connection.send:
+                "Invalid subcommand: {COMMAND}{$replier.exception.message}",
+                :$roomid unless $replier.defined;
+        }
     }
 }
 
 method parse-html(Str $roomid, *@html) {
-    await $!state.propagated;
+    await $!state.rooms-propagated;
+    await $!state.users-propagated;
 
     my Str         $html  = @html.join: '|';
     my PSBot::Room $room  = $!state.get-room: $roomid;
@@ -297,7 +307,8 @@ method parse-html(Str $roomid, *@html) {
 }
 
 method parse-popup(Str $roomid, *@popup) {
-    await $!state.propagated;
+    await $!state.rooms-propagated;
+    await $!state.users-propagated;
 
     my Str         $popup = @popup.join('|').subst('||', "\n", :g);
     my PSBot::Room $room  = $!state.get-room: $roomid;
@@ -311,7 +322,8 @@ method parse-popup(Str $roomid, *@popup) {
 }
 
 method parse-raw(Str $roomid, *@html) {
-    await $!state.propagated;
+    await $!state.rooms-propagated;
+    await $!state.users-propagated;
 
     my Str         $html  = @html.join: '|';
     my PSBot::Room $room  = $!state.get-room: $roomid;

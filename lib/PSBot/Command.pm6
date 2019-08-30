@@ -160,10 +160,6 @@ method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
 
     if self.administrative {
         return self.reply: 'Permission denied.', $user, PSBot::Room unless ADMINS ∋ $user.id;
-    } else {
-        # Administrative commands need to be possible to use before state is
-        # fully propagated in case of bugs.
-        await $state.propagated;
     }
 
     if self.autoconfirmed {
@@ -173,7 +169,7 @@ method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
             $user, PSBot::Room unless $user.autoconfirmed && $is-unlocked;
     }
 
-    if $room {
+    if $room.defined {
         my      $command  := $state.database.get-command: $room.id, self.name;
         my Bool $disabled  = $command<disabled>:exists ??  $command<disabled>.Bool !! False;
         return self.reply:
