@@ -8,7 +8,7 @@ class RoomInfo {
     has Str     $.broadcast-command is rw;
     has Instant $.broadcast-timeout is rw;
 
-    method set-group(Group :$!group) {}
+    method set-group(RoomInfo:D: Group :$!group) {}
 }
 
 has Group    $.group;

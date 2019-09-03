@@ -55,7 +55,7 @@ method message:sym<updateuser>(Match $/) {
     my Bool            $is-named = Bool(+$<is-named>.made);
     my Str             $avatar   = $<avatar>.made;
     my                 %data     = from-json $<data>.made;
-    $*BOT.on-update-user: $userinfo.group, $userinfo.name, $is-named, $avatar, %data;
+    $*BOT.on-update-user: $userinfo, $is-named, $avatar, %data;
 }
 method message:sym<challstr>(Match $/) {
     return unless USERNAME;

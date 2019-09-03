@@ -36,13 +36,13 @@ has Bool   $.pms-blocked;
 has Bool   $.challenges-blocked;
 has Bool   $.help-tickets-ignored;
 
-has Bool     $.inited            = False;
-has Promise  $.pending-rename   .= new;
-has Promise  $.logged-in        .= new;
-has Supplier $.room-joined      .= new;
-has Supplier $.user-joined      .= new;
-has Promise  $.rooms-propagated .= new;
-has Promise  $.users-propagated .= new;
+has Bool    $.inited            = False;
+has Channel $.pending-rename   .= new;
+has Channel $.logged-in        .= new;
+has Channel $.room-joined      .= new;
+has Channel $.user-joined      .= new;
+has Promise $.rooms-propagated .= new;
+has Promise $.users-propagated .= new;
 
 has Lock::Async $!chat-mux    .= new;
 has PSBot::User %.users;
@@ -101,11 +101,11 @@ method start() {
                     $!connection.connection.send: $message;
                 }
             }
-            whenever $!room-joined.Supply.schedule-on($*SCHEDULER).serialize -> Str $roomid {
+            whenever $!room-joined -> Str $roomid {
                 # Propagate room state on join.
                 $!connection.send-raw: "/cmd roominfo $roomid";
             }
-            whenever $!user-joined.Supply.schedule-on($*SCHEDULER).serialize -> Str $userid {
+            whenever $!user-joined -> Str $userid {
                 # Propagate user state on join or rename.
                 $!connection.send-raw: "/cmd userdetails $userid"
                     if $!users-propagated.status ~~ Kept;
@@ -121,7 +121,7 @@ method start() {
                 if %!users.values.grep(!*.propagated) -> @unpropagated-users {
                     $!connection.send-raw: @unpropagated-users.map({ "/cmd userdetails " ~ .id });
                 } else {
-                    $!users-propagated.keep if $!users-propagated.status ~~ Planned;
+                    $!users-propagated.keep;
                 }
             }
             whenever $!users-propagated {
@@ -190,11 +190,11 @@ method authenticate(Str $username, Str $password?, Str $challstr? --> Str) {
     $!login-server.log-in: $username, $password, $!challstr
 }
 
-method on-update-user(Group $group, Str $username, Bool $is-named, Str $avatar, %data) {
-    $!group                = $group;
-    $!guest-username       = $username if $!is-guest;
-    $!username             = $username;
-    $!userid               = to-id $username;
+method on-update-user(PSBot::UserInfo $userinfo, Bool $is-named, Str $avatar, %data) {
+    $!group                = $userinfo.group;
+    $!guest-username       = $userinfo.name unless $is-named;
+    $!username             = $userinfo.name;
+    $!userid               = $userinfo.id;
     $!is-guest             = not $is-named;
     $!avatar               = $avatar;
     $!is-staff             = %data<isStaff>         // False;
@@ -204,11 +204,11 @@ method on-update-user(Group $group, Str $username, Bool $is-named, Str $avatar, 
     $!help-tickets-ignored = %data<ignoreTickets>   // False;
 
     if $!inited {
-        $!pending-rename.keep;
-    } elsif !USERNAME || $username === USERNAME {
+        $!pending-rename.send: $!userid;
+    } elsif !USERNAME || $!username === USERNAME {
         $!inited = True;
-        $!pending-rename.keep;
-        $!logged-in.keep;
+        $!pending-rename.send: $!userid;
+        $!logged-in.send: $!userid;
     }
 }
 
@@ -259,25 +259,31 @@ method on-room-info(%data) {
 
         $room.on-room-info: %data;
 
-        for %data<auth>.kv -> Str $group-str, @userids {
-            for @userids -> $userid {
-                if %!users ∋ $userid {
-                    my PSBot::User $user  = %!users{$userid};
-                    my Group       $group = Group(Group.enums{$group-str});
-                    $user.set-group: $roomid, $group;
-                    $room.set-group: $userid, $group;
-                }
-            }
-        }
-
         for %data<users>.flat -> Str $userinfo-str {
             my PSBot::Grammar  $match    .= parse: $userinfo-str, :$!actions, :rule<userinfo>;
             my PSBot::UserInfo $userinfo  = $match.made;
             my Str             $userid    = $userinfo.id;
-            if %!users ∌ $userid {
+            if %!users ∋ $userid {
+                $room.join: $userinfo;
+                %!users{$userid}.on-join: $userinfo, $roomid;
+            } else {
                 my PSBot::User $user .= new: $userinfo, $roomid;
                 %!users{$userid} = $user;
-                $!user-joined.emit: $userid;
+            }
+            $!user-joined.send: $userid;
+        }
+
+        for %data<auth>.kv -> Str $group-str, @userids {
+            for @userids -> $userid {
+                if %!users ∋ $userid {
+                    my PSBot::User     $user      = %!users{$userid};
+                    my Group           $group     = Group(Group.enums{$group-str});
+                    my PSBot::UserInfo $userinfo .= new: :id($user.id), :name($user.name), :$group, :status(Online);
+                    $room.join: $userinfo;
+                    $user.on-join: $userinfo, $roomid;
+                    $user.set-group: $roomid, $group;
+                    $room.set-group: $userid, $group;
+                }
             }
         }
 
@@ -311,7 +317,7 @@ method add-room(Str $roomid) {
         my PSBot::Room $room .= new: $roomid;
         $room.add-game: .id, .type for %!games.values.grep: *.has-room: $room;
         %!rooms{$roomid} = $room;
-        $!room-joined.emit: $roomid;
+        $!room-joined.send: $roomid;
     });
 }
 
@@ -353,7 +359,7 @@ method add-user(PSBot::UserInfo $userinfo, Str $roomid) {
         }
         %!rooms{$roomid}.join: $userinfo;
         %!users{$userid}.on-join: $userinfo, $roomid;
-        $!user-joined.emit: $userid;
+        $!user-joined.send: $userid;
     });
 }
 
@@ -384,7 +390,7 @@ method rename-user(PSBot::UserInfo $userinfo, Str $oldid, Str $roomid) {
             %!users{$oldid}.rename: $userinfo, $roomid;
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
             %!users{$userid} = %!users{$oldid}:delete;
-            $!user-joined.emit: $userid;
+            $!user-joined.send: $userid;
         } else {
             # Already received a rename message from another room.
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
