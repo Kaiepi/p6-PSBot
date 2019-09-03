@@ -43,6 +43,7 @@ has Channel $.room-joined      .= new;
 has Channel $.user-joined      .= new;
 has Promise $.rooms-propagated .= new;
 has Promise $.users-propagated .= new;
+has Promise $.done             .= new;
 
 has Lock::Async $!chat-mux    .= new;
 has PSBot::User %.users;
@@ -63,6 +64,9 @@ method start() {
     $!connection.connect;
 
     loop {
+        # The bot wants to stop. Exit the loop.
+        last if $!done.status ~~ Kept;
+
         react {
             whenever $!connection.on-connect {
                 # Setup prologue.
@@ -96,10 +100,8 @@ method start() {
             }
             whenever $!connection.sender -> Str $message {
                 # We want to send a message.
-                unless $!connection.closed {
-                    debug '[SEND]', $message;
-                    $!connection.connection.send: $message;
-                }
+                debug '[SEND]', $message;
+                $!connection.connection.send: $message unless $!connection.closed;
             }
             whenever $!room-joined -> Str $roomid {
                 # Propagate room state on join.
@@ -172,13 +174,27 @@ method start() {
                     }
                 }
             }
-            whenever signal(SIGINT) {
-                try await $!connection.close: :force;
-                $!database.DESTROY;
-                exit 0;
+            whenever $!done {
+                # The bot wants to stop. Exit the react block, then exit the loop.
+                done;
+            }
+            whenever signal(SIGINT) | signal(SIGTERM) | signal(SIGKILL) {
+                # The bot received a signal from Ctrl+C, Ctrl+D, or killing the
+                # process. Stop the bot.
+                self.stop;
             }
         }
     }
+}
+
+# Stops the bot at any given time.
+method stop(--> Nil) {
+    $!login-server.log-out;
+    $!connection.connection.send: '/logout', :raw;
+    await $!pending-rename;
+    try await $!connection.close: :force;
+    $!database.DESTROY;
+    $!done.keep;
 }
 
 method set-avatar(Str $!avatar) {}
@@ -449,10 +465,8 @@ method reset() {
     $!users-propagated   .= new;
     $!rooms-propagated   .= new;
     $!chat-mux.protect({
-        %!users.DESTROY;
-        %!users .= new;
-        %!rooms.DESTROY;
-        %!rooms .= new;
+        %!users{*}:delete;
+        %!rooms{*}:delete;
     });
 }
 =begin pod

@@ -167,13 +167,8 @@ BEGIN {
 
     my PSBot::Command $suicide .= new:
         :administrative,
-        anon method suicide(Str $target --> Replier) {
-            $*BOT.login-server.log-out: $*BOT.username;
-            $*BOT.connection.send: '/logout', :raw;
-            await $*BOT.pending-rename;
-            try await $*BOT.connection.close: :force;
-            $*BOT.database.DESTROY;
-            exit 0;
+        anon method suicide(Str $target --> Nil) {
+            $*BOT.stop;
         };
 
     my PSBot::Command $uptime .= new:

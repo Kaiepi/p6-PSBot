@@ -72,13 +72,15 @@ method log-in(Str $username!, Str $password!, Str $challstr! --> Str) {
     %data<assertion>
 }
 
-method log-out(Str $username --> Bool) {
-    my Str                 $userid   = to-id $username;
+method log-out(--> Bool) {
+    my Str $userid = to-id $.account;
+    return False unless $userid;
+
     my Cro::HTTP::Response $response = await $!client.post:
         "https://play.pokemonshowdown.com/~~$!serverid/action.php",
         http         => '1.1',
         content-type => 'application/x-www-form-urlencoded; charset=UTF-8',
-        body         => %(act => 'logout', userid => $userid);
+        body         => %(:act<logout>, :$userid);
     my Str                 $data     = await $response.body-text;
     return False unless $data;
 

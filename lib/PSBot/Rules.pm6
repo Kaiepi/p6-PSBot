@@ -262,8 +262,10 @@ method new() {
                         my Str $userid = $*USER.id;
                         \($output, :$userid)
                     }
+                } else {
+                    Capture
                 }
-            }
+             }
         )
     ];
 

@@ -81,9 +81,7 @@ method message:sym<queryresponse>(Match $/) {
                 $*BOT.destroy-user: %data<userid>;
             } elsif !(%data<autoconfirmed>:exists) {
                 note "This server must support user autoconfirmed metadata in /cmd userdetails in order for {USERNAME} to run properly! Contact a server administrator and ask them to update the server.";
-                try await $*BOT.connection.close: :force;
-                $*BOT.database.DESTROY;
-                exit 1;
+                $*BOT.stop;
             } else {
                 $*BOT.on-user-details: %data;
             }
@@ -91,13 +89,11 @@ method message:sym<queryresponse>(Match $/) {
         when 'roominfo' {
             if $data eq 'null' {
                 note "This server must support /cmd roominfo in order for {USERNAME} to run properly! Contact a server administrator and ask them to update the server.";
-                try await $*BOT.connection.close: :force;
-                $*BOT.database.DESTROY;
-                exit 1;
+                $*BOT.stop;
+            } else {
+                my %data = from-json $data;
+                $*BOT.on-room-info: %data;
             }
-
-            my %data = from-json $data;
-            $*BOT.on-room-info: %data;
         }
     }
 }

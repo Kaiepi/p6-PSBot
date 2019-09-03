@@ -118,14 +118,17 @@ method reply(Result \output, PSBot::User $user, PSBot::Room $room,
                 }
             }
         };
-        return unless $result;
 
-        if $room.defined {
-            my Str $roomid = $room.id;
-            \($result, :$roomid, :$raw)
+        if $result {
+            if $room.defined {
+                my Str $roomid = $room.id;
+                \($result, :$roomid, :$raw)
+            } else {
+                my Str $userid = $user.id;
+                \($result, :$userid, :$raw)
+            }
         } else {
-            my Str $userid = $user.id;
-            \($result, :$userid, :$raw)
+            Capture
         }
     }
 }
