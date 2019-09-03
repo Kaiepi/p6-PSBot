@@ -96,7 +96,7 @@ method reconnect() {
 }
 
 proto method send(| --> Nil) {*}
-multi method send(*@data, Str :$roomid!, Bool :$raw where True --> Nil) {
+multi method send(*@data, Str :$roomid!, Bool :$raw where .so --> Nil) {
     for @data -> $data {
         my Str $message = "$roomid|$data";
         if $data.starts-with: '>> ' {
