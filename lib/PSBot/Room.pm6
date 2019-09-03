@@ -65,7 +65,7 @@ method join(PSBot::UserInfo $userinfo --> Nil) {
     my Str   $id    = $userinfo.id;
     my Str   $name  = $userinfo.name;
     my Group $group = $userinfo.group;
-    %!users{$id} = UserInfo.new: :$id, :$name, :$group;
+    %!users{$id} .= new: :$id, :$name, :$group;
 }
 
 method leave(PSBot::UserInfo $userinfo --> Nil) {
@@ -74,12 +74,12 @@ method leave(PSBot::UserInfo $userinfo --> Nil) {
 
 method on-rename(Str $oldid, PSBot::UserInfo $userinfo --> Nil) {
     my UserInfo $old-userinfo = %!users{$oldid}:delete;
-    my Str      $id           = $userinfo.id;
-    my Str      $name         = $userinfo.name;
-    my Group    $group        = $userinfo.group;
-    %!users{$id} = $old-userinfo.?group === $group
-        ?? $old-userinfo
-        !! UserInfo.new: :$id, :$name, :$group;
+    if !$old-userinfo.defined || $old-userinfo.group !=== $userinfo.group {
+        my Str   $id    = $userinfo.id;
+        my Str   $name  = $userinfo.name;
+        my Group $group = $userinfo.group;
+        %!users{$id} .= new: :$id, :$name, :$group;
+    }
 }
 
 method has-game-id(Int $gameid --> Bool) {
