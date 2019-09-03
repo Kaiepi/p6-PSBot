@@ -1,5 +1,7 @@
 use v6.d;
 use PSBot::Room;
+use PSBot::Tools;
+use PSBot::UserInfo;
 use Test;
 
 plan 7;
@@ -11,16 +13,26 @@ is $room.id, $roomid, 'can set room id attribute';
 
 # PSBot::Room.on-room-info is tested in t/04-parser.t
 
-$room.join: '+Kpimov';
-cmp-ok $room.ranks, '∋', 'kpimov', 'can get room ranks userid on join';
-is $room.ranks<kpimov>, '+', 'can get room ranks rank on join';
+my PSBot::UserInfo $old-userinfo .= new:
+    :id<kpimov>,
+    :name<Kpimov>,
+    :group(Group(Group.enums{'+'})),
+    :status(Online);
+$room.join: $old-userinfo;
+cmp-ok $room.users, '∋', $old-userinfo.id, 'can get room users ID on join';
+is $room.users{$old-userinfo.id}.group, $old-userinfo.group, 'can get room users group on join';
 
-$room.on-rename: 'kpimov', ' Kaiepi';
-cmp-ok $room.ranks, '∌', 'kpimov', 'cannot get room ranks oldid on rename';
-cmp-ok $room.ranks, '∋', 'kaiepi', 'can get room ranks userid on rename';
-is $room.ranks<kaiepi>, ' ', 'can get room ranks rank on rename';
+my PSBot::UserInfo $userinfo .= new:
+    :id<kaiepi>,
+    :name<Kaiepi>,
+    :group(Group(Group.enums{' '})),
+    :status(Online);
+$room.on-rename: $old-userinfo.id, $userinfo;
+cmp-ok $room.users, '∌', $old-userinfo.id, 'cannot get room ranks oldid on rename';
+cmp-ok $room.users, '∋', $userinfo.id, 'can get room ranks userid on rename';
+is $room.users{$userinfo.id}.group, Group(Group.enums{' '}), 'can get room ranks rank on rename';
 
-$room.leave: ' Kaiepi';
-cmp-ok $room.ranks, '∌', 'kaiepi', 'cannot get room ranks userid on leave';
+$room.leave: $userinfo;
+cmp-ok $room.users, '∌', $userinfo.id, 'cannot get room ranks userid on leave';
 
 # vim: ft=perl6 sw=4 ts=4 sts=4 expandtab

@@ -143,12 +143,12 @@ method CALL-ME(Str $target --> Replier) {
         when Locale::Room {
             return self.reply:
                 "Permission denied. {COMMAND}{self.name} can only be used in rooms.",
-                $*USER, Nil unless $*ROOM.defined;
+                $*USER, PSBot::Room unless $*ROOM.defined;
         }
         when Locale::PM {
             return self.reply:
                 "Permission denied. {COMMAND}{self.name} can only be used in PMs.",
-                $*USER, Nil if $*ROOM.defined;
+                $*USER, PSBot::Room if $*ROOM.defined;
         }
         when Locale::Everywhere {
             # No check necessary.
@@ -156,7 +156,7 @@ method CALL-ME(Str $target --> Replier) {
     }
 
     if self.administrative {
-        return self.reply: 'Permission denied.', $*USER, Nil unless ADMINS ∋ $*USER.id;
+        return self.reply: 'Permission denied.', $*USER, PSBot::Room unless ADMINS ∋ $*USER.id;
     }
 
     if self.autoconfirmed {
