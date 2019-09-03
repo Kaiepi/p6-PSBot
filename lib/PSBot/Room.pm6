@@ -1,11 +1,16 @@
 use v6.d;
 use PSBot::Tools;
+use PSBot::UserInfo;
 unit class PSBot::Room;
 
 subset Modjoin where Str | True;
 
 class UserInfo {
-    has Str $.rank;
+    has Str   $.id;
+    has Str   $.name;
+    has Group $.group;
+
+    method set-group(Group $!group) {}
 }
 
 has Str         $.id;
@@ -27,8 +32,8 @@ method modjoin(--> Str) {
     $!modjoin ~~ Bool ?? $!modchat !! $!modjoin
 }
 
-method set-rank(Str $userid, Str $rank --> Nil) {
-    %!users{$userid} = UserInfo.new: :$rank;
+method set-group(Str $userid, Group $group --> Nil) {
+    %!users{$userid}.set-group: $group;
 }
 
 method set-visibility(Str $visibility --> Nil) {
@@ -48,31 +53,33 @@ method on-room-info(%data) {
         $rank => Array[Str].new: @userids
     });
     %!users      = %data<users>.flat.map(-> $userinfo {
-        my Str $rank   = $userinfo.substr: 0, 1;
-        my Str $userid = to-id $userinfo.substr: 1;
-        $userid => UserInfo.new: :$rank
+        my Group $group = Group($userinfo.substr: 0, 1);
+        my Str   $name  = $userinfo.substr: 1;
+        my Str   $id    = to-id $name;
+        $id => UserInfo.new: :$id, :$name, :$group;
     });
     $!propagated.keep unless $!propagated.status ~~ Kept;
 }
 
-method join(Str $userinfo --> Nil) {
-    my Str $rank   = $userinfo.substr: 0, 1;
-    my Str $userid = to-id $userinfo.substr: 1;
-    %!users{$userid} = UserInfo.new: :$rank;
+method join(PSBot::UserInfo $userinfo --> Nil) {
+    my Str   $id    = $userinfo.id;
+    my Str   $name  = $userinfo.name;
+    my Group $group = $userinfo.group;
+    %!users{$id} = UserInfo.new: :$id, :$name, :$group;
 }
 
-method leave(Str $userinfo --> Nil) {
-    my Str $userid = to-id $userinfo.substr: 1;
-    %!users{$userid}:delete;
+method leave(PSBot::UserInfo $userinfo --> Nil) {
+    %!users{$userinfo.id}:delete;
 }
 
-method on-rename(Str $oldid, Str $userinfo --> Nil) {
-    my Str      $rank         = $userinfo.substr: 0, 1;
-    my Str      $userid       = to-id $userinfo.substr: 1;
+method on-rename(Str $oldid, PSBot::UserInfo $userinfo --> Nil) {
+    my Str      $id           = $userinfo.id;
+    my Str      $name         = $userinfo.name;
+    my Group    $group        = $userinfo.group;
     my UserInfo $old-userinfo = %!users{$oldid}:delete;
-    %!users{$userid} = ($old-userinfo.defined && $old-userinfo.rank eq $rank)
+    %!users{$id} = ($old-userinfo.defined && $old-userinfo.group eq $group.key)
         ?? $old-userinfo
-        !! UserInfo.new: :$rank;
+        !! UserInfo.new: :$id, :$name, :$group;
 }
 
 method has-game-id(Int $gameid --> Bool) {

@@ -3,14 +3,13 @@ use Failable;
 use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Room;
-use PSBot::StateManager;
 use PSBot::Tools;
 use PSBot::User;
 unit class PSBot::Command;
 
 enum Locale is export <Room PM Everywhere>;
 
-subset Replier is export where Callable[Result];
+subset Replier is export where Callable[Result] | Nil;
 
 # The name of the command. This is used by the parser to find the command. Any
 # Unicode is allowed except for spaces.
@@ -19,10 +18,10 @@ has Str    $.name;
 has Bool   $.administrative;
 # Whether or not the user running the command should be autoconfirmed.
 has Bool   $.autoconfirmed;
-# The default rank required to run the command.
-has Str    $.default-rank;
-# The actual ranks required to run the command.
-has Str    %!ranks;
+# The default group required to run the command.
+has Group  $.default-group;
+# The actual groups required to run the command.
+has Group  %!groups;
 # Where the command can be used, depending on where the message containing the
 # command was sent from.
 has Locale $.locale;
@@ -39,13 +38,13 @@ has ::?CLASS $.root;
 
 proto method new(|) {*}
 multi method new(&command, Str :$name = &command.name, Bool :$administrative = False,
-        Bool :$autoconfirmed = False, Str :$default-rank = ' ', Locale :$locale = Everywhere) {
-    self.bless: :$name, :$administrative, :$autoconfirmed, :$default-rank, :$locale, :&command;
+        Bool :$autoconfirmed = False, Str :$default-group = ' ', Locale :$locale = Everywhere) {
+    self.bless: :$name, :$administrative, :$autoconfirmed, :default-group(Group(Group.enums{$default-group}) // Group(Group.enums{' '})), :$locale, :&command;
 }
 multi method new(+@subcommands, Str :$name!, Bool :$administrative = False,
-        Bool :$autoconfirmed = False, Str :$default-rank = ' ', Locale :$locale = Everywhere) {
+        Bool :$autoconfirmed = False, Str :$default-group = ' ', Locale :$locale = Everywhere) {
     my Map            $subcommands .= new: @subcommands.map(-> $sc { $sc.name => $sc });
-    my PSBot::Command $command      = self.bless: :$name, :$administrative, :$autoconfirmed, :$default-rank, :$locale, :$subcommands;
+    my PSBot::Command $command      = self.bless: :$name, :$administrative, :$autoconfirmed, :default-group(Group(Group.enums{$default-group})), :$locale, :$subcommands;
     .set-root: $command for @subcommands;
     $command
 }
@@ -66,14 +65,14 @@ method autoconfirmed(--> Bool) {
     $!autoconfirmed
 }
 
-method get-rank(Str $roomid  --> Str) {
-    return %!ranks{$roomid} if %!ranks{$roomid}:exists && %!ranks{$roomid} ne ' ';
-    return $!root.get-rank: $roomid if $!root.defined;
-    $!default-rank
+method get-group(Str $roomid  --> Group) {
+    return %!groups{$roomid} if %!groups{$roomid}:exists && %!groups{$roomid} ne ' ';
+    return $!root.get-group: $roomid if $!root.defined;
+    $!default-group
 }
 
-method set-rank(Str $roomid, Str $rank) {
-    %!ranks{$roomid} := $rank;
+method set-group(Str $roomid, Str $group --> Group) {
+    %!groups{$roomid} := Group(Group.enums{$group});
 }
 
 method locale(--> Locale) {
@@ -84,15 +83,14 @@ method locale(--> Locale) {
 
 method set-root(::?CLASS:D $!root) {}
 
-method is-rank(Str $rank --> Bool) {
-    Rank.enums{$rank}:exists
+method is-group(Str $group --> Bool) {
+    Group.enums{$group}:exists
 }
 
 # Check if a user's rank is at or above the required rank. Used for permission
 # checking.
-method can(Str $required, Str $target --> Bool) {
-    my Map $ranks = Rank.enums;
-    $ranks{$target} >= $ranks{$required}
+method can(Group $required, Group $target --> Bool) {
+    $target >= $required
 }
 
 # Takes the output of a command and returns a callback that processes it and
@@ -140,18 +138,17 @@ method reply(Result \output, PSBot::User $user, PSBot::Room $room,
 # with subcommands, extract the subcommand name from the target and run it, or
 # fail with the command chain's full name if the subcommand doesn't exist to
 # allow the parser to notify the user.
-method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
-        PSBot::StateManager $state, PSBot::Connection $connection --> Replier) {
+method CALL-ME(Str $target --> Replier) {
     given self.locale {
         when Locale::Room {
             return self.reply:
                 "Permission denied. {COMMAND}{self.name} can only be used in rooms.",
-                $user, PSBot::Room unless $room;
+                $*USER, Nil unless $*ROOM.defined;
         }
         when Locale::PM {
             return self.reply:
                 "Permission denied. {COMMAND}{self.name} can only be used in PMs.",
-                $user, PSBot::Room if $room;
+                $*USER, Nil if $*ROOM.defined;
         }
         when Locale::Everywhere {
             # No check necessary.
@@ -159,32 +156,32 @@ method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
     }
 
     if self.administrative {
-        return self.reply: 'Permission denied.', $user, PSBot::Room unless ADMINS ∋ $user.id;
+        return self.reply: 'Permission denied.', $*USER, Nil unless ADMINS ∋ $*USER.id;
     }
 
     if self.autoconfirmed {
-        my Bool $is-unlocked = self.can: ' ', $room ?? $user.rooms{$room.id}.rank !! $user.group;
+        my Bool $is-unlocked = self.can: Group(Group.enums{' '}), $*ROOM ?? $*USER.rooms{$*ROOM.id}.group !! $*USER.group;
         return self.reply:
             "Permission denied. {COMMAND}{self.name} requires your account to be autoconfirmed.",
-            $user, PSBot::Room unless $user.autoconfirmed && $is-unlocked;
+            $*USER, PSBot::Room unless $*USER.autoconfirmed && $is-unlocked;
     }
 
-    if $room.defined {
-        my      $command  := $state.database.get-command: $room.id, self.name;
+    if $*ROOM.defined {
+        my      $command  := $*BOT.database.get-command: $*ROOM.id, self.name;
         my Bool $disabled  = $command<disabled>:exists ??  $command<disabled>.Bool !! False;
         return self.reply:
-            "Permision denied. {COMMAND}{self.name} is disabled in {$room.title}.",
-            $user, PSBot::Room if $disabled;
+            "Permision denied. {COMMAND}{self.name} is disabled in {$*ROOM.title}.",
+            $*USER, PSBot::Room if $disabled;
 
-        my Str $rank = %!ranks ∋ $room.id
-            ?? self.get-rank($room.id)
-            !! self.set-rank($room.id, $command<rank>:exists ?? $command<rank> !! $!default-rank);
+        my Group $group = %!groups ∋ $*ROOM.id
+            ?? self.get-group($*ROOM.id)
+            !! self.set-group($*ROOM.id, $command<rank>:exists ?? $command<rank> !! $!default-group.key);
         return self.reply:
-            qq[Permission denied. {COMMAND}{self.name} requires at least rank "$rank".],
-            $user, PSBot::Room unless self.can: $rank, $user.rooms{$room.id}.rank;
+            qq[Permission denied. {COMMAND}{self.name} requires at least rank "$group".],
+            $*USER, PSBot::Room unless self.can: $group, $*USER.rooms{$*ROOM.id}.group;
     }
 
-    return &!command(self, $target, $user, $room, $state, $connection) if &!command;
+    return &!command(self, $target) if &!command;
 
     my Int $idx             = $target.index: ' ';
     my Str $subcommand-name = $idx.defined ?? $target.substr(0, $idx) !! $target;
@@ -192,7 +189,7 @@ method CALL-ME(Str $target, PSBot::User $user, PSBot::Room $room,
 
     my ::?CLASS          $subcommand  = $!subcommands{$subcommand-name};
     my Str               $subtarget   = $idx.defined ?? $target.substr($idx + 1) !! '';
-    my Failable[Replier] $output     := $subcommand($subtarget, $user, $room, $state, $connection);
+    my Failable[Replier] $output     := $subcommand($subtarget);
     fail "$!name {$output.exception}" unless $output.defined;
     $output
 }

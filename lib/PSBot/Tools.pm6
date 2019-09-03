@@ -13,7 +13,7 @@ my enum Status is export (
 
 my subset Result is export where Str | Positional | Sequence | Awaitable | Nil;
 
-my enum Rank is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
+my enum Group is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
 
 my enum Visibility is export (
     Public => 'public',

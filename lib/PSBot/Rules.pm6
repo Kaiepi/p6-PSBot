@@ -19,10 +19,10 @@ my class Rule {
         self.bless: :$includes, :$excludes, :$matcher, :&on-match;
     }
 
-    method match($target, $room, $user, $state, $connection) {
-        return if $room && ((+$!includes && $!includes ∌ $room.id) || (+$!excludes && $!excludes ∋ $room.id));
+    method match($target) {
+        return if $*ROOM && ((+$!includes && $!includes ∌ $*ROOM.id) || (+$!excludes && $!excludes ∋ $*ROOM.id));
         $target ~~ $!matcher;
-        &!on-match($/, $room, $user, $state, $connection) if $/;
+        &!on-match($/) if $/;
     }
 }
 
@@ -38,9 +38,9 @@ method new() {
             [],
             [],
             token { ^ '/log ' .+? ' made this room ' $<visibility>=[\w+] '.' $ },
-            -> $/, $room, $user, $state, $connection {
+            -> Match $/ {
                 my Str $visibility = ~$<visibility>;
-                $room.set-visibility: $visibility;
+                $*ROOM.set-visibility: $visibility;
             }
         ),
         Rule.new(
@@ -55,13 +55,13 @@ method new() {
                 ]
                 »
             },
-            -> $/, $room, $user, $state, $connection {
-                if YOUTUBE_API_KEY && $user.name ne $state.username {
+            -> Match $/ {
+                if YOUTUBE_API_KEY && $*USER.name ne $*BOT.username {
                     my Str             $id    = ~$<id>;
                     my Failable[Video] $video = get-video $id;
                     $video.defined
-                        ?? qq[{$user.name} posted a video: "{$video.title}"]
-                        !! "Failed to get the video {$user.name} posted: {$video.exception.message}"
+                        ?? qq[{$*USER.name} posted a video: "{$video.title}"]
+                        !! "Failed to get the video {$*USER.name} posted: {$video.exception.message}"
                 }
             }
         ),
@@ -77,9 +77,9 @@ method new() {
                 ]
                 $
             },
-            -> $/, $room, $user, $state, $connection {
-                my Str                   $roomid = $room.id;
-                my PSBot::User::RoomInfo $ri     = $user.rooms{$roomid};
+            -> Match $/ {
+                my Str                   $roomid = $*ROOM.id;
+                my PSBot::User::RoomInfo $ri     = $*USER.rooms{$roomid};
                 if $ri.defined {
                     my Instant $timeout = $ri.broadcast-timeout;
                     my Str     $command = $ri.broadcast-command;
@@ -117,7 +117,7 @@ method new() {
             ['scholastic'],
             [],
             token { :i ar\-?15 },
-            -> $/, $room, $user, $state, $connection {
+            -> Match $/ {
                 state Instant $timeout = now - 600;
                 if now - $timeout >= 600 {
                     $timeout = now;
@@ -129,7 +129,7 @@ method new() {
             ['techcode'],
             [],
             token { :i 'can i ask a question' },
-            -> $/, $room, $user, $state, $connection {
+            -> Match $/ {
                 "Don't ask if you can ask a question. Just ask it"
             }
         )
@@ -138,12 +138,12 @@ method new() {
         Rule.new(
             [],
             [],
-            token { ^ '/invite ' $<roomid>=[<[a..z]>+] $ },
-            -> $/, $room, $user, $state, $connection {
+            token { ^ '/invite ' $<roomid>=[<[a..z 0..9 -]>+] $ },
+            -> Match $/ {
                 my Str $roomid = ~$<roomid>;
                 unless $roomid.starts-with: 'battle-' {
-                    my Map $ranks  = Rank.enums;
-                    "/join $roomid" if $ranks{$user.group} >= $ranks<%>;
+                    my Map $groups = Group.enums;
+                    "/join $roomid" if $groups{$*USER.group} >= $groups<%>;
                 }
             }
         )
@@ -161,51 +161,51 @@ method new() {
                 '" alt="' <-["]>* '" width="80" height="80" />'
                 $
             },
-            -> $/, $room, $user, $state, $connection {
+            -> Match $/ {
                 my Str $avatar = ~$<avatar>;
-                $state.set-avatar: $avatar;
+                $*BOT.set-avatar: $avatar;
             }
         ),
         Rule.new(
             [],
             [],
             token { ^ '<div class="broadcast-red"><strong>Moderated chat was set to ' $<rank>=[.+?] '!</strong><br />Only users of rank + and higher can talk.</div>' },
-            -> $/, $room, $user, $state, $connection {
+            -> Match $/ {
                 my Str $rank = ~$<rank>;
-                $room.set-modchat: $rank;
+                $*ROOM.set-modchat: $rank;
             }
         ),
         Rule.new(
             [],
             [],
             token { ^ '<div class="broadcast-blue"><strong>Moderated chat was disabled!</strong><br />Anyone may talk now.</div>' $ },
-            -> $/, $room, $user, $state, $connection {
-                $room.set-modchat: ' ';
+            -> Match $/ {
+                $*ROOM.set-modchat: ' ';
             }
         ),
         Rule.new(
             [],
             [],
             token { ^ '<div class="broadcast-red"><strong>This room is now invite only!</strong><br />Users must be rank ' $<rank>=[.+?] ' or invited with <code>/invite</code> to join</div>' $ },
-            -> $/, $room, $user, $state, $connection {
+            -> Match $/ {
                 my Str $rank = ~$<rank>;
-                $room.set-modjoin: $rank;
+                $*ROOM.set-modjoin: $rank;
             }
         ),
         Rule.new(
             [],
             [],
             token { ^ '<div class="broadcast-red"><strong>Moderated join is set to sync with modchat!</strong><br />Only users who can speak in modchat can join.</div>' $ },
-            -> $/, $room, $user, $state, $connection {
-                $room.set-modjoin: True;
+            -> Match $/ {
+                $*ROOM.set-modjoin: True;
             }
         ),
         Rule.new(
             [],
             [],
             token { ^ '<div class="broadcast-blue"><strong>This room is no longer invite only!</strong><br />Anyone may now join.</div>' $ },
-            -> $/, $room, $user, $state, $connection {
-                $room.set-modjoin: ' ';
+            -> Match $/ {
+                $*ROOM.set-modjoin: ' ';
             }
         )
     ];

@@ -1,41 +1,43 @@
 use v6.d;
 use PSBot::Tools;
+use PSBot::UserInfo;
 unit class PSBot::User;
 
 class RoomInfo {
-    has Str $.rank;
-
+    has Group   $.group;
     has Str     $.broadcast-command is rw;
     has Instant $.broadcast-timeout is rw;
+
+    method set-group(Group :$!group) {}
 }
 
+has Group    $.group;
 has Str      $.id;
 has Str      $.name;
 has Status   $.status;
 has Str      $.message;
-has Str      $.group;
 has Str      $.avatar;
 has Bool     $.autoconfirmed;
 has RoomInfo %.rooms;
 has Symbol   %.games{Int};
 has Promise  $.propagated .= new;
 
-proto method new(Str, Str $?) {*}
-multi method new(Str $userinfo) {
-    my Str $name = $userinfo.substr: 1;
-    my Str $id   = to-id $name;
+proto method new(PSBot::UserInfo, Str $?) {*}
+multi method new(PSBot::UserInfo $userinfo) {
+    my Str $id   = $userinfo.id;
+    my Str $name = $userinfo.name;
     self.bless: :$id, :$name;
 }
-multi method new(Str $userinfo, Str $roomid) {
-    my Str      $rank  = $userinfo.substr: 0, 1;
-    my Str      $name  = $userinfo.substr: 1;
-    my Str      $id    = to-id $name;
-    my RoomInfo %rooms = %($roomid => RoomInfo.new: :$rank);
+multi method new(PSBot::UserInfo $userinfo, Str $roomid) {
+    my Group    $group = $userinfo.group;
+    my Str      $id    = $userinfo.id;
+    my Str      $name  = $userinfo.name;
+    my RoomInfo %rooms = %($roomid => RoomInfo.new: :$group);
     self.bless: :$id, :$name, :%rooms
 }
 
-method set-rank(Str $roomid, Str $rank) {
-    %!rooms{$roomid} = RoomInfo.new: :$rank;
+method set-group(Str $roomid, Group $group) {
+    %!rooms{$roomid}.set-group: :$group;
 }
 
 method is-guest(--> Bool) {
@@ -43,7 +45,7 @@ method is-guest(--> Bool) {
 }
 
 method on-user-details(%data) {
-    $!group         = %data<group> // ' ';
+    $!group         = Group(Group.enums{%data<group> // ' '});
     $!avatar        = ~%data<avatar>;
     $!autoconfirmed = %data<autoconfirmed>;
 
@@ -66,21 +68,20 @@ method on-user-details(%data) {
     $!propagated.keep unless $!propagated.status ~~ Kept;
 }
 
-method on-join(Str $userinfo, Str $roomid) {
-    my Str $rank = $userinfo.substr: 0, 1;
-    %!rooms{$roomid} = RoomInfo.new: :$rank;
+method on-join(PSBot::UserInfo $userinfo, Str $roomid) {
+    my Group $group = $userinfo.group;
+    %!rooms{$roomid} = RoomInfo.new: :$group;
 }
 
 method on-leave(Str $roomid) {
     %!rooms{$roomid}:delete;
 }
 
-method rename(Str $userinfo, Str $roomid) {
-    my Str $rank = $userinfo.substr: 0, 1;
-    my Int $idx  = $userinfo.rindex('@!') // $userinfo.codes;
-    %!rooms{$roomid} = RoomInfo.new: :$rank;
-    $!name           = $userinfo.substr: 1, $idx;
-    $!id             = to-id $!name;
+method rename(PSBot::UserInfo $userinfo, Str $roomid) {
+    my Group $group  = $userinfo.group;
+    $!id             = $userinfo.id;
+    $!name           = $userinfo.name;
+    %!rooms{$roomid} = RoomInfo.new: :$group;
 }
 
 method has-game-id(Int $gameid --> Bool) {

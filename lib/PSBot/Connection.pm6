@@ -14,22 +14,14 @@ has Bool    $.force-closed   = False;
 has Channel $.on-connect    .= new;
 has Channel $.on-disconnect .= new;
 
-has Supplier::Preserving $!receiver;
-has Supply               $!receiver-supply;
-has Tap                  $!receiver-tap;
+has Rat      $.throttle            = 0.6;
+has Supplier $!on-update-throttle .= new;
 
-has Lock::Async $!sender-mux;
-has Supplier    $!sender;
-has Supply      $!sender-supply;
-has Tap         $!sender-tap;
+has Supplier::Preserving $!sender        .= new;
+has Supplier::Preserving $!receiver      .= new;
+has Tap                  $!messages-tap;
 
-submethod BUILD(Cro::WebSocket::Client :$!client) {
-    $!receiver        .= new;
-    $!receiver-supply  = $!receiver.Supply.schedule-on($*SCHEDULER).serialize;
-    $!sender-mux      .= new;
-    $!sender          .= new;
-    # $!sender-supply is assigned on connect.
-}
+submethod BUILD(Cro::WebSocket::Client :$!client) {}
 
 method new(Str $host, Int $port) {
     my Str                    $protocol  = $port == 443 ?? 'wss' !! 'ws';
@@ -38,8 +30,20 @@ method new(Str $host, Int $port) {
     self.bless: :$client;
 }
 
+method set-throttle(Rat $!throttle --> Nil) {
+    $!on-update-throttle.emit: $!throttle;
+}
+
+method on-update-throttle(--> Supply) {
+    $!on-update-throttle.Supply
+}
+
+method sender(--> Supply) {
+    $!sender.Supply.schedule-on($*SCHEDULER).serialize.throttle(1, $!throttle)
+}
+
 method receiver(--> Supply) {
-    $!receiver-supply
+    $!receiver.Supply.schedule-on($*SCHEDULER).serialize
 }
 
 method uri(--> Str) {
@@ -64,39 +68,18 @@ method connect() {
     $!timeout      = 1;
     $!force-closed = False;
 
-    # Reset the sender supply in case of reconnect and set up message handling.
-    $!sender-mux.protect({
-        $!sender-supply = $!sender.Supply.schedule-on($*SCHEDULER).serialize.throttle(1, 0.6);
-        $!sender-tap    = $!sender-supply.tap(-> $data {
-            debug '[SEND]', $data;
-            $!connection.send: $data unless self.closed;
-        });
-    });
-
     # Pass any received messages back to PSBot to pass to the parser.
-    $!receiver-tap = $!connection.messages.on-close({
+    $!messages-tap = $!connection.messages.on-close({
         $!on-disconnect.send: True;
         $*SCHEDULER.cue({ self.reconnect }) unless $!force-closed;
     }).tap(-> $data {
         if $data.is-text {
             my Str $text = await $data.body-text;
-            debug '[RECV]', $text;
             $!receiver.emit: $text;
         }
     });
 
     $!on-connect.send: True;
-}
-
-method set-throttle(Rat $throttle --> Nil) {
-    $!sender-mux.protect({
-        $!sender-tap.close;
-        $!sender-supply = $!sender.Supply.schedule-on($*SCHEDULER).serialize.throttle(1, $throttle);
-        $!sender-tap    = $!sender-supply.tap(-> $data {
-            debug '[SEND]', $data;
-            $!connection.send: $data;
-        });
-    })
 }
 
 method reconnect() {
@@ -112,58 +95,59 @@ method reconnect() {
     $!timeout *= 2;
 }
 
-proto method send(*@, Str :$roomid?, Str :$userid? --> Nil) {
-    $!sender-mux.protect({{*}})
-}
+proto method send(*@, Str :$roomid?, Str :$userid? --> Nil) {*}
 multi method send(*@data --> Nil) {
     for @data -> $data {
-        if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
-            $!sender.emit: "| $data";
+        my Str $message = do if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
+            "| $data"
         } else {
-            $!sender.emit: "|$data";
-        }
+            "|$data"
+        };
+        $!sender.emit: $message;
     }
 }
 multi method send(*@data, Str :$roomid! --> Nil) {
     for @data -> $data {
-        if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
-            $!sender.emit: "$roomid| $data";
+        my Str $message = do if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
+            "$roomid| $data"
         } else {
-            $!sender.emit: "$roomid|$data";
-        }
+            "$roomid|$data"
+        };
+        $!sender.emit: $message;
     }
 }
 multi method send(*@data, Str :$userid! --> Nil) {
     for @data -> $data {
-        given $data {
-            when / ^ '/' <!before '/'> /          { $!sender.emit: "|/w $userid, /$data" }
-            when / ^ '!' <!before '!'> /          { $!sender.emit: "|/w $userid, !$data" }
-            when / ^ [ '~~ ' | '>> ' | '>>> ' ] / { $!sender.emit: "|/w $userid,  $data" }
-            default                               { $!sender.emit: "|/w $userid, $data"  }
-        }
+        my Str $message = do given $data {
+            when / ^ '/' <!before '/'> /          { "|/w $userid, /$data" }
+            when / ^ '!' <!before '!'> /          { "|/w $userid, !$data" }
+            when / ^ [ '~~ ' | '>> ' | '>>> ' ] / { "|/w $userid,  $data" }
+            default                               { "|/w $userid, $data"  }
+        };
+        $!sender.emit: $message;
     }
 }
 
-proto method send-raw(*@, Str :$roomid?, Str :$userid? --> Nil) {
-    $!sender-mux.protect({{*}})
-}
+proto method send-raw(*@, Str :$roomid?, Str :$userid? --> Nil) {*}
 multi method send-raw(*@data --> Nil) {
     for @data -> $data {
+        my Str $message = "|$data";
         if $data.starts-with('/cmd userdetails') || $data.starts-with('>> ') {
             # These commands are not throttled.
-            debug '[SEND]', "|$data";
-            $!connection.send: "|$data";
+            debug '[SEND]', $message;
+            $*SCHEDULER.cue({ $!connection.send: $message });
         } else {
-            $!sender.emit: "|$data";
+            $!sender.emit: $message;
         }
     }
 }
 multi method send-raw(*@data, Str :$roomid! --> Nil) {
     for @data -> $data {
+        my Str $message = "$roomid|$data";
         if $data.starts-with: '>> ' {
             # This command is not throttled.
-            debug '[SEND]', "|$data";
-            $!connection.send: "$roomid|$data";
+            debug '[SEND]', $message;
+            $*SCHEDULER.cue({ $!connection.send: $message });
         } else {
             $!sender.emit: "$roomid|$data";
         }
@@ -180,11 +164,12 @@ method close(Bool :$force = False --> Promise) {
 
     $!force-closed = $force;
 
-    $!receiver.done if $force;
-    $!receiver-tap.close;
+    if $force {
+        $!sender.done;
+        $!receiver.done;
+    }
 
-    $!sender.done if $force;
-    $!sender-tap.close;
+    $!messages-tap.close;
 
-    $!connection.close;
+    $!connection.close
 }
