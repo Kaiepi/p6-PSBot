@@ -150,7 +150,7 @@ BEGIN {
             if $userid eq $*BOT.userid || $userid eq to-id $*BOT.guest-username {
                 # TODO: login server needs updating if the name is different
                 # but the userid is the same.
-                $*BOT.connection.send-raw: "/trn $username";
+                $*BOT.connection.send: "/trn $username", :raw;
                 await $*BOT.pending-rename;
                 return self.reply: "Successfully renamed to $username!", $*USER, $*ROOM;
             }
@@ -160,7 +160,7 @@ BEGIN {
                 "Failed to rename to $username: {$assertion.exception.message}",
                 $*USER, $*ROOM if $assertion ~~ Failure:D;
 
-            $*BOT.connection.send-raw: "/trn $username,0,$assertion";
+            $*BOT.connection.send: "/trn $username,0,$assertion", :raw;
             await $*BOT.pending-rename;
             self.reply: "Successfully renamed to $username!", $*USER, $*ROOM
         };
@@ -169,7 +169,7 @@ BEGIN {
         :administrative,
         anon method suicide(Str $target --> Replier) {
             $*BOT.login-server.log-out: $*BOT.username;
-            $*BOT.connection.send-raw: '/logout';
+            $*BOT.connection.send: '/logout', :raw;
             await $*BOT.pending-rename;
             try await $*BOT.connection.close: :force;
             $*BOT.database.DESTROY;

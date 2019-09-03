@@ -66,11 +66,11 @@ method start() {
         react {
             whenever $!connection.on-connect {
                 # Setup prologue.
-                $!connection.send-raw: "/avatar {AVATAR}" if AVATAR.defined;
+                $!connection.send: "/avatar {AVATAR}", :raw if AVATAR.defined;
 
                 my Str @rooms    = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
                 my Str $autojoin = @rooms.join: ',';
-                $!connection.send-raw: "/autojoin $autojoin";
+                $!connection.send: "/autojoin $autojoin", :raw;
             }
             whenever $!connection.on-disconnect {
                 # We disconnected from the server.
@@ -103,37 +103,37 @@ method start() {
             }
             whenever $!room-joined -> Str $roomid {
                 # Propagate room state on join.
-                $!connection.send-raw: "/cmd roominfo $roomid";
+                $!connection.send: "/cmd roominfo $roomid", :raw;
             }
             whenever $!user-joined -> Str $userid {
                 # Propagate user state on join or rename.
-                $!connection.send-raw: "/cmd userdetails $userid"
+                $!connection.send: "/cmd userdetails $userid", :raw
                     if $!users-propagated.status ~~ Kept;
             }
             whenever $!logged-in {
                 # Now that we're logged in, join any remaining rooms manually. This
                 # is in case any of them have modjoin set.
-                $!connection.send-raw: ROOMS.keys[11..*].map({ "/join $_" }) if +ROOMS > 11;
+                $!connection.send: ROOMS.keys[11..*].map({ "/join $_" }), :raw if +ROOMS > 11;
             }
             whenever $!rooms-propagated {
                 # Awaits any users waiting to get propagated, ignoring guests.
                 # Note: $!chat-mux is already locked when this runs.
                 if %!users.values.grep(!*.propagated) -> @unpropagated-users {
-                    $!connection.send-raw: @unpropagated-users.map({ "/cmd userdetails " ~ .id });
+                    $!connection.send: @unpropagated-users.map({ "/cmd userdetails " ~ .id }), :raw;
                 } else {
-                    $!users-propagated.keep;
+                    $!users-propagated.keep if $!users-propagated.status ~~ Planned;
                 }
             }
             whenever $!users-propagated {
                 # Setup epilogue.
                 # Note: $!chat-mux is already locked when this runs.
-                $!connection.send-raw: '/blockchallenges'
+                $!connection.send: '/blockchallenges', :raw
                     unless $!challenges-blocked;
-                $!connection.send-raw: '/unblockpms'
+                $!connection.send: '/unblockpms', :raw
                     if $!pms-blocked;
-                $!connection.send-raw: '/ht ignore', :roomid<staff>
+                $!connection.send: '/ht ignore', :roomid<staff>, :raw
                     if %!rooms<staff>:exists && !$!help-tickets-ignored;
-                $!connection.send-raw: "/status {STATUS}"
+                $!connection.send: "/status {STATUS}", :raw
                     if STATUS.defined;
 
                 # Send user mail if the recipient is online. If not, wait until
@@ -312,9 +312,9 @@ method get-rooms(--> Hash[PSBot::Room]) {
     })
 }
 
-method add-room(Str $roomid) {
+method add-room(Str $roomid, RoomType $type) {
     $!chat-mux.protect({
-        my PSBot::Room $room .= new: $roomid;
+        my PSBot::Room $room .= new: $roomid, $type;
         $room.add-game: .id, .type for %!games.values.grep: *.has-room: $room;
         %!rooms{$roomid} = $room;
         $!room-joined.send: $roomid;

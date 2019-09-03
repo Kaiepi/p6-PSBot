@@ -4,12 +4,14 @@ use PSBot::Tools;
 use PSBot::UserInfo;
 use Test;
 
-plan 7;
+plan 8;
 
 my Str         $roomid  = 'lobby';
-my PSBot::Room $room   .= new: $roomid;
+my RoomType    $type    = Chat;
+my PSBot::Room $room   .= new: $roomid, $type;
 
 is $room.id, $roomid, 'can set room id attribute';
+is $room.type, $type, 'can set room type attribute';
 
 # PSBot::Room.on-room-info is tested in t/04-parser.t
 

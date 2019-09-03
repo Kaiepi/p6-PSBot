@@ -9,7 +9,7 @@ unit class PSBot::Command;
 
 enum Locale is export <Room PM Everywhere>;
 
-subset Replier is export where Callable[Result] | Nil;
+subset Replier is export where Callable[Capture] | Nil;
 
 # The name of the command. This is used by the parser to find the command. Any
 # Unicode is allowed except for spaces.
@@ -97,7 +97,7 @@ method can(Group $required, Group $target --> Bool) {
 # sends a response to the user.
 method reply(Result \output, PSBot::User $user, PSBot::Room $room,
         Bool :$raw = False, Bool :$paste = False --> Replier) is pure {
-    sub (PSBot::Connection $connection --> Result) {
+    sub (--> Capture) {
         my Result $result := output;
         $result := await $result while $result ~~ Awaitable:D;
         given $result {
@@ -120,17 +120,13 @@ method reply(Result \output, PSBot::User $user, PSBot::Room $room,
         };
         return unless $result;
 
-        if $raw {
-            $room
-                ?? $connection.send-raw: $result, roomid => $room.id
-                !! $connection.send-raw: $result, userid => $user.id;
+        if $room.defined {
+            my Str $roomid = $room.id;
+            \($result, :$roomid, :$raw)
         } else {
-            $room
-                ?? $connection.send: $result, roomid => $room.id
-                !! $connection.send: $result, userid => $user.id;
+            my Str $userid = $user.id;
+            \($result, :$userid, :$raw)
         }
-
-        $result
     }
 }
 

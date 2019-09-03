@@ -95,53 +95,8 @@ method reconnect() {
     $!timeout *= 2;
 }
 
-proto method send(*@, Str :$roomid?, Str :$userid? --> Nil) {*}
-multi method send(*@data --> Nil) {
-    for @data -> $data {
-        my Str $message = do if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
-            "| $data"
-        } else {
-            "|$data"
-        };
-        $!sender.emit: $message;
-    }
-}
-multi method send(*@data, Str :$roomid! --> Nil) {
-    for @data -> $data {
-        my Str $message = do if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
-            "$roomid| $data"
-        } else {
-            "$roomid|$data"
-        };
-        $!sender.emit: $message;
-    }
-}
-multi method send(*@data, Str :$userid! --> Nil) {
-    for @data -> $data {
-        my Str $message = do given $data {
-            when / ^ '/' <!before '/'> /          { "|/w $userid, /$data" }
-            when / ^ '!' <!before '!'> /          { "|/w $userid, !$data" }
-            when / ^ [ '~~ ' | '>> ' | '>>> ' ] / { "|/w $userid,  $data" }
-            default                               { "|/w $userid, $data"  }
-        };
-        $!sender.emit: $message;
-    }
-}
-
-proto method send-raw(*@, Str :$roomid?, Str :$userid? --> Nil) {*}
-multi method send-raw(*@data --> Nil) {
-    for @data -> $data {
-        my Str $message = "|$data";
-        if $data.starts-with('/cmd userdetails') || $data.starts-with('>> ') {
-            # These commands are not throttled.
-            debug '[SEND]', $message;
-            $*SCHEDULER.cue({ $!connection.send: $message });
-        } else {
-            $!sender.emit: $message;
-        }
-    }
-}
-multi method send-raw(*@data, Str :$roomid! --> Nil) {
+proto method send(| --> Nil) {*}
+multi method send(*@data, Str :$roomid!, Bool :$raw where True --> Nil) {
     for @data -> $data {
         my Str $message = "$roomid|$data";
         if $data.starts-with: '>> ' {
@@ -153,9 +108,52 @@ multi method send-raw(*@data, Str :$roomid! --> Nil) {
         }
     }
 }
-multi method send-raw(*@data, Str :$userid! --> Nil) {
+multi method send(*@data, Str :$roomid!, Bool :$raw where not *.so --> Nil) {
+    for @data -> $data {
+        my Str $message = do if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
+            "$roomid| $data"
+        } else {
+            "$roomid|$data"
+        };
+        $!sender.emit: $message;
+    }
+}
+multi method send(*@data, Str :$userid!, Bool :$raw where .so --> Nil) {
     for @data -> $data {
         $!sender.emit: "|/w $userid, $data";
+    }
+}
+multi method send(*@data, Str :$userid!, Bool :$raw where not *.so --> Nil) {
+    for @data -> $data {
+        my Str $message = do given $data {
+            when / ^ '/' <!before '/'> /          { "|/w $userid, /$data" }
+            when / ^ '!' <!before '!'> /          { "|/w $userid, !$data" }
+            when / ^ [ '~~ ' | '>> ' | '>>> ' ] / { "|/w $userid,  $data" }
+            default                               { "|/w $userid, $data"  }
+        };
+        $!sender.emit: $message;
+    }
+}
+multi method send(*@data, Bool :$raw where .so --> Nil) {
+    for @data -> $data {
+        my Str $message = "|$data";
+        if $data.starts-with('/cmd userdetails') || $data.starts-with('>> ') {
+            # These commands are not throttled.
+            debug '[SEND]', $message;
+            $*SCHEDULER.cue({ $!connection.send: $message });
+        } else {
+            $!sender.emit: $message;
+        }
+    }
+}
+multi method send(*@data, Bool :$raw where not *.so --> Nil) {
+    for @data -> $data {
+        my Str $message = do if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
+            "| $data"
+        } else {
+            "|$data"
+        };
+        $!sender.emit: $message;
     }
 }
 

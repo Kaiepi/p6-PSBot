@@ -15,7 +15,7 @@ class UserInfo {
 
 has Str         $.id;
 has Str         $.title;
-has Str         $.type;
+has RoomType    $.type;
 has Visibility  $.visibility;
 has Str         $.modchat;
 has Modjoin     $.modjoin;
@@ -24,8 +24,8 @@ has UserInfo    %.users;
 has Symbol      %.games{Int};
 has Promise     $.propagated .= new;
 
-method new(Str $id) {
-    self.bless: :$id
+method new(Str $id, RoomType $type --> ::?CLASS:D) {
+    self.bless: :$id, :$type
 }
 
 method modjoin(--> Str) {

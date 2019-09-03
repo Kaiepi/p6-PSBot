@@ -2,6 +2,14 @@ use v6.d;
 use Pastebin::Shadowcat;
 unit module PSBot::Tools;
 
+my enum MessageType is export (
+    ChatMessage    => 'c:',
+    PrivateMessage => 'pm',
+    PopupMessage   => 'popup',
+    HTMLMessage    => 'html',
+    RawMessage     => 'raw'
+);
+
 my enum Status is export (
     Online => 'Online',
     Idle   => 'Idle',
@@ -11,8 +19,6 @@ my enum Status is export (
     Busy   => 'Busy'
 );
 
-my subset Result is export where Str | Positional | Sequence | Awaitable | Nil;
-
 my enum Group is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
 
 my enum Visibility is export (
@@ -20,6 +26,14 @@ my enum Visibility is export (
     Hidden => 'hidden',
     Secret => 'secret'
 );
+
+my enum RoomType is export (
+    Chat      => 'chat',
+    Battle    => 'battle',
+    GroupChat => 'groupchat'
+);
+
+my subset Result is export where Str | Positional | Sequence | Awaitable | Nil;
 
 # Yes, a CPAN module exists for this already. We don't use it because it has
 # unnecessary dependencies.

@@ -1,8 +1,6 @@
 use v6.d;
 use Failable;
 use JSON::Fast;
-use PSBot::Command;
-use PSBot::Commands;
 use PSBot::Config;
 use PSBot::Room;
 use PSBot::Tools;
@@ -63,7 +61,7 @@ method message:sym<challstr>(Match $/) {
     my Str           $challenge = $<challenge>.made;
     my Failable[Str] $assertion = $*BOT.authenticate: USERNAME // '', PASSWORD // '', $challenge;
     if $assertion.defined {
-        $*BOT.connection.send-raw: "/trn {USERNAME},0,$assertion";
+        $*BOT.connection.send: "/trn {USERNAME},0,$assertion", :raw;
     } elsif $assertion ~~ Failure:D {
         $assertion.throw;
     }
@@ -104,9 +102,8 @@ method message:sym<queryresponse>(Match $/) {
     }
 }
 method message:sym<init>(Match $/) {
-    my Str $type = $<type>.made;
-    # TODO: keep track of room type.
-    $*BOT.add-room: $*ROOMID;
+    my RoomType $type = RoomType($<type>.made);
+    $*BOT.add-room: $*ROOMID, $type;
 }
 method message:sym<deinit>(Match $/) {
     $*BOT.delete-room: $*ROOMID;
@@ -255,100 +252,25 @@ method message:sym<c:>(Match $/ is copy) {
     await $*BOT.rooms-propagated;
     await $*BOT.users-propagated;
 
+    my Str         $message  = $<message>.made;
     my PSBot::User $*USER   := $*BOT.get-user: $userid;
     my Str         $roomid   = $*ROOMID;
     my PSBot::Room $*ROOM   := $*BOT.get-room: $roomid;
-    my Str         $message  = $<message>.made;
-    for $*BOT.rules.chat -> $rule {
-        my Result \output = $rule.match: $message;
-        output = await output while output ~~ Awaitable:D;
-        $*BOT.connection.send-raw: output, :$roomid if output;
-        return if output;
-    }
-
-    # TODO: this should be a rule
-    if $message.starts-with: COMMAND {
-        return unless $message ~~ token { ^ $(COMMAND) $<command>=\S+ [ \s $<target>=.+ ]? $ };
-        return unless $<command>.defined;
-
-        my Str $command-name = ~$<command>;
-        return unless $command-name;
-        return unless PSBot::Commands::{$command-name}:exists;
-
-        my $bot  = $*BOT;
-        my $user = $*USER;
-        my $room = $*ROOM;
-        $*SCHEDULER.cue({
-            my $*BOT  := $bot;
-            my $*USER := $user;
-            my $*ROOM := $room;
-
-            my PSBot::Command    $command = PSBot::Commands::{$command-name};
-            my Str               $target  = $<target>.defined ?? ~$<target> !! '';
-            my Failable[Replier] $replier = $command($target);
-            if $replier.defined {
-                $replier($*BOT.connection);
-            } elsif $replier ~~ Failure:D {
-                my Str $message = "Invalid subcommand: {COMMAND}{$replier.exception.message}";
-                $*BOT.connection.send: $message, :$roomid;
-            }
-        });
-    }
+    $*BOT.rules.parse: MessageType('c:'), $message, :$roomid;
 }
 method message:sym<pm>(Match $/ is copy) {
-    my PSBot::UserInfo $from    = $<from>.made;
-    my PSBot::UserInfo $to      = $<to>.made;
-    my Str             $message = $<message>.made;
+    my PSBot::UserInfo $from = $<from>.made;
     return if $from.name === $*BOT.username;
 
     await $*BOT.rooms-propagated;
     await $*BOT.users-propagated;
 
-    my Str         $userid  = $from.id;
-    my PSBot::User $*USER  := $*BOT.get-user: $userid;
-    my Str         $roomid  = $*ROOMID;
-    my PSBot::Room $*ROOM  := PSBot::Room;
-    if $*USER.defined {
-        $*USER.set-group: $from.group unless $from.group === $*USER.group;
-    } else {
-        $*USER := PSBot::User.new: $from;
-    }
-
-    for $*BOT.rules.pm -> $rule {
-        my Result \output = $rule.match: $message;
-        output = await output while output ~~ Awaitable:D;
-        $*BOT.send-raw: output, :$userid if output;
-        return if output;
-    }
-
-    # TODO: this should be a rule
-    if $message.starts-with: COMMAND {
-        return unless $message ~~ token { ^ $(COMMAND) $<command>=\S+ [ \s $<target>=.+ ]? $ };
-        return unless $<command>.defined;
-
-        my Str $command-name = ~$<command>;
-        return unless $command-name;
-        return unless PSBot::Commands::{$command-name}:exists;
-
-        my $bot  = $*BOT;
-        my $user = $*USER;
-        my $room = $*ROOM;
-        $*SCHEDULER.cue({
-            my $*BOT  := $bot;
-            my $*USER := $user;
-            my $*ROOM := $room;
-
-            my PSBot::Command    $command = PSBot::Commands::{$command-name};
-            my Str               $target  = $<target>.defined ?? ~$<target> !! '';
-            my Failable[Replier] $replier = $command($target);
-            if $replier.defined {
-                $replier($*BOT.connection);
-            } elsif $replier ~~ Failure:D {
-                my Str $message = "Invalid subcommand: {COMMAND}{$replier.exception.message}";
-                $*BOT.connection.send: $message, :$roomid;
-            }
-        });
-    }
+    my Str         $message  = $<message>.made;
+    my Str         $userid   = $from.id;
+    my PSBot::User $*USER   := $*BOT.get-user: $userid;
+    my Str         $roomid   = $*ROOMID;
+    my PSBot::Room $*ROOM   := $*BOT.get-room: $roomid;
+    $*BOT.rules.parse: MessageType('pm'), $message, :$userid;
 }
 method message:sym<html>(Match $/) {
     return if $*INIT;
@@ -360,12 +282,7 @@ method message:sym<html>(Match $/) {
     my PSBot::User $*USER  := PSBot::User;
     my Str         $roomid  = $*ROOMID;
     my PSBot::Room $*ROOM  := $*BOT.get-room: $roomid;
-    for $*BOT.rules.html -> $rule {
-        my Result \output = $rule.match: $data;
-        output = await output while output ~~ Awaitable:D;
-        $*BOT.connection.send-raw: output, :$roomid if output;
-        return if output;
-    }
+    $*BOT.rules.parse: MessageType('html'), $data, :$roomid;
 }
 method message:sym<popup>(Match $/) {
     return if $*INIT;
@@ -377,12 +294,7 @@ method message:sym<popup>(Match $/) {
     my PSBot::User $*USER  := PSBot::User;
     my Str         $roomid  = $*ROOMID;
     my PSBot::Room $*ROOM  := $*BOT.get-room: $roomid;
-    for $*BOT.rules.popup -> $rule {
-        my Result \output = $rule.match: $data;
-        output = await output while output ~~ Awaitable:D;
-        $*BOT.connection.send-raw: output, :$roomid if output;
-        return if output;
-    }
+    $*BOT.rules.parse: MessageType('popup'), $data, :$roomid;
 }
 method message:sym<raw>(Match $/) {
     return if $*INIT;
@@ -394,10 +306,5 @@ method message:sym<raw>(Match $/) {
     my PSBot::User $*USER  := PSBot::User;
     my Str         $roomid  = $*ROOMID;
     my PSBot::Room $*ROOM  := $*BOT.get-room: $roomid;
-    for $*BOT.rules.raw -> $rule {
-        my Result \output = $rule.match: $data;
-        output = await output while output ~~ Awaitable:D;
-        $*BOT.connection.send-raw: output, :$roomid if output;
-        return if output;
-    }
+    $*BOT.rules.parse: MessageType('popup'), $data, :$roomid;
 }
