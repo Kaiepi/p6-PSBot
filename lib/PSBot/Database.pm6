@@ -119,8 +119,8 @@ method add-user(Str $name --> Int) {
         my Failable[Int] $rowid = self.get-user: $name;
         return $rowid if $rowid.defined;
 
-        my DB::SQLite::Statement  $sth;
-        my DB::SQLite::Result     $res;
+        my DB::SQLite::Statement $sth;
+        my DB::SQLite::Result    $res;
 
         $!db.begin;
         $sth = $!db.prepare: q:to/STATEMENT/, :nocache;
@@ -128,9 +128,14 @@ method add-user(Str $name --> Int) {
         VALUES (?);
         STATEMENT
         $sth.execute: $userid;
+        $res = $!db.query: q:to/STATEMENT/, $userid;
+        SELECT (ROWID)
+        FROM users
+        WHERE id = ?;
+        STATEMENT
         $!db.commit;
 
-        self.get-user: $name;
+        $res.value;
     })
 }
 
@@ -180,8 +185,8 @@ method add-room(Str $name --> Int) {
         my Failable[Int] $rowid = self.get-room: $name;
         return $rowid if $rowid.defined;
 
-        my DB::SQLite::Statement  $sth;
-        my DB::SQLite::Result     $res;
+        my DB::SQLite::Statement $sth;
+        my DB::SQLite::Result    $res;
 
         $!db.begin;
         $sth = $!db.prepare: q:to/STATEMENT/, :nocache;
@@ -189,9 +194,14 @@ method add-room(Str $name --> Int) {
         VALUES (?);
         STATEMENT
         $sth.execute: $roomid;
+        $res = $!db.query: q:to/STATEMENT/, $roomid;
+        SELECT (ROWID)
+        FROM rooms
+        WHERE id = ?;
+        STATEMENT
         $!db.commit;
 
-        self.get-room: $name;
+        $res.value
     })
 }
 
