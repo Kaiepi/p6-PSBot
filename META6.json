@@ -33,6 +33,7 @@
 		"PSBot::Rules" : "lib/PSBot/Rules.pm6",
 		"PSBot::Tools" : "lib/PSBot/Tools.pm6",
 		"PSBot::User" : "lib/PSBot/User.pm6",
+		"PSBot::UserInfo" : "lib/PSBot/UserInfo.pm6",
 		"PSBot::Games::Hangman" : "lib/PSBot/Games/Hangman.pm6",
 		"PSBot::Plugins::Translate" : "lib/PSBot/Plugins/Translate.pm6",
 		"PSBot::Plugins::YouTube" : "lib/PSBot/Plugins/YouTube.pm6"
