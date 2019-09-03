@@ -352,14 +352,15 @@ method get-users(--> Hash[PSBot::User]) {
 method add-user(PSBot::UserInfo $userinfo, Str $roomid) {
     $!chat-mux.protect({
         my Str $userid = $userinfo.id;
-        if %!users ∌ $userid {
+        if %!users ∋ $userid {
+            %!rooms{$roomid}.join: $userinfo;
+            %!users{$userid}.on-join: $userinfo, $roomid;
+        } else {
             my PSBot::User $user .= new: $userinfo, $roomid;
             $user.games{.id} = .value for %!games.values.grep(*.has-player: $user);
             %!users{$userid} = $user;
+            $!user-joined.send: $userid;
         }
-        %!rooms{$roomid}.join: $userinfo;
-        %!users{$userid}.on-join: $userinfo, $roomid;
-        $!user-joined.send: $userid;
     });
 }
 
@@ -387,8 +388,8 @@ method rename-user(PSBot::UserInfo $userinfo, Str $oldid, Str $roomid) {
 
     $!chat-mux.protect({
         if %!users ∋ $oldid {
-            %!users{$oldid}.rename: $userinfo, $roomid;
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
+            %!users{$oldid}.rename: $userinfo, $roomid;
             %!users{$userid} = %!users{$oldid}:delete;
             $!user-joined.send: $userid;
         } else {

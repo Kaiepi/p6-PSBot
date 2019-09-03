@@ -69,8 +69,10 @@ method on-user-details(%data) {
 }
 
 method on-join(PSBot::UserInfo $userinfo, Str $roomid) {
-    my Group $group = $userinfo.group;
-    %!rooms{$roomid} = RoomInfo.new: :$group;
+    unless %!rooms{$roomid}:exists {
+        my Group $group = $userinfo.group;
+        %!rooms{$roomid} .= new: :$group;
+    }
 }
 
 method on-leave(Str $roomid) {

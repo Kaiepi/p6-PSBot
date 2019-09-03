@@ -73,11 +73,11 @@ method leave(PSBot::UserInfo $userinfo --> Nil) {
 }
 
 method on-rename(Str $oldid, PSBot::UserInfo $userinfo --> Nil) {
+    my UserInfo $old-userinfo = %!users{$oldid}:delete;
     my Str      $id           = $userinfo.id;
     my Str      $name         = $userinfo.name;
     my Group    $group        = $userinfo.group;
-    my UserInfo $old-userinfo = %!users{$oldid}:delete;
-    %!users{$id} = ($old-userinfo.defined && $old-userinfo.group eq $group.key)
+    %!users{$id} = $old-userinfo.?group === $group
         ?? $old-userinfo
         !! UserInfo.new: :$id, :$name, :$group;
 }
