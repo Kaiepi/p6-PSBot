@@ -88,3 +88,36 @@ The API key for Youtube. Set to null if you don't want to use the youtube comman
 
 The API key for Google Translate. Set to null if you don't want to use the translate and badtranslate commands.
 
+Why use PSBot?
+--------------
+
+There are a lot of bots for Pokémon Showdown out there, but PSBot has a number of advantages over others:
+
+### User and room tracking
+
+PSBot keeps track of all information related to users and rooms that is possible for the bot to obtain at any rank and relevant for implementing features. For example, this means that it is possible to implement commands that only autoconfirmed users can use with PSBot.
+
+### Better account management
+
+All requests made to the login server are handled using an instance of the `PSBot::LoginServer` class, which is available in all of PSBot's code that is invoked from the parser, rather than just the parts of the parser that need it. The nick command is an example of something that would be more difficult to implement in other bots.
+
+PSBot also uses the `upkeep` login server action to handle logging in after reconnects. This is somewhat faster than using the `login` action.
+
+### Better command handling
+
+Commands in PSBot are a combination of a method and command metadata. At the moment, this includes:
+
+  * whether or not the command requires you to be a bot administrator
+
+  * whether or not the command requires autoconfirmed status
+
+  * whether the commnd can be used in rooms, PMs, or everywhere
+
+  * what rank the command should require by default
+
+PSBot's command handler uses this information to automatically respond with why a command can't be used if the user (and, optionally, the room) the command was used in don't meet the criteria the command was defined with. This means you don't have to write any boilerplate for anything related to this yourself; PSBot will handle it for you.
+
+### Rules
+
+Rules make it possible to change how PSBot parses messages without needing to fork the bot. They are a combination of a regex and a routine for parsing `|c:|`, `|pm|`, `|html|`, `|popup|`, and `|raw|` messages (at the moment; more supported message types are in the works). For example, PSBot's command parser and room invite handler are implemented as rules.
+
