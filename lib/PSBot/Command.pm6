@@ -66,7 +66,8 @@ method autoconfirmed(--> Bool) {
 }
 
 method get-group(Str $roomid  --> Group) {
-    return %!groups{$roomid} if %!groups{$roomid}:exists && %!groups{$roomid} ne ' ';
+    return %!groups{$roomid} if %!groups{$roomid}:exists
+                             && %!groups{$roomid} !=== Group(Group.enums{' '});
     return $!root.get-group: $roomid if $!root.defined;
     $!default-group
 }
