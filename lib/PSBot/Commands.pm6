@@ -40,8 +40,6 @@ BEGIN {
 
             my Str         $res = await $p;
             my PSBot::User $bot = $*BOT.get-user($*BOT.userid);
-            return unless $bot.defined;
-
             if $*ROOM.defined {
                 my Bool $raw = self.can(Group(Group.enums{'+'}), $bot.rooms{$*ROOM.id}.group)
                         && ($res.contains("\n") || 150 < $res.codes < 8194);
@@ -112,7 +110,6 @@ BEGIN {
 
             my Str         $res = await $p;
             my PSBot::User $bot = $*BOT.get-user($*BOT.userid);
-            return unless $bot.defined;
 
             if $*ROOM.defined {
                 my Bool $raw = self.can(Group(Group.enums{'+'}), $bot.rooms{$*ROOM.id}.group)

@@ -41,7 +41,7 @@ method userinfo(Match $/) {
     my Str    $name   = $<username>.made;
     my Str    $id     = to-id $name;
     my Status $status = $<status>.made;
-    $/.make: PSBot::UserInfo.new: :$group, :$name, :$id, :$status;
+    $/.make: PSBot::UserInfo.new: :$name, :$id, :$group, :$status;
 }
 
 method timestamp(Match $/) {
@@ -250,8 +250,12 @@ method message:sym<c:>(Match $/ is copy) {
 
     my Str         $message  = $<message>.made;
     my PSBot::User $*USER   := $*BOT.get-user: $userid;
+    return unless $*USER.defined;
+
     my Str         $roomid   = $*ROOMID;
     my PSBot::Room $*ROOM   := $*BOT.get-room: $roomid;
+    return unless $*ROOM.defined;
+
     $*BOT.rules.parse: MessageType('c:'), $message, :$roomid;
 }
 method message:sym<pm>(Match $/ is copy) {
@@ -264,8 +268,10 @@ method message:sym<pm>(Match $/ is copy) {
     my Str         $message  = $<message>.made;
     my Str         $userid   = $from.id;
     my PSBot::User $*USER   := $*BOT.get-user: $userid;
-    my Str         $roomid   = $*ROOMID;
-    my PSBot::Room $*ROOM   := $*BOT.get-room: $roomid;
+    my PSBot::Room $*ROOM   := PSBot::Room;
+    say $*USER;
+    return unless $*USER.defined;
+
     $*BOT.rules.parse: MessageType('pm'), $message, :$userid;
 }
 method message:sym<html>(Match $/) {
@@ -278,6 +284,7 @@ method message:sym<html>(Match $/) {
     my PSBot::User $*USER  := PSBot::User;
     my Str         $roomid  = $*ROOMID;
     my PSBot::Room $*ROOM  := $*BOT.get-room: $roomid;
+
     $*BOT.rules.parse: MessageType('html'), $data, :$roomid;
 }
 method message:sym<popup>(Match $/) {
@@ -290,6 +297,7 @@ method message:sym<popup>(Match $/) {
     my PSBot::User $*USER  := PSBot::User;
     my Str         $roomid  = $*ROOMID;
     my PSBot::Room $*ROOM  := $*BOT.get-room: $roomid;
+
     $*BOT.rules.parse: MessageType('popup'), $data, :$roomid;
 }
 method message:sym<raw>(Match $/) {
@@ -302,5 +310,6 @@ method message:sym<raw>(Match $/) {
     my PSBot::User $*USER  := PSBot::User;
     my Str         $roomid  = $*ROOMID;
     my PSBot::Room $*ROOM  := $*BOT.get-room: $roomid;
+
     $*BOT.rules.parse: MessageType('popup'), $data, :$roomid;
 }

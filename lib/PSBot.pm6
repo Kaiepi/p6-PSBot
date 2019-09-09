@@ -36,19 +36,20 @@ has Bool   $.pms-blocked;
 has Bool   $.challenges-blocked;
 has Bool   $.help-tickets-ignored;
 
-has Bool    $.inited            = False;
-has Channel $.pending-rename   .= new;
-has Channel $.logged-in        .= new;
-has Channel $.room-joined      .= new;
-has Channel $.user-joined      .= new;
-has Promise $.rooms-propagated .= new;
-has Promise $.users-propagated .= new;
-has Promise $.done             .= new;
+has Bool    $.inited             = False;
+has Channel $.pending-rename    .= new;
+has Channel $.logged-in         .= new;
+has Channel $.room-joined       .= new;
+has Channel $.user-joined       .= new;
+has Promise $.rooms-propagated  .= new;
+has Promise $.users-propagated  .= new;
+has Promise $.done              .= new;
 
-has Lock::Async $!chat-mux    .= new;
-has PSBot::User %.users;
-has PSBot::Room %.rooms;
-has PSBot::Game %.games{Int};
+has Lock::Async    $!chat-mux       .= new;
+has PSBot::User    %.users;
+has Array[Promise] %.missing-users;
+has PSBot::Room    %.rooms;
+has PSBot::Game    %.games{Int};
 
 method new(Str $host = HOST, Int $port = PORT, Str $serverid = SERVERID) {
     my PSBot::Connection  $connection   .= new: $host, $port;
@@ -72,9 +73,11 @@ method start() {
                 # Setup prologue.
                 $!connection.send: "/avatar {AVATAR}", :raw if AVATAR.defined;
 
-                my Str @rooms    = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
-                my Str $autojoin = @rooms.join: ',';
-                $!connection.send: "/autojoin $autojoin", :raw;
+                if +ROOMS {
+                    my Str @rooms    = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
+                    my Str $autojoin = @rooms.join: ',';
+                    $!connection.send: "/autojoin $autojoin", :raw;
+                }
             }
             whenever $!connection.on-disconnect {
                 # We disconnected from the server.
@@ -115,7 +118,11 @@ method start() {
             whenever $!logged-in {
                 # Now that we're logged in, join any remaining rooms manually. This
                 # is in case any of them have modjoin set.
-                $!connection.send: ROOMS.keys[11..*].map({ "/join $_" }), :raw if +ROOMS > 11;
+                if +ROOMS > 11 {
+                    $!connection.send: ROOMS.keys[11..*].map({ "/join $_" }), :raw if +ROOMS > 11;
+                } elsif +ROOMS == 0 {
+                    $!rooms-propagated.keep;
+                }
             }
             whenever $!rooms-propagated {
                 # Awaits any users waiting to get propagated, ignoring guests.
@@ -190,8 +197,8 @@ method start() {
 # Stops the bot at any given time.
 method stop(--> Nil) {
     $!login-server.log-out;
-    $!connection.connection.send: '/logout', :raw;
-    await $!pending-rename;
+    try $!connection.connection.send: '|/logout';
+    await $!pending-rename unless $!;
     try await $!connection.close: :force;
     $!database.DESTROY;
     $!done.keep;
@@ -231,9 +238,31 @@ method on-update-user(PSBot::UserInfo $userinfo, Bool $is-named, Str $avatar, %d
 method on-user-details(%data) {
     $!chat-mux.protect({
         my Str $userid = %data<userid>;
+
         if %!users ∋ $userid {
             my PSBot::User $user = %!users{$userid};
             $user.on-user-details: %data;
+        }
+
+        if %!missing-users{$userid}:exists {
+            my Promise @promises := %!missing-users{$userid}:delete;
+            if %data<rooms> {
+                my PSBot::User $user = do if %!users{$userid}:exists {
+                    %!users{$userid}
+                } else {
+                    my Str             $id        = $userid;
+                    my Str             $name      = %data<name> // $userid;
+                    my Group           $group     = Group(Group.enums{%data<group>});
+                    my Status          $status    = Online;
+                    my PSBot::UserInfo $userinfo .= new: :$id, :$name, :$group, :$status;
+                    my PSBot::User     $user     .= new: $userinfo;
+                    $user.on-user-details: %data;
+                    $user
+                };
+                .keep: $user for @promises;
+            } else {
+                .break: X::PSBot::UserDNE.new: :$userid for @promises;
+            }
         }
 
         if $userid === $!userid {
@@ -354,9 +383,27 @@ method has-user(Str $userid --> Bool) {
 }
 
 method get-user(Str $userid --> PSBot::User) {
-    $!chat-mux.protect({
-        %!users{$userid}
-    })
+    await $!chat-mux.lock;
+
+    if %!users{$userid}:exists {
+        my PSBot::User $user = %!users{$userid};
+        $!chat-mux.unlock;
+        $user
+    } else {
+        my Promise $p .= new;
+
+        if %!missing-users{$userid}:exists {
+            %!missing-users{$userid}.push: $p;
+        } else {
+            %!missing-users{$userid} .= new: $p;
+            $!connection.send: "/cmd userdetails $userid", :raw;
+        }
+
+        $!chat-mux.unlock;
+
+        my PSBot::User $user = try await $p;
+        $user // Failure.new: $!
+    }
 }
 
 method get-users(--> Hash[PSBot::User]) {
@@ -368,6 +415,7 @@ method get-users(--> Hash[PSBot::User]) {
 method add-user(PSBot::UserInfo $userinfo, Str $roomid) {
     $!chat-mux.protect({
         my Str $userid = $userinfo.id;
+
         if %!users ∋ $userid {
             %!rooms{$roomid}.join: $userinfo;
             %!users{$userid}.on-join: $userinfo, $roomid;
@@ -381,9 +429,9 @@ method add-user(PSBot::UserInfo $userinfo, Str $roomid) {
 }
 
 method delete-user(PSBot::UserInfo $userinfo, Str $roomid) {
-    my Str $userid = $userinfo.id;
-
     $!chat-mux.protect({
+        my Str $userid = $userinfo.id;
+
         if %!users ∋ $userid {
             %!rooms{$roomid}.leave: $userinfo;
             %!users{$userid}.on-leave: $roomid;
@@ -400,9 +448,9 @@ method destroy-user(Str $userid) {
 }
 
 method rename-user(PSBot::UserInfo $userinfo, Str $oldid, Str $roomid) {
-    my Str $userid = $userinfo.id;
-
     $!chat-mux.protect({
+        my Str $userid = $userinfo.id;
+
         if %!users ∋ $oldid {
             %!rooms{$roomid}.on-rename: $oldid, $userinfo;
             %!users{$oldid}.rename: $userinfo, $roomid;
@@ -469,6 +517,7 @@ method reset() {
         %!rooms{*}:delete;
     });
 }
+
 =begin pod
 
 =head1 NAME

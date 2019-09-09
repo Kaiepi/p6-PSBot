@@ -4,6 +4,7 @@ unit module PSBot::Exceptions;
 class X::PSBot::NameTaken is Exception {
     has Str $.username;
     has Str $.reason;
+
     method message(--> Str) {
         my Str $res = 'Failed to rename';
         $res ~= " to $!username" if $!username;
@@ -18,5 +19,13 @@ class X::PSBot::ReconnectFailure is Exception {
 
     method message(--> Str) {
         "Failed to connect to $!uri after $!attempts attempts."
+    }
+}
+
+class X::PSBot::UserDNE is Exception {
+    has Str $.userid;
+
+    method message(--> Str) {
+        "User '$!userid' does not exist."
     }
 }
