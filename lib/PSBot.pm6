@@ -116,8 +116,10 @@ method start() {
             }
             whenever $!user-joined -> Str $userid {
                 # Propagate user state on join or rename.
-                $!connection.send: "/cmd userdetails $userid", :raw
-                    if $!users-propagated.status ~~ Kept;
+		$!lock.protect({
+		    $!connection.send: "/cmd userdetails $userid", :raw
+		        if $!users-propagated.status ~~ Kept;
+		})
             }
             whenever $!logged-in {
                 # Now that we're logged in, join any remaining rooms manually. This
@@ -203,7 +205,7 @@ method start() {
 # Stops the bot at any given time.
 method stop(--> Nil) {
     $!login-server.log-out;
-    try $!connection.send: '|/logout';
+    try $!connection.send: '/logout', :raw;
     await $!pending-rename unless $!.defined;
     try await $!connection.close: :force;
     $!database.DESTROY;
