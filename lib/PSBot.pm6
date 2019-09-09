@@ -18,7 +18,9 @@ has PSBot::Actions     $.actions;
 has PSBot::LoginServer $.login-server;
 has PSBot::Rules       $.rules;
 has PSBot::Database    $.database;
-has Cancellation       %.reminders{Int};
+
+# This protects all of the following attributes.
+has Lock::Async $!lock .= new;
 
 has Str    $.challstr;
 has Group  $.group;
@@ -45,11 +47,11 @@ has Promise $.rooms-propagated  .= new;
 has Promise $.users-propagated  .= new;
 has Promise $.done              .= new;
 
-has Lock::Async    $!chat-mux       .= new;
 has PSBot::User    %.users;
 has Array[Promise] %.missing-users;
 has PSBot::Room    %.rooms;
 has PSBot::Game    %.games{Int};
+has Cancellation   %.reminders{Int};
 
 method new(Str $host = HOST, Int $port = PORT, Str $serverid = SERVERID) {
     my PSBot::Connection  $connection   .= new: $host, $port;
@@ -126,60 +128,62 @@ method start() {
             }
             whenever $!rooms-propagated {
                 # Awaits any users waiting to get propagated, ignoring guests.
-                # Note: $!chat-mux is already locked when this runs.
-                if %!users.values.grep(!*.propagated) -> @unpropagated-users {
-                    $!connection.send: @unpropagated-users.map({ "/cmd userdetails " ~ .id }), :raw;
-                } else {
-                    $!users-propagated.keep if $!users-propagated.status ~~ Planned;
-                }
+                $!lock.protect({
+                    if %!users.values.grep(!*.propagated) -> @unpropagated-users {
+                        $!connection.send: @unpropagated-users.map({ "/cmd userdetails " ~ .id }), :raw;
+                    } else {
+                        $!users-propagated.keep if $!users-propagated.status ~~ Planned;
+                    }
+                })
             }
             whenever $!users-propagated {
                 # Setup epilogue.
-                # Note: $!chat-mux is already locked when this runs.
-                $!connection.send: '/blockchallenges', :raw
-                    unless $!challenges-blocked;
-                $!connection.send: '/unblockpms', :raw
-                    if $!pms-blocked;
-                $!connection.send: '/ht ignore', :roomid<staff>, :raw
-                    if %!rooms<staff>:exists && !$!help-tickets-ignored;
-                $!connection.send: "/status {STATUS}", :raw
-                    if STATUS.defined;
+                $!lock.protect({
+                    $!connection.send: '/blockchallenges', :raw
+                        unless $!challenges-blocked;
+                    $!connection.send: '/unblockpms', :raw
+                        if $!pms-blocked;
+                    $!connection.send: '/ht ignore', :roomid<staff>, :raw
+                        if %!rooms<staff>:exists && !$!help-tickets-ignored;
+                    $!connection.send: "/status {STATUS}", :raw
+                        if STATUS.defined && $!status !=== STATUS;
 
-                # Send user mail if the recipient is online. If not, wait until
-                # they join a room the bot's in.
-                with $!database.get-mail -> @mail {
-                    my List %mail = (%(), |@mail).reduce(-> %data, %row {
-                        my Str $userid  = %row<target>;
-                        my Str $message = "[%row<source>] %row<message>";
-                        %data{$userid}  = %data{$userid}:exists
-                            ?? (|%data{$userid}, $message)
-                            !! ($message,);
-                        %data
-                    });
-                    for %mail.kv -> $userid, @messages {
-                        if self.has-user: $userid {
-                            $!database.remove-mail: $userid;
-                            $!connection.send:
-                                "You received {+@messages} message{+@messages == 1 ?? '' !! 's'}:",
-                                @messages, :$userid;
+                    # Send user mail if the recipient is online. If not, wait until
+                    # they join a room the bot's in.
+                    with $!database.get-mail -> @mail {
+                        my List %mail = (%(), |@mail).reduce(-> %data, %row {
+                            my Str $userid  = %row<target>;
+                            my Str $message = "[%row<source>] %row<message>";
+                            %data{$userid}  = %data{$userid}:exists
+                                ?? (|%data{$userid}, $message)
+                                !! ($message,);
+                            %data
+                        });
+                        for %mail.kv -> $userid, @messages {
+                            if self.has-user: $userid {
+                                $!database.remove-mail: $userid;
+                                $!connection.send:
+                                    "You received {+@messages} message{+@messages == 1 ?? '' !! 's'}:",
+                                    @messages, :$userid;
+                            }
                         }
                     }
-                }
 
-                # Schedule user reminders.
-                with $!database.get-reminders -> @reminders {
-                    for @reminders -> %row {
-                        %!reminders{%row<id>} := $*SCHEDULER.cue({
-                            if %row<roomid>.defined {
-                                $!database.remove-reminder: %row<reminder>, %row<end>, %row<userid>, %row<roomid>;
-                                $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", roomid => %row<roomid>;
-                            } else {
-                                $!database.remove-reminder: %row<reminder>, %row<end>, %row<userid>;
-                                $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", userid => %row<userid>;
-                            }
-                        }, at => %row<end>);
+                    # Schedule user reminders.
+                    with $!database.get-reminders -> @reminders {
+                        for @reminders -> %row {
+                            %!reminders{%row<id>} := $*SCHEDULER.cue({
+                                if %row<roomid>.defined {
+                                    $!database.remove-reminder: %row<reminder>, %row<end>, %row<userid>, %row<roomid>;
+                                    $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", roomid => %row<roomid>;
+                                } else {
+                                    $!database.remove-reminder: %row<reminder>, %row<end>, %row<userid>;
+                                    $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", userid => %row<userid>;
+                                }
+                            }, at => %row<end>);
+                        }
                     }
-                }
+                })
             }
             whenever $!done {
                 # The bot wants to stop. Exit the react block, then exit the loop.
@@ -197,8 +201,8 @@ method start() {
 # Stops the bot at any given time.
 method stop(--> Nil) {
     $!login-server.log-out;
-    try $!connection.connection.send: '|/logout';
-    await $!pending-rename unless $!;
+    try $!connection.send: '|/logout';
+    await $!pending-rename unless $!.defined;
     try await $!connection.close: :force;
     $!database.DESTROY;
     $!done.keep;
@@ -207,36 +211,40 @@ method stop(--> Nil) {
 method set-avatar(Str $!avatar) {}
 
 method authenticate(Str $username, Str $password?, Str $challstr? --> Str) {
-    $!challstr = $challstr if $challstr;
-    return $!login-server.get-assertion: $username, $!challstr unless defined $password;
-    return $!login-server.upkeep: $!challstr if $!login-server.account eq $username;
-    $!login-server.log-in: $username, $password, $!challstr
+    $!lock.protect({
+        $!challstr = $challstr if $challstr;
+        return $!login-server.get-assertion: $username, $!challstr unless defined $password;
+        return $!login-server.upkeep: $!challstr if $!login-server.account eq $username;
+        $!login-server.log-in: $username, $password, $!challstr
+    })
 }
 
-method on-update-user(PSBot::UserInfo $userinfo, Bool $is-named, Str $avatar, %data) {
-    $!group                = $userinfo.group;
-    $!guest-username       = $userinfo.name unless $is-named;
-    $!username             = $userinfo.name;
-    $!userid               = $userinfo.id;
-    $!is-guest             = not $is-named;
-    $!avatar               = $avatar;
-    $!is-staff             = %data<isStaff>         // False;
-    $!is-sysop             = %data<isSysop>         // False;
-    $!pms-blocked          = %data<blockPMs>        // False;
-    $!challenges-blocked   = %data<blockChallenges> // False;
-    $!help-tickets-ignored = %data<ignoreTickets>   // False;
+method on-update-user(PSBot::UserInfo $userinfo, Bool $is-named, Str $avatar, %data --> Nil) {
+    $!lock.protect({
+        $!group                = $userinfo.group;
+        $!guest-username       = $userinfo.name unless $is-named;
+        $!username             = $userinfo.name;
+        $!userid               = $userinfo.id;
+        $!is-guest             = not $is-named;
+        $!avatar               = $avatar;
+        $!is-staff             = %data<isStaff>         // False;
+        $!is-sysop             = %data<isSysop>         // False;
+        $!pms-blocked          = %data<blockPMs>        // False;
+        $!challenges-blocked   = %data<blockChallenges> // False;
+        $!help-tickets-ignored = %data<ignoreTickets>   // False;
 
-    if $!inited {
-        $!pending-rename.send: $!userid;
-    } elsif !USERNAME || $!username === USERNAME {
-        $!inited = True;
-        $!pending-rename.send: $!userid;
-        $!logged-in.send: $!userid;
-    }
+        if $!inited {
+            $!pending-rename.send: $!userid;
+        } elsif !USERNAME || $!username === USERNAME {
+            $!inited = True;
+            $!pending-rename.send: $!userid;
+            $!logged-in.send: $!userid;
+        }
+    })
 }
 
 method on-user-details(%data) {
-    $!chat-mux.protect({
+    $!lock.protect({
         my Str $userid = %data<userid>;
 
         if %!users ∋ $userid {
@@ -288,16 +296,21 @@ method on-user-details(%data) {
             my Map $groups   = Group.enums;
             my Rat $throttle = $groups{%data<group>} >= $groups<+> ?? 0.3 !! 0.6;
             $!connection.set-throttle: $throttle;
-        }
 
-        $!users-propagated.keep
-            if $!users-propagated.status ~~ Planned
-            && !%!users.values.first(!*.propagated);
+            $!users-propagated.keep
+                if $!users-propagated.status ~~ Planned
+                && !ROOMS
+                && !%!users.values.first(!*.propagated);
+        } else {
+            $!users-propagated.keep
+                if $!users-propagated.status ~~ Planned
+                && !%!users.values.first(!*.propagated);
+        }
     })
 }
 
-method on-room-info(%data) {
-    $!chat-mux.protect({
+method on-room-info(%data --> Nil) {
+    $!lock.protect({
         my Str         $roomid = %data<roomid>;
         my PSBot::Room $room   = %!rooms{$roomid};
         return unless $room.defined;
@@ -322,7 +335,7 @@ method on-room-info(%data) {
             for @userids -> $userid {
                 if %!users ∋ $userid {
                     my PSBot::User     $user      = %!users{$userid};
-                    my Group           $group     = Group(Group.enums{$group-str});
+                    my Group           $group     = Group(Group.enums{$group-str} // Group.enums{' '});
                     my PSBot::UserInfo $userinfo .= new: :id($user.id), :name($user.name), :$group, :status(Online);
                     $room.join: $userinfo;
                     $user.on-join: $userinfo, $roomid;
@@ -340,25 +353,25 @@ method on-room-info(%data) {
 }
 
 method has-room(Str $roomid --> Bool) {
-    $!chat-mux.protect({
+    $!lock.protect({
         %!rooms ∋ $roomid
     })
 }
 
 method get-room(Str $roomid --> PSBot::Room) {
-    $!chat-mux.protect({
+    $!lock.protect({
         %!rooms{$roomid}
     })
 }
 
 method get-rooms(--> Hash[PSBot::Room]) {
-    $!chat-mux.protect(-> {
+    $!lock.protect(-> {
         %!rooms
     })
 }
 
-method add-room(Str $roomid, RoomType $type) {
-    $!chat-mux.protect({
+method add-room(Str $roomid, RoomType $type --> Nil) {
+    $!lock.protect({
         my PSBot::Room $room .= new: $roomid, $type;
         $room.add-game: .id, .type for %!games.values.grep: *.has-room: $room;
         %!rooms{$roomid} = $room;
@@ -366,8 +379,8 @@ method add-room(Str $roomid, RoomType $type) {
     });
 }
 
-method delete-room(Str $roomid) {
-    $!chat-mux.protect({
+method delete-room(Str $roomid --> Nil) {
+    $!lock.protect({
         my PSBot::Room $room = %!rooms{$roomid}:delete;
         for $room.users.keys -> $userid {
             %!users{$userid}.on-leave: $roomid;
@@ -377,17 +390,17 @@ method delete-room(Str $roomid) {
 }
 
 method has-user(Str $userid --> Bool) {
-    $!chat-mux.protect({
+    $!lock.protect({
         %!users ∋ $userid
     })
 }
 
 method get-user(Str $userid --> PSBot::User) {
-    await $!chat-mux.lock;
+    await $!lock.lock;
 
     if %!users{$userid}:exists {
         my PSBot::User $user = %!users{$userid};
-        $!chat-mux.unlock;
+        $!lock.unlock;
         $user
     } else {
         my Promise $p .= new;
@@ -399,7 +412,7 @@ method get-user(Str $userid --> PSBot::User) {
             $!connection.send: "/cmd userdetails $userid", :raw;
         }
 
-        $!chat-mux.unlock;
+        $!lock.unlock;
 
         my PSBot::User $user = try await $p;
         $user // Failure.new: $!
@@ -407,13 +420,13 @@ method get-user(Str $userid --> PSBot::User) {
 }
 
 method get-users(--> Hash[PSBot::User]) {
-    $!chat-mux.protect(-> {
+    $!lock.protect(-> {
         %!users
     })
 }
 
 method add-user(PSBot::UserInfo $userinfo, Str $roomid) {
-    $!chat-mux.protect({
+    $!lock.protect({
         my Str $userid = $userinfo.id;
 
         if %!users ∋ $userid {
@@ -429,7 +442,7 @@ method add-user(PSBot::UserInfo $userinfo, Str $roomid) {
 }
 
 method delete-user(PSBot::UserInfo $userinfo, Str $roomid) {
-    $!chat-mux.protect({
+    $!lock.protect({
         my Str $userid = $userinfo.id;
 
         if %!users ∋ $userid {
@@ -441,14 +454,14 @@ method delete-user(PSBot::UserInfo $userinfo, Str $roomid) {
 }
 
 method destroy-user(Str $userid) {
-    $!chat-mux.protect({
+    $!lock.protect({
         %!users{$userid}:delete;
         $_.users{$userid}:delete for %!rooms.values;
     })
 }
 
 method rename-user(PSBot::UserInfo $userinfo, Str $oldid, Str $roomid) {
-    $!chat-mux.protect({
+    $!lock.protect({
         my Str $userid = $userinfo.id;
 
         if %!users ∋ $oldid {
@@ -464,55 +477,55 @@ method rename-user(PSBot::UserInfo $userinfo, Str $oldid, Str $roomid) {
 }
 
 method has-game(Int $gameid --> Bool) {
-    $!chat-mux.protect({
+    $!lock.protect({
         %!games ∋ $gameid
     })
 }
 
 method get-game(Int $gameid --> PSBot::Game) {
-    $!chat-mux.protect({
+    $!lock.protect({
         %!games{$gameid}
     })
 }
 
 method get-games(--> Hash[PSBot::Game, Int]) {
-    $!chat-mux.protect(-> {
+    $!lock.protect(-> {
         %!games
     })
 }
 
 method add-game(PSBot::Game $game) {
-    $!chat-mux.protect({
+    $!lock.protect({
         %!games{$game.id} = $game;
     })
 }
 
 method delete-game(Int $gameid) {
-    $!chat-mux.protect({
+    $!lock.protect({
         %!games{$gameid}:delete;
     })
 }
 
 method reset() {
-    $!guest-username      = Nil;
-    $!username            = Nil;
-    $!userid              = Nil;
-    $!status              = Nil;
-    $!message             = Nil;
-    $!group               = Nil;
-    $!avatar              = Nil;
-    $!autoconfirmed       = False;
-    $!is-guest            = True;
-    $!is-staff            = False;
-    $!is-sysop            = False;
-    $!pms-blocked         = False;
-    $!challenges-blocked  = False;
-    $!inited              = False;
-    $!pending-rename     .= new;
-    $!logged-in          .= new;
-    $!users-propagated   .= new;
-    $!rooms-propagated   .= new;
-    $!chat-mux.protect({
+    $!lock.protect({
+        $!guest-username      = Nil;
+        $!username            = Nil;
+        $!userid              = Nil;
+        $!status              = Nil;
+        $!message             = Nil;
+        $!group               = Nil;
+        $!avatar              = Nil;
+        $!autoconfirmed       = False;
+        $!is-guest            = True;
+        $!is-staff            = False;
+        $!is-sysop            = False;
+        $!pms-blocked         = False;
+        $!challenges-blocked  = False;
+        $!inited              = False;
+        $!pending-rename     .= new;
+        $!logged-in          .= new;
+        $!users-propagated   .= new;
+        $!rooms-propagated   .= new;
         %!users{*}:delete;
         %!rooms{*}:delete;
     });
