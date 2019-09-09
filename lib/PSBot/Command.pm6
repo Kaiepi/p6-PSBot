@@ -120,6 +120,7 @@ method reply(Result \output, PSBot::User $user, PSBot::Room $room,
             }
         };
 
+        say $result;
         if $result {
             if $room.defined {
                 my Str $roomid = $room.id;

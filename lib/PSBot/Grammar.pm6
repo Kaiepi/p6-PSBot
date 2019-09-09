@@ -29,7 +29,8 @@ token message:sym<challstr>      { '|' <.sym> '|' <challenge=data> }
 token message:sym<nametaken>     { '|' <.sym> '|' <username> '|' <reason=data> }
 token message:sym<queryresponse> { '|' <.sym> '|' <type=chunk> '|' <data> }
 token message:sym<init>          { '|' <.sym> '|' <type=data> { $*INIT := True } }
-token message:sym<deinit>        { '|' <.sym> '|' }
+token message:sym<deinit>        { '|' <.sym> }
+token message:sym<noinit>        { '|' <.sym> '|' <type=chunk> '|' <reason=data> }
 token message:sym<j>             { '|' <.sym> '|' <userinfo> }
 token message:sym<J>             { '|' <.sym> '|' <userinfo> }
 token message:sym<l>             { '|' <.sym> '|' <userinfo> }

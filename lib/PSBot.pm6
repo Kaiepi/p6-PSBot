@@ -50,16 +50,18 @@ has Promise $.done              .= new;
 has PSBot::User    %.users;
 has Array[Promise] %.missing-users;
 has PSBot::Room    %.rooms;
+has SetHash        $.joinable-rooms;
 has PSBot::Game    %.games{Int};
 has Cancellation   %.reminders{Int};
 
-method new(Str $host = HOST, Int $port = PORT, Str $serverid = SERVERID) {
-    my PSBot::Connection  $connection   .= new: $host, $port;
-    my PSBot::Actions     $actions      .= new;
-    my PSBot::LoginServer $login-server .= new: :$serverid;
-    my PSBot::Rules       $rules        .= new;
-    my PSBot::Database    $database     .= new;
-    self.bless: :$connection, :$actions, :$login-server, :$rules, :$database;
+method new(Str :$host = HOST, Int :$port = PORT, Str :$serverid = SERVERID, :@rooms = ROOMS.keys) {
+    my PSBot::Connection  $connection     .= new: $host, $port;
+    my PSBot::Actions     $actions        .= new;
+    my PSBot::LoginServer $login-server   .= new: :$serverid;
+    my PSBot::Rules       $rules          .= new;
+    my PSBot::Database    $database       .= new;
+    my SetHash            $joinable-rooms .= new: |@rooms;
+    self.bless: :$connection, :$actions, :$login-server, :$rules, :$database, :$joinable-rooms
 }
 
 # Runs the bot. This blocks a thread until the process exits.
@@ -75,8 +77,8 @@ method start() {
                 # Setup prologue.
                 $!connection.send: "/avatar {AVATAR}", :raw if AVATAR.defined;
 
-                if +ROOMS {
-                    my Str @rooms    = +ROOMS > 11 ?? ROOMS.keys[0..10] !! ROOMS.keys;
+                if +$!joinable-rooms {
+                    my Str @rooms    = +$!joinable-rooms > 11 ?? $!joinable-rooms.keys[0..10] !! $!joinable-rooms.keys;
                     my Str $autojoin = @rooms.join: ',';
                     $!connection.send: "/autojoin $autojoin", :raw;
                 }
@@ -120,9 +122,9 @@ method start() {
             whenever $!logged-in {
                 # Now that we're logged in, join any remaining rooms manually. This
                 # is in case any of them have modjoin set.
-                if +ROOMS > 11 {
-                    $!connection.send: ROOMS.keys[11..*].map({ "/join $_" }), :raw if +ROOMS > 11;
-                } elsif +ROOMS == 0 {
+                if +$!joinable-rooms > 11 {
+                    $!connection.send: $!joinable-rooms.keys[11..*].map({ "/join $_" }), :raw;
+                } elsif +$!joinable-rooms == 0 {
                     $!rooms-propagated.keep;
                 }
             }
@@ -212,10 +214,15 @@ method set-avatar(Str $!avatar) {}
 
 method authenticate(Str $username, Str $password?, Str $challstr? --> Str) {
     $!lock.protect({
-        $!challstr = $challstr if $challstr;
-        return $!login-server.get-assertion: $username, $!challstr unless defined $password;
-        return $!login-server.upkeep: $!challstr if $!login-server.account eq $username;
-        $!login-server.log-in: $username, $password, $!challstr
+        $!challstr = $challstr if $challstr.defined;
+
+        if $!login-server.account eq $username {
+            $!login-server.upkeep: $!challstr;
+        } elsif !$password.defined {
+            $!login-server.get-assertion: $username, $!challstr;
+        } else {
+            $!login-server.log-in: $username, $password, $!challstr;
+        }
     })
 }
 
@@ -299,7 +306,7 @@ method on-user-details(%data) {
 
             $!users-propagated.keep
                 if $!users-propagated.status ~~ Planned
-                && !ROOMS
+                && !$!joinable-rooms
                 && !%!users.values.first(!*.propagated);
         } else {
             $!users-propagated.keep
@@ -347,7 +354,7 @@ method on-room-info(%data --> Nil) {
 
         $!rooms-propagated.keep
             if $!rooms-propagated.status ~~ Planned
-            && (ROOMS.keys ∖ %!rooms.keys === ∅)
+            && ($!joinable-rooms.keys ∖ %!rooms.keys === ∅)
             && !%!rooms.values.first(!*.propagated);
     });
 }
@@ -386,6 +393,18 @@ method delete-room(Str $roomid --> Nil) {
             %!users{$userid}.on-leave: $roomid;
             %!users{$userid}:delete unless +%!users{$userid}.rooms;
         }
+    })
+}
+
+method mark-room-joinable(Str $roomid --> Nil) {
+    $!lock.protect(-> {
+        $!joinable-rooms{$roomid}++
+    })
+}
+
+method mark-room-unjoinable(Str $roomid --> Nil) {
+    $!lock.protect(-> {
+        $!joinable-rooms{$roomid}:delete
     })
 }
 

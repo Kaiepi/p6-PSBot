@@ -99,10 +99,15 @@ method message:sym<queryresponse>(Match $/) {
 }
 method message:sym<init>(Match $/) {
     my RoomType $type = RoomType($<type>.made);
+    $*BOT.mark-room-joinable: $*ROOMID;
     $*BOT.add-room: $*ROOMID, $type;
 }
 method message:sym<deinit>(Match $/) {
+    $*BOT.mark-room-unjoinable: $*ROOMID;
     $*BOT.delete-room: $*ROOMID;
+}
+method message:sym<noinit>(Match $/) {
+    $*BOT.mark-room-unjoinable: $*ROOMID;
 }
 method message:sym<j>(Match $/) {
     return if $*INIT;
@@ -269,7 +274,6 @@ method message:sym<pm>(Match $/ is copy) {
     my Str         $userid   = $from.id;
     my PSBot::User $*USER   := $*BOT.get-user: $userid;
     my PSBot::Room $*ROOM   := PSBot::Room;
-    say $*USER;
     return unless $*USER.defined;
 
     $*BOT.rules.parse: MessageType('pm'), $message, :$userid;
