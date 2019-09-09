@@ -25,29 +25,28 @@ BEGIN {
     my PSBot::Command $eval .= new:
         :administrative,
         anon method eval(Str $target --> Replier) {
-            my Promise $p .= new;
-            await Promise.anyof(
-                Promise.in(30).then({
-                    $p.keep: 'Evaluation timed out after 30 seconds.';
-                }),
-                Promise.start({
+            sub evaluate(Promise $output --> Sub) {
+                sub {
                     use MONKEY-SEE-NO-EVAL;
-                    my \output = EVAL $target;
-                    $p.keep: output.gist;
-                    CATCH { default { $p.keep: .gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g } }
-                })
-            );
 
-            my Str         $res = await $p;
-            my PSBot::User $bot = $*BOT.get-user($*BOT.userid);
-            if $*ROOM.defined {
-                my Bool $raw = self.can(Group(Group.enums{'+'}), $bot.rooms{$*ROOM.id}.group)
-                        && ($res.contains("\n") || 150 < $res.codes < 8194);
-                $res = $raw ?? "!code $res" !! "``$res``";
-                self.reply: $res, $*USER, $*ROOM, :$raw;
-            } else {
-                self.reply: $res.split("\n").map({ "``$_``" }), $*USER, $*ROOM
+                    my Group $src-group  = Group(Group.enums{'+'});
+                    my Group $tar-group  = ($*ROOM.defined && $*BOT.userid.defined) ?? $*ROOM.users{$*BOT.userid}.group !! $*BOT.group;
+                    my Str   $result     = EVAL($target).gist;
+                    my Bool  $raw        = ($result.contains("\n") || 150 < $result.codes < 8194)
+                                        && self.can: $src-group, $tar-group;
+                    $output.keep: $raw ?? "!code $result" !! $result.split("\n").map({ "``$_``" });
+
+                    CATCH { default { $output.keep: .gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g } }
+                }
             }
+
+            my Promise $output .= new;
+
+            await Promise.anyof:
+                Promise.in(30).then({ $output.keep: 'Evaluation timed out after 30 seconds.' }),
+                Promise.start(&evaluate($output));
+
+            self.reply: $output, $*USER, $*ROOM, :raw;
         };
 
     my PSBot::Command $evalcommand .= new:
@@ -95,30 +94,26 @@ BEGIN {
             my PSBot::Room $command-room = $*BOT.get-room: $roomid;
             return self.reply: "$roomid is not a known room.", $*USER, $*ROOM unless $command-room.defined;
 
-            my Promise $p .= new;
-            await Promise.anyof(
-                Promise.in(30).then({
-                    $p.keep: 'Evaluation timed out after 30 seconds.';
-                }),
-                Promise.start({
+            sub evaluate(Promise $output --> Sub) {
+                sub {
+                    use MONKEY-SEE-NO-EVAL;
+
                     my Replier $replier = $command($command-target);
-                    $replier($*BOT.connection) if $replier.defined;
-                    $p.keep: Nil.gist;
-                    CATCH { default { $p.keep: .gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g } }
-                })
-            );
+                    my Capture $result  = $replier();
+                    $*BOT.connection.send: |$result if $result.defined;
+                    $output.keep: '``' ~ Nil.gist ~ '``';
 
-            my Str         $res = await $p;
-            my PSBot::User $bot = $*BOT.get-user($*BOT.userid);
-
-            if $*ROOM.defined {
-                my Bool $raw = self.can(Group(Group.enums{'+'}), $bot.rooms{$*ROOM.id}.group)
-                        && ($res.contains("\n") || 150 < $res.codes < 8192);
-                $res = $raw ?? "!code $res" !! "``$res``";
-                self.reply: $res, $*USER, $*ROOM, :$raw;
-            } else {
-                self.reply: $res.split("\n").map({ "``$_``" }), $*USER, $*ROOM
+                    CATCH { default { $output.keep: .gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g } }
+                }
             }
+
+            my Promise $output .= new;
+
+            await Promise.anyof:
+                Promise.in(30).then({ $output.keep: 'Evaluation timed out after 30 seconds.' }),
+                Promise.start(&evaluate($output));
+
+            self.reply: $output, $*USER, $*ROOM;
         };
 
     my PSBot::Command $max-rss .= new:
@@ -296,7 +291,7 @@ BEGIN {
                 .map(*.head);
             return self.reply:
                 "/addhtmlbox <ol>{@definitions.map({ "<li>{$_}</li>" })}</ol>",
-                $*USER, $*ROOM, :raw if self.can: Group(Group.enums{'*'}), $*BOT.get-user($*BOT.userid).rooms{$*ROOM.id}.group;
+                $*USER, $*ROOM, :raw if self.can: Group(Group.enums{'*'}), $*ROOM.users{$*BOT.userid}.group;
 
             my Failable[Str] $url = paste @definitions.kv.map(-> $i, $definition { "$i. $definition" }).join;
             my Str           $res = $url.defined
@@ -502,7 +497,7 @@ BEGIN {
                 my @reminders = $*BOT.database.get-reminders: $*USER.id;
                 return self.reply: 'You have no reminders set.', $*USER, $*ROOM unless +@reminders;
 
-                if $*ROOM.defined && self.can: Group(Group.enums{'*'}), $*BOT.get-user($*BOT.userid).rooms{$*ROOM.id}.group {
+                if $*ROOM.defined && self.can: Group(Group.enums{'*'}), $*ROOM.users{$*BOT.userid}.group {
                     my Str $list = '<details><summary>Reminder List</summary><ol>' ~ do for @reminders -> %reminder {
                         my DateTime $begin .= new: %reminder<begin>;
                         my DateTime $end   .= new: %reminder<end>;
@@ -709,7 +704,7 @@ BEGIN {
                 })
                 .sort({ $^a.key cmp $^b.key });
 
-            if self.can: Group(Group.enums{'*'}), $*BOT.get-user($*BOT.userid).rooms{$*ROOM.id}.group {
+            if self.can: Group(Group.enums{'*'}), $*ROOM.users{$*BOT.userid}.group {
                 my Str $res = do {
                     my Str $rows = @requirements.map(-> $p {
                         my Str $name        = $p.key;
@@ -735,7 +730,7 @@ BEGIN {
             my Map $groups = Group.enums;
             return self.reply:
                 "{$*BOT.username} must be able to broadcast commands in order for {COMMAND}permit to be used.",
-                $*USER, $*ROOM if $groups{$*BOT.get-user($*BOT.userid).rooms{$*ROOM.id}.group} < $groups<+>;
+                $*USER, $*ROOM if $groups{$*ROOM.users{$*BOT.userid}.group} < $groups<+>;
 
             my (Str $userid, Str $command) = $target.split(',').map(&to-id);
             return self.reply: 'No valid userid was given.', $*USER, $*ROOM unless $userid;
