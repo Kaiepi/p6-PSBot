@@ -116,10 +116,10 @@ method start() {
             }
             whenever $!user-joined -> Str $userid {
                 # Propagate user state on join or rename.
-		$!lock.protect({
-		    $!connection.send: "/cmd userdetails $userid", :raw
-		        if $!users-propagated.status ~~ Kept;
-		})
+                $!lock.protect({
+                    $!connection.send: "/cmd userdetails $userid", :raw
+                        if $!users-propagated.status ~~ Kept;
+                })
             }
             whenever $!logged-in {
                 # Now that we're logged in, join any remaining rooms manually. This
@@ -150,7 +150,7 @@ method start() {
                     $!connection.send: '/ht ignore', :roomid<staff>, :raw
                         if %!rooms<staff>:exists && !$!help-tickets-ignored;
                     $!connection.send: "/status {STATUS}", :raw
-                        if STATUS.defined && $!status !=== STATUS;
+                        if STATUS.defined && $!message !=== STATUS;
 
                     # Send user mail if the recipient is online. If not, wait until
                     # they join a room the bot's in.
