@@ -5,6 +5,7 @@ use Failable;
 use PSBot::Command;
 use PSBot::Config;
 use PSBot::Exceptions;
+use PSBot::Games::BlackAndWhite;
 use PSBot::Games::Hangman;
 use PSBot::Plugins::Translate;
 use PSBot::Plugins::YouTube;
@@ -772,75 +773,69 @@ BEGIN {
 
                 my PSBot::Games::Hangman $game .= new: :allow-late-joins;
                 $game.add-room: $*ROOM;
-                $*ROOM.add-game: $game.id, $game.type;
                 $*BOT.add-game: $game;
                 self.reply: "A new game of {$game.name} has been created.", $*USER, $*ROOM
             }
         ),
         PSBot::Command.new(
             anon method join(Str $target --> Replier) is pure {
-                my Symbol      $game-type = PSBot::Games::Hangman.type;
-                my Int         $gameid    = $*ROOM.get-game-id: $game-type;
-                my PSBot::Game $game      = $*BOT.get-game: $gameid;
+                my Str $name   = PSBot::Games::Hangman.name;
+                my Int $gameid = $*ROOM.get-game-id: PSBot::Games::Hangman.type;
                 return self.reply:
-                    "{$*ROOM.title} is not participating in any games of {PSBot::Games::Hangman.name}.",
-                    $*USER, $*ROOM unless $game.defined;
+                    "{$*ROOM.title} is not participating in any games of $name.",
+                    $*USER, $*ROOM unless $gameid.defined;
 
-                my PSBot::Games::Hangman $hangman = $game;
+                my PSBot::Games::Hangman $hangman = $*BOT.get-game: $gameid;
                 $hangman.join: $*USER, $*ROOM
             }
         ),
         PSBot::Command.new(
             anon method leave(Str $target --> Replier) is pure {
-                my Symbol      $game-type = PSBot::Games::Hangman.type;
-                my Int         $gameid    = $*ROOM.get-game-id: $game-type;
-                my PSBot::Game $game      = $*BOT.get-game: $gameid;
+                my Str $name   = PSBot::Games::Hangman.name;
+                my Int $gameid = $*ROOM.get-game-id: PSBot::Games::Hangman.type;
                 return self.reply:
-                    "{$*ROOM.title} is not participating in any games of {PSBot::Games::Hangman.name}.",
-                    $*USER, $*ROOM unless $game.defined;
+                    "{$*ROOM.title} is not participating in any games of $name.",
+                    $*USER, $*ROOM unless $gameid.defined;
 
-                my PSBot::Games::Hangman $hangman = $game;
+                my PSBot::Games::Hangman $hangman = $*BOT.get-game: $gameid;
                 $hangman.leave: $*USER, $*ROOM
             }
         ),
         PSBot::Command.new(
             :default-group<+>,
             anon method players(Str $target --> Replier) is pure {
-                my Symbol      $game-type = PSBot::Games::Hangman.type;
-                my Int         $gameid    = $*ROOM.get-game-id: $game-type;
-                my PSBot::Game $game      = $*BOT.get-game: $gameid;
+                my Str $name   = PSBot::Games::Hangman.name;
+                my Int $gameid = $*ROOM.get-game-id: PSBot::Games::Hangman.type;
                 return self.reply:
-                    "{$*ROOM.title} is not participating in any games of {PSBot::Games::Hangman.name}.",
-                    $*USER, $*ROOM unless $game.defined;
+                    "{$*ROOM.title} is not participating in any games of $name.",
+                    $*USER, $*ROOM unless $gameid.defined;
 
-                my PSBot::Games::Hangman $hangman = $game;
+                my PSBot::Games::Hangman $hangman = $*BOT.get-game: $gameid;
                 $hangman.players: $*ROOM
             }
         ),
         PSBot::Command.new(
             :default-group<+>,
             anon method start(Str $target --> Replier) is pure {
-                my Symbol      $game-type = PSBot::Games::Hangman.type;
-                my Int         $gameid    = $*ROOM.get-game-id: $game-type;
-                my PSBot::Game $game      = $*BOT.get-game: $gameid;
+                my Str $name   = PSBot::Games::Hangman.name;
+                my Int $gameid = $*ROOM.get-game-id: PSBot::Games::Hangman.type;
                 return self.reply:
-                    "{$*ROOM.title} is not participating in any games of {PSBot::Games::Hangman.name}.",
-                    $*USER, $*ROOM unless $game.defined;
+                    "{$*ROOM.title} is not participating in any games of $name.",
+                    $*USER, $*ROOM unless $gameid.defined;
 
-                my PSBot::Games::Hangman $hangman = $game;
+                my PSBot::Games::Hangman $hangman = $*BOT.get-game: $gameid;
                 $hangman.start: $*USER, $*ROOM
             }
         ),
         PSBot::Command.new(
             anon method guess(Str $target --> Replier) is pure {
-                my Symbol      $game-type = PSBot::Games::Hangman.type;
-                my Int         $gameid    = $*ROOM.get-game-id: $game-type;
-                my PSBot::Game $game      = $*BOT.get-game: $gameid;
+                my Str $name   = PSBot::Games::Hangman.name;
+                my Int $gameid = $*ROOM.get-game-id: PSBot::Games::Hangman.type;
                 return self.reply:
-                    "{$*ROOM.title} is not participating in any games of {PSBot::Games::Hangman.name}.",
-                    $*USER, $*ROOM unless $game.defined;
+                    "{$*ROOM.title} is not participating in any games of $name.",
+                    $*USER, $*ROOM unless $gameid.defined;
 
-                my PSBot::Games::Hangman $hangman = $game;
+                my PSBot::Games::Hangman $hangman = $*BOT.get-game: $gameid;
                 my Replier               $replier = $hangman.guess: $target, $*USER, $*ROOM;
                 $*ROOM.delete-game: $hangman.id if ?$hangman.ended;
                 $replier
@@ -849,17 +844,102 @@ BEGIN {
         PSBot::Command.new(
             :default-group<+>,
             anon method end(Str $target --> Replier) is pure {
-                my Symbol      $game-type = PSBot::Games::Hangman.type;
-                my Int         $gameid    = $*ROOM.get-game-id: $game-type;
-                my PSBot::Game $game      = $*BOT.get-game: $gameid;
+                my Str $name   = PSBot::Games::Hangman.name;
+                my Int $gameid = $*ROOM.get-game-id: PSBot::Games::Hangman.type;
                 return self.reply:
-                    "{$*ROOM.title} is not participating in any games of {PSBot::Games::Hangman.name}.",
-                    $*USER, $*ROOM unless $game.defined;
+                    "{$*ROOM.title} is not participating in any games of $name.",
+                    $*USER, $*ROOM unless $gameid.defined;
 
-                my PSBot::Games::Hangman $hangman = $game;
+                my PSBot::Games::Hangman $hangman = $*BOT.get-game: $gameid;
                 my Replier               $replier = $hangman.end: $*USER, $*ROOM;
                 $*ROOM.delete-game: $hangman.id;
                 $replier
+            }
+        );
+
+    my PSBot::Command $baw .= new:
+        :name<baw>,
+        PSBot::Command.new(
+            :default-group<@>,
+            :locale(Locale::Room),
+            anon method new(Str $target --> Replier) is pure {
+                my Int $idx  = $target.index: ',';
+                my Str $name = PSBot::Games::BlackAndWhite.name;
+                return self.reply:
+                    "Two players must be specified when creating a game of $name.",
+                    $*USER, $*ROOM unless $idx.defined;
+
+                my Str $player1-id = to-id $target.substr: 0, $idx;
+                return self.reply:
+                    "Two players must be specified when creating a game of $name.",
+                    $*USER, $*ROOM unless $player1-id;
+
+                my Str $player2-id = to-id $target.substr: $idx + 1;
+                return self.reply:
+                    "Two players must be specified when creating a game of $name.",
+                    $*USER, $*ROOM unless $player1-id;
+
+                my PSBot::User $player1 = $*BOT.get-user: $player1-id;
+                return self.reply:
+                    "{$*BOT.username} is not aware of any user '$player1-id' existing.",
+                    $*USER, $*ROOM unless $player1.defined;
+
+                my PSBot::User $player2 = $*BOT.get-user: $player2-id;
+                return self.reply:
+                    "{$*BOT.username} is not aware of any user '$player2-id' existing.",
+                    $*USER, $*ROOM unless $player2.defined;
+
+                my PSBot::Games::BlackAndWhite $game .= new: $player1, $player2, $*ROOM;
+                $*BOT.add-game: $game;
+
+                my Str $response = "A new game of $name has been created. Use ``{COMMAND}baw start`` to start the game.";
+                self.reply: $response, $*USER, $*ROOM
+            }
+        ),
+        PSBot::Command.new(
+            :default-group<@>,
+            :locale(Locale::Room),
+            anon method start(Str $target --> Replier) {
+                my Str $name   = PSBot::Games::BlackAndWhite.name;
+                my Int $gameid = $*ROOM.get-game-id: PSBot::Games::BlackAndWhite.type;
+                return self.reply:
+                    "{$*ROOM.title} is not participating in any game of $name.",
+                    $*USER, $*ROOM unless $gameid.defined;
+
+                my PSBot::Games::BlackAndWhite $baw = $*BOT.get-game: $gameid;
+                $baw.start: $*USER, $*ROOM
+            }
+        ),
+        PSBot::Command.new(
+            :locale(Locale::PM),
+            anon method play(Str $target --> Replier) {
+                my Str $name   = PSBot::Games::BlackAndWhite.name;
+                my Int $gameid = $*USER.get-game-id: PSBot::Games::BlackAndWhite.type;
+                return self.reply:
+                    "You are not a player of any game of $name.",
+                    $*USER, $*ROOM unless $gameid.defined;
+
+                my Int $value = try +$target;
+                return self.reply:
+                    "A tile numbered from 0 to 8 must be given.",
+                    $*USER, $*ROOM unless $value.defined && 0 <= $value <= 8;
+
+                my PSBot::Games::BlackAndWhite $baw = $*BOT.get-game: $gameid;
+                $baw.play: $value, $*USER
+            }
+        ),
+        PSBot::Command.new(
+            :default-group<@>,
+            :locale(Locale::Room),
+            anon method end(Str $target --> Replier) {
+                my Str $name   = PSBot::Games::BlackAndWhite.name;
+                my Int $gameid = $*ROOM.get-game-id: PSBot::Games::BlackAndWhite.type;
+                return self.reply:
+                    "{$*ROOM.title} is not participating in any game of $name.",
+                    $*USER, PSBot::Room unless $gameid.defined;
+
+                my PSBot::Games::BlackAndWhite $baw = $*BOT.get-game: $gameid;
+                $baw.end: $*USER, $*ROOM
             }
         );
 
