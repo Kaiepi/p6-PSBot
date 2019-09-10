@@ -8,9 +8,9 @@ use PSBot::ResponseHandler;
 use PSBot::Room;
 use PSBot::Tools;
 use PSBot::User;
-unit class PSBot::Rules does PSBot::ResponseHandler;
+unit class PSBot::Rules;
 
-my class Rule {
+my class Rule does PSBot::ResponseHandler {
     has Set:_    $.message-types;
     has Set:_    $.includes;
     has Set:_    $.excludes;
@@ -29,7 +29,7 @@ my class Rule {
               && ((+$!includes && $!includes ∌ $*ROOM.id) || (+$!excludes && $!excludes ∋ $*ROOM.id));
 
         $target ~~ $!matcher;
-        $/.defined ?? &!on-match($/) !! Nil
+        $/.defined ?? &!on-match(self, $/) !! Nil
     }
 }
 
@@ -50,7 +50,7 @@ method new() {
             [],
             [],
             token { ^ '/log ' .+? ' made this room ' $<visibility>=[\w+] '.' $ },
-            sub (Match:D $/ --> Nil) is pure {
+            method (Match:D $/ --> Nil) is pure {
                 my Str $visibility = ~$<visibility>;
                 $*ROOM.set-visibility: $visibility;
             }
@@ -68,7 +68,7 @@ method new() {
                 ]
                 »
             },
-            sub (Match:D $/ --> Replier:_) is pure {
+            method (Match:D $/ --> Replier:_) is pure {
                 return if !YOUTUBE_API_KEY.defined || $*USER.name eq $*BOT.username;
 
                 my Str:D             $id     = ~$<id>;
@@ -94,7 +94,7 @@ method new() {
                 ]
                 $
             },
-            sub (Match:D $/ --> Replier:_) is pure {
+            method (Match:D $/ --> Replier:_) is pure {
                 my Str:D                   $roomid = $*ROOM.id;
                 my PSBot::User::RoomInfo:D $ri     = $*USER.rooms{$roomid};
                 return unless $ri.defined
@@ -137,7 +137,7 @@ method new() {
             ['scholastic'],
             [],
             token { :i ar\-?15 },
-            sub (Match:D $/ --> Replier:_) {
+            method (Match:D $/ --> Replier:_) {
                 state Instant:D $timeout = now - 600;
                 return unless now - $timeout >= 600;
 
@@ -154,7 +154,7 @@ method new() {
             ['techcode'],
             [],
             token { :i 'can i ask a question' },
-            sub (Match:D $/ --> Replier:_) {
+            method (Match:D $/ --> Replier:_) {
                 my Str:D $output = "Don't ask if you can ask a question. Just ask it";
                 my Str:D $userid = $*USER.id;
                 my Str:D $roomid = $*ROOM.id;
@@ -166,7 +166,7 @@ method new() {
             [],
             [],
             token { ^ '/invite ' $<roomid>=[<[a..z 0..9 -]>+] $ },
-            sub (Match:D $/ --> Replier:_) {
+            method (Match:D $/ --> Replier:_) {
                 my Str:D $roomid = ~$<roomid>;
                 return if $roomid.starts-with: 'battle-';
 
@@ -189,7 +189,7 @@ method new() {
                 '" alt="' <-["]>* '" width="80" height="80" />'
                 $
             },
-            sub (Match:D $/ --> Nil) {
+            method (Match:D $/ --> Nil) {
                 my Str $avatar = ~$<avatar>;
                 $*BOT.set-avatar: $avatar;
             }
@@ -199,7 +199,7 @@ method new() {
             [],
             [],
             token { ^ '<div class="broadcast-red"><strong>Moderated chat was set to ' $<rank>=[.+?] '!</strong><br />Only users of rank + and higher can talk.</div>' },
-            sub (Match:D $/ --> Nil) {
+            method (Match:D $/ --> Nil) {
                 my Str $rank = ~$<rank>;
                 $*ROOM.set-modchat: $rank;
             }
@@ -209,7 +209,7 @@ method new() {
             [],
             [],
             token { ^ '<div class="broadcast-blue"><strong>Moderated chat was disabled!</strong><br />Anyone may talk now.</div>' $ },
-            sub (Match:D $/ --> Nil) {
+            method (Match:D $/ --> Nil) {
                 $*ROOM.set-modchat: ' ';
             }
         ),
@@ -218,7 +218,7 @@ method new() {
             [],
             [],
             token { ^ '<div class="broadcast-red"><strong>This room is now invite only!</strong><br />Users must be rank ' $<rank>=[.+?] ' or invited with <code>/invite</code> to join</div>' $ },
-            sub (Match:D $/ --> Nil) {
+            method (Match:D $/ --> Nil) {
                 my Str $rank = ~$<rank>;
                 $*ROOM.set-modjoin: $rank;
             }
@@ -228,7 +228,7 @@ method new() {
             [],
             [],
             token { ^ '<div class="broadcast-red"><strong>Moderated join is set to sync with modchat!</strong><br />Only users who can speak in modchat can join.</div>' $ },
-            sub (Match:D $/ --> Nil) {
+            method (Match:D $/ --> Nil) {
                 $*ROOM.set-modjoin: True;
             }
         ),
@@ -237,7 +237,7 @@ method new() {
             [],
             [],
             token { ^ '<div class="broadcast-blue"><strong>This room is no longer invite only!</strong><br />Anyone may now join.</div>' $ },
-            sub (Match:D $/ --> Nil) {
+            method (Match:D $/ --> Nil) {
                 $*ROOM.set-modjoin: ' ';
             }
         ),
@@ -249,7 +249,7 @@ method new() {
             [],
             [],
             token { ^ $(COMMAND) $<command>=\S+ [ \s $<target>=.+ ]? $ },
-            sub (Match:D $/ --> Replier:_) {
+            method (Match:D $/ --> Replier:_) {
                 return unless $<command>.defined;
 
                 my Str:D $command-name = ~$<command>;

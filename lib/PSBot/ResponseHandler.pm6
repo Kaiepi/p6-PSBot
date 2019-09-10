@@ -30,7 +30,7 @@ multi method make-responses(PSBot::ResponseHandler:D: Awaitable:D $future-result
 # This wraps PSBot::ResponseHandler.make-responses in a callback so rules,
 # commands, games, and battles can pass around arguments to eventually pass
 # back to the parser for sending.
-method reply(|args --> Replier) {
+method reply(PSBot::ResponseHandler:D: |args --> Replier) {
     sub (--> ResponseList:D) {
         self.make-responses: |args
     }
