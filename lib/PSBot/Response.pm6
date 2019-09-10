@@ -12,7 +12,6 @@ has Str:_  $.roomid;
 has Bool:_ $.raw;
 
 method new(PSBot::Response:_: Str:D $message, Str:_ :$userid, Str:_ :$roomid, Bool:D :$raw = False, |) {
-    say $message, $userid, $roomid, $raw;
     self.bless: :$message, :$userid, :$roomid, :$raw
 }
 
