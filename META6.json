@@ -2,8 +2,7 @@
 	"authors" : [
 		"Ben Davies"
 	],
-	"build-depends" : [ ],
-	"depends" : [
+	"build-depends" : [
 		"Cro::HTTP",
 		"Cro::WebSocket",
 		"DB::SQLite",
@@ -13,6 +12,7 @@
 		"Pastebin::Shadowcat",
 		"URI::Encode"
 	],
+	"depends" : [],
 	"description" : "Pokémon Showdown chat bot",
 	"license" : "Artistic-2.0",
 	"name" : "PSBot",
@@ -29,6 +29,8 @@
 		"PSBot::Game" : "lib/PSBot/Game.pm6",
 		"PSBot::Grammar" : "lib/PSBot/Grammar.pm6",
 		"PSBot::LoginServer" : "lib/PSBot/LoginServer.pm6",
+		"PSBot::Response" : "lib/PSBot/Response.pm6",
+		"PSBot::ResponseHandler" : "lib/PSBot/ResponseHandler.pm6",
 		"PSBot::Room" : "lib/PSBot/Room.pm6",
 		"PSBot::Rules" : "lib/PSBot/Rules.pm6",
 		"PSBot::Tools" : "lib/PSBot/Tools.pm6",

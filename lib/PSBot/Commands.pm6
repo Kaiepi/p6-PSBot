@@ -31,12 +31,10 @@ BEGIN {
 
                     my Group $src-group  = Group(Group.enums{'+'});
                     my Group $tar-group  = ($*ROOM.defined && $*BOT.userid.defined) ?? $*ROOM.users{$*BOT.userid}.group !! $*BOT.group;
-                    my Str   $result     = EVAL($target).gist;
-                    my Bool  $raw        = ($result.contains("\n") || 150 < $result.codes < 8194)
+                    my Str   $result     = (try EVAL($target).gist) // $!.gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g;
+                    my Bool  $raw        = ($result.contains("\n") || (150 < $result.codes < 8194))
                                         && self.can: $src-group, $tar-group;
                     $output.keep: $raw ?? "!code $result" !! $result.split("\n").map({ "``$_``" });
-
-                    CATCH { default { $output.keep: .gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g } }
                 }
             }
 
@@ -95,15 +93,30 @@ BEGIN {
             return self.reply: "$roomid is not a known room.", $*USER, $*ROOM unless $command-room.defined;
 
             sub evaluate(Promise $output --> Sub) {
-                sub {
+                sub (--> Nil) {
                     use MONKEY-SEE-NO-EVAL;
 
-                    my Replier $replier = $command($command-target);
-                    my Capture $result  = $replier();
-                    $*BOT.connection.send: |$result if $result.defined;
-                    $output.keep: '``' ~ Nil.gist ~ '``';
+                    my Group:D $src-group  = Group(Group.enums{'+'});
+                    my Group:D $tar-group  = ($*ROOM.defined && $*BOT.userid.defined) ?? $*ROOM.users{$*BOT.userid}.group !! $*BOT.group;
+                    my Replier $replier    = $command($command-target);
+                    my List    $result     = try $replier();
+                    my Bool:D  $raw        = $result.defined
+                                          && ($result.contains("\n") || (150 < $result.codes < 8194))
+                                          && self.can: $src-group, $tar-group;
 
-                    CATCH { default { $output.keep: .gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g } }
+                    $result //= do with $! {
+                        my Str $output = .gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g;
+                        (PSBot::Response.new($output, :$userid, :$roomid, :$raw),)
+                    };
+
+                    {
+                        # TODO: should be returning the output rather than sending it.
+                        my PSBot::User $*USER := $command-user;
+                        my PSBot::Room $*ROOM := $command-room;
+                        .send for $result;
+                    }
+
+                    $output.keep: '``' ~ Nil.gist ~ '``';
                 }
             }
 
@@ -761,7 +774,7 @@ BEGIN {
                 $game.add-room: $*ROOM;
                 $*ROOM.add-game: $game.id, $game.type;
                 $*BOT.add-game: $game;
-                self.reply: "A game of {$game.name} has been created.", $*USER, $*ROOM
+                self.reply: "A new game of {$game.name} has been created.", $*USER, $*ROOM
             }
         ),
         PSBot::Command.new(
@@ -769,13 +782,12 @@ BEGIN {
                 my Symbol      $game-type = PSBot::Games::Hangman.type;
                 my Int         $gameid    = $*ROOM.get-game-id: $game-type;
                 my PSBot::Game $game      = $*BOT.get-game: $gameid;
-                my Str         $message   = do if $game.defined {
-                    my PSBot::Games::Hangman $hangman = $game;
-                    $hangman.join($*USER, $*ROOM)
-                } else {
-                    "No game of {PSBot::Games::Hangman.name} is running in this room."
-                };
-                self.reply: $message, $*USER, $*ROOM
+                return self.reply:
+                    "{$*ROOM.title} is not participating in any games of {PSBot::Games::Hangman.name}.",
+                    $*USER, $*ROOM unless $game.defined;
+
+                my PSBot::Games::Hangman $hangman = $game;
+                $hangman.join: $*USER, $*ROOM
             }
         ),
         PSBot::Command.new(
@@ -783,13 +795,12 @@ BEGIN {
                 my Symbol      $game-type = PSBot::Games::Hangman.type;
                 my Int         $gameid    = $*ROOM.get-game-id: $game-type;
                 my PSBot::Game $game      = $*BOT.get-game: $gameid;
-                my Str         $message   = do if $game.defined {
-                    my PSBot::Games::Hangman $hangman = $game;
-                    $hangman.leave($*USER, $*ROOM)
-                } else {
-                    "No game of {PSBot::Games::Hangman.name} is running in this room."
-                };
-                self.reply: $message, $*USER, $*ROOM
+                return self.reply:
+                    "{$*ROOM.title} is not participating in any games of {PSBot::Games::Hangman.name}.",
+                    $*USER, $*ROOM unless $game.defined;
+
+                my PSBot::Games::Hangman $hangman = $game;
+                $hangman.leave: $*USER, $*ROOM
             }
         ),
         PSBot::Command.new(
@@ -798,13 +809,12 @@ BEGIN {
                 my Symbol      $game-type = PSBot::Games::Hangman.type;
                 my Int         $gameid    = $*ROOM.get-game-id: $game-type;
                 my PSBot::Game $game      = $*BOT.get-game: $gameid;
-                my Str         $message   = do if $game.defined {
-                    my PSBot::Games::Hangman $hangman = $game;
-                    $hangman.players
-                } else {
-                    "No game of {PSBot::Games::Hangman.name} is running in this room."
-                };
-                self.reply: $message, $*USER, $*ROOM
+                return self.reply:
+                    "{$*ROOM.title} is not participating in any games of {PSBot::Games::Hangman.name}.",
+                    $*USER, $*ROOM unless $game.defined;
+
+                my PSBot::Games::Hangman $hangman = $game;
+                $hangman.players: $*ROOM
             }
         ),
         PSBot::Command.new(
@@ -813,13 +823,12 @@ BEGIN {
                 my Symbol      $game-type = PSBot::Games::Hangman.type;
                 my Int         $gameid    = $*ROOM.get-game-id: $game-type;
                 my PSBot::Game $game      = $*BOT.get-game: $gameid;
-                my             @messages  = do if $game.defined {
-                    my PSBot::Games::Hangman $hangman = $game;
-                    $hangman.start
-                } else {
-                    ("No game of {PSBot::Games::Hangman.name} is running in this room.",)
-                };
-                self.reply: @messages, $*USER, $*ROOM
+                return self.reply:
+                    "{$*ROOM.title} is not participating in any games of {PSBot::Games::Hangman.name}.",
+                    $*USER, $*ROOM unless $game.defined;
+
+                my PSBot::Games::Hangman $hangman = $game;
+                $hangman.start: $*ROOM
             }
         ),
         PSBot::Command.new(
@@ -827,15 +836,14 @@ BEGIN {
                 my Symbol      $game-type = PSBot::Games::Hangman.type;
                 my Int         $gameid    = $*ROOM.get-game-id: $game-type;
                 my PSBot::Game $game      = $*BOT.get-game: $gameid;
-                my             @messages  = do if $game.defined {
-                    my PSBot::Games::Hangman $hangman = $game;
-                    $_ := $hangman.guess: $*USER, $target;
-                    $*ROOM.delete-game: $hangman.id if $hangman.finished;
-                    $_
-                } else {
-                    ("No game of {PSBot::Games::Hangman.name} is running in this room.",)
-                };
-                self.reply: @messages, $*USER, $*ROOM
+                return self.reply:
+                    "{$*ROOM.title} is not participating in any games of {PSBot::Games::Hangman.name}.",
+                    $*USER, $*ROOM unless $game.defined;
+
+                my PSBot::Games::Hangman $hangman = $game;
+                my Replier               $replier = $hangman.guess: $target, $*USER, $*ROOM;
+                $*ROOM.delete-game: $hangman.id if $hangman.finished;
+                $replier
             }
         ),
         PSBot::Command.new(
@@ -844,15 +852,14 @@ BEGIN {
                 my Symbol      $game-type = PSBot::Games::Hangman.type;
                 my Int         $gameid    = $*ROOM.get-game-id: $game-type;
                 my PSBot::Game $game      = $*BOT.get-game: $gameid;
-                my Str         $message   = do if $game.defined {
-                    my PSBot::Games::Hangman $hangman = $game;
-                    $_ := $hangman.end;
-                    $*ROOM.delete-game: $hangman.id;
-                    $_
-                } else {
-                    ("No game of {PSBot::Games::Hangman.name} is running in this room.",)
-                };
-                self.reply: $message, $*USER, $*ROOM
+                return self.reply:
+                    "{$*ROOM.title} is not participating in any games of {PSBot::Games::Hangman.name}.",
+                    $*USER, $*ROOM unless $game.defined;
+
+                my PSBot::Games::Hangman $hangman = $game;
+                my Replier               $replier = $hangman.end: $*ROOM;
+                $*ROOM.delete-game: $hangman.id;
+                $replier
             }
         );
 

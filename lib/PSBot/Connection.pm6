@@ -96,7 +96,7 @@ method reconnect() {
 }
 
 proto method send(| --> Nil) {*}
-multi method send(*@data, Str :$roomid!, Bool :$raw where .so --> Nil) {
+multi method send(*@data, Str:D :$roomid!, Bool:D :$raw where .so --> Nil) {
     for @data -> $data {
         my Str $message = "$roomid|$data";
         if $data.starts-with: '>> ' {
@@ -108,7 +108,7 @@ multi method send(*@data, Str :$roomid!, Bool :$raw where .so --> Nil) {
         }
     }
 }
-multi method send(*@data, Str :$roomid!, Bool :$raw where not *.so --> Nil) {
+multi method send(*@data, Str:D :$roomid!, Bool:D :$raw where not *.so --> Nil) {
     for @data -> $data {
         my Str $message = do if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
             "$roomid| $data"
@@ -118,12 +118,12 @@ multi method send(*@data, Str :$roomid!, Bool :$raw where not *.so --> Nil) {
         $!sender.emit: $message;
     }
 }
-multi method send(*@data, Str :$userid!, Bool :$raw where .so --> Nil) {
+multi method send(*@data, Str:D :$userid!, Bool:D :$raw where .so --> Nil) {
     for @data -> $data {
         $!sender.emit: "|/w $userid, $data";
     }
 }
-multi method send(*@data, Str :$userid!, Bool :$raw where not *.so --> Nil) {
+multi method send(*@data, Str:D :$userid!, Bool:D :$raw where not *.so --> Nil) {
     for @data -> $data {
         my Str $message = do given $data {
             when / ^ '/' <!before '/'> /          { "|/w $userid, /$data" }
@@ -134,7 +134,7 @@ multi method send(*@data, Str :$userid!, Bool :$raw where not *.so --> Nil) {
         $!sender.emit: $message;
     }
 }
-multi method send(*@data, Bool :$raw where .so --> Nil) {
+multi method send(*@data, Bool:D :$raw where .so --> Nil) {
     for @data -> $data {
         my Str $message = "|$data";
         if $data.starts-with('/cmd userdetails') || $data.starts-with('>> ') {
@@ -146,7 +146,7 @@ multi method send(*@data, Bool :$raw where .so --> Nil) {
         }
     }
 }
-multi method send(*@data, Bool :$raw where not *.so --> Nil) {
+multi method send(*@data, Bool:D :$raw where not *.so --> Nil) {
     for @data -> $data {
         my Str $message = do if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
             "| $data"

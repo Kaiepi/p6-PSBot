@@ -4,39 +4,42 @@ use PSBot::Command;
 use PSBot::Commands;
 use PSBot::Config;
 use PSBot::Plugins::YouTube;
+use PSBot::ResponseHandler;
 use PSBot::Room;
 use PSBot::Tools;
 use PSBot::User;
-unit class PSBot::Rules;
+unit class PSBot::Rules does PSBot::ResponseHandler;
 
 my class Rule {
-    has Set    $.message-types;
-    has Set    $.includes;
-    has Set    $.excludes;
-    has Regex  $.matcher;
-    has        &.on-match;
+    has Set:_    $.message-types;
+    has Set:_    $.includes;
+    has Set:_    $.excludes;
+    has Regex:_  $.matcher;
+    has          &.on-match;
 
-    method new(@message-types, @includes, @excludes, Regex $matcher, &on-match) {
+    method new(@message-types, @includes, @excludes, Regex:D $matcher, &on-match) {
         my Set $message-types .= new: @message-types;
         my Set $includes      .= new: @includes;
         my Set $excludes      .= new: @excludes;
         self.bless: :$message-types, :$includes, :$excludes, :$matcher, :&on-match;
     }
 
-    method match(Str $target) {
-        return if $*ROOM && ((+$!includes && $!includes ∌ $*ROOM.id) || (+$!excludes && $!excludes ∋ $*ROOM.id));
+    method match(Str:D $target --> Replier:_) {
+        return if $*ROOM.defined
+              && ((+$!includes && $!includes ∌ $*ROOM.id) || (+$!excludes && $!excludes ∋ $*ROOM.id));
+
         $target ~~ $!matcher;
-        &!on-match($/) if $/;
+        $/.defined ?? &!on-match($/) !! Nil
     }
 }
 
-has Rule    @!rules;
-has SetHash %!cache{MessageType};
+has Rule:D    @!rules;
+has SetHash:D %!cache{MessageType};
 
-submethod BUILD(Rule :@!rules) {
-    %!cache .= new: MessageType.enums.values.map({
-        my MessageType $type = MessageType($_);
-        $type => SetHash.new: @!rules.grep: *.message-types ∋ $type
+submethod TWEAK(Rule :@!rules) {
+    %!cache.STORE: MessageType.enums.values.map({
+        my MessageType:D $type = MessageType($_);
+        $type => SetHash.new: |@!rules.grep: *.message-types ∋ $type
     });
 }
 
@@ -47,7 +50,7 @@ method new() {
             [],
             [],
             token { ^ '/log ' .+? ' made this room ' $<visibility>=[\w+] '.' $ },
-            sub (Match $/ --> Nil) is pure {
+            sub (Match:D $/ --> Nil) is pure {
                 my Str $visibility = ~$<visibility>;
                 $*ROOM.set-visibility: $visibility;
             }
@@ -65,16 +68,17 @@ method new() {
                 ]
                 »
             },
-            sub (Match $/ --> Capture) is pure {
+            sub (Match:D $/ --> Replier:_) is pure {
                 return if !YOUTUBE_API_KEY.defined || $*USER.name eq $*BOT.username;
 
-                my Str             $id     = ~$<id>;
-                my Failable[Video] $video  = get-video $id;
-                my Str             $output = $video.defined
+                my Str:D             $id     = ~$<id>;
+                my Failable[Video:D] $video  = get-video $id;
+                my Str:D             $output = $video.defined
                     ?? qq[{$*USER.name} posted a video: "{$video.title}"]
                     !! "Failed to get the video {$*USER.name} posted: {$video.exception.message}";
-                my Str             $roomid = $*ROOMID;
-                \($output, :$roomid)
+                my Str:D             $userid = $*USER.id;
+                my Str:_             $roomid = $*ROOM.id;
+                self.reply: $output, :$userid, :$roomid
             }
         ),
         Rule.new(
@@ -90,17 +94,17 @@ method new() {
                 ]
                 $
             },
-            sub (Match $/ --> Capture) is pure {
-                my Str                   $roomid = $*ROOM.id;
-                my PSBot::User::RoomInfo $ri     = $*USER.rooms{$roomid};
-                return unless $ri.defined;
+            sub (Match:D $/ --> Replier:_) is pure {
+                my Str:D                   $roomid = $*ROOM.id;
+                my PSBot::User::RoomInfo:D $ri     = $*USER.rooms{$roomid};
+                return unless $ri.defined
+                           && $ri.broadcast-timeout.defined
+                           && $ri.broadcast-command.defined;
 
-                my Instant $timeout = $ri.broadcast-timeout;
-                my Str     $command = $ri.broadcast-command;
-                return unless $timeout.defined && $command.defined;
-
-                my Str $input  = $<command> ?? to-id(~$<command>) !! Nil;
-                my Str $output = do if $input === $command {
+                my Instant:D $timeout = $ri.broadcast-timeout;
+                my Str:D     $command = $ri.broadcast-command;
+                my Str:_     $input   = $<command> && to-id ~$<command>;
+                my Str:D     $output  = do if $input === $command {
                     $ri.broadcast-command = Nil;
                     $ri.broadcast-timeout = Nil;
                     if now > $timeout - 5 * 60 {
@@ -124,7 +128,8 @@ method new() {
                 } else {
                     "This is not the command you have permission to use.";
                 };
-                \($output, :$roomid, :raw)
+                my Str:D     $userid  = $*USER.id;
+                self.reply: $output, :$userid, :$roomid, :raw
             }
         ),
         Rule.new(
@@ -132,14 +137,16 @@ method new() {
             ['scholastic'],
             [],
             token { :i ar\-?15 },
-            sub (Match $/ --> Capture) {
-                state Instant $timeout = now - 600;
+            sub (Match:D $/ --> Replier:_) {
+                state Instant:D $timeout = now - 600;
                 return unless now - $timeout >= 600;
 
-                my Str $output = 'The AR in AR-15 stands for assault rifle (15 is the number of bullets the clip holds)';
-                my Str $roomid = $*ROOMID;
                 $timeout = now;
-                \($output, :$roomid)
+
+                my Str:D $output = 'The AR in AR-15 stands for assault rifle (15 is the number of bullets the clip holds)';
+                my Str:D $userid = $*USER.id;
+                my Str:D $roomid = $*ROOM.id;
+                self.reply: $output, :$userid, :$roomid
             }
         ),
         Rule.new(
@@ -147,10 +154,11 @@ method new() {
             ['techcode'],
             [],
             token { :i 'can i ask a question' },
-            sub (Match $/ --> Capture) {
-                my Str $output = "Don't ask if you can ask a question. Just ask it";
-                my Str $roomid = $*ROOMID;
-                \($output, :$roomid)
+            sub (Match:D $/ --> Replier:_) {
+                my Str:D $output = "Don't ask if you can ask a question. Just ask it";
+                my Str:D $userid = $*USER.id;
+                my Str:D $roomid = $*ROOM.id;
+                self.reply: $output, :$userid, :$roomid
             }
         ),
         Rule.new(
@@ -158,16 +166,16 @@ method new() {
             [],
             [],
             token { ^ '/invite ' $<roomid>=[<[a..z 0..9 -]>+] $ },
-            sub (Match $/ --> Capture) {
-                my Str $roomid = ~$<roomid>;
+            sub (Match:D $/ --> Replier:_) {
+                my Str:D $roomid = ~$<roomid>;
                 return if $roomid.starts-with: 'battle-';
 
-                my Map $groups = Group.enums;
+                my Map:D $groups = Group.enums;
                 return unless $groups{$*USER.group} >= $groups<%>;
 
-                my Str $output = "/join $roomid";
-                my Str $userid = $*USER.id;
-                \($output, :raw)
+                my Str:D $output = "/join $roomid";
+                my Str:D $userid = $*USER.id;
+                self.reply: $output, :raw
             }
         ),
         Rule.new(
@@ -181,7 +189,7 @@ method new() {
                 '" alt="' <-["]>* '" width="80" height="80" />'
                 $
             },
-            sub (Match $/ --> Nil) {
+            sub (Match:D $/ --> Nil) {
                 my Str $avatar = ~$<avatar>;
                 $*BOT.set-avatar: $avatar;
             }
@@ -191,7 +199,7 @@ method new() {
             [],
             [],
             token { ^ '<div class="broadcast-red"><strong>Moderated chat was set to ' $<rank>=[.+?] '!</strong><br />Only users of rank + and higher can talk.</div>' },
-            sub (Match $/ --> Nil) {
+            sub (Match:D $/ --> Nil) {
                 my Str $rank = ~$<rank>;
                 $*ROOM.set-modchat: $rank;
             }
@@ -201,7 +209,7 @@ method new() {
             [],
             [],
             token { ^ '<div class="broadcast-blue"><strong>Moderated chat was disabled!</strong><br />Anyone may talk now.</div>' $ },
-            sub (Match $/ --> Nil) {
+            sub (Match:D $/ --> Nil) {
                 $*ROOM.set-modchat: ' ';
             }
         ),
@@ -210,7 +218,7 @@ method new() {
             [],
             [],
             token { ^ '<div class="broadcast-red"><strong>This room is now invite only!</strong><br />Users must be rank ' $<rank>=[.+?] ' or invited with <code>/invite</code> to join</div>' $ },
-            sub (Match $/ --> Nil) {
+            sub (Match:D $/ --> Nil) {
                 my Str $rank = ~$<rank>;
                 $*ROOM.set-modjoin: $rank;
             }
@@ -220,7 +228,7 @@ method new() {
             [],
             [],
             token { ^ '<div class="broadcast-red"><strong>Moderated join is set to sync with modchat!</strong><br />Only users who can speak in modchat can join.</div>' $ },
-            sub (Match $/ --> Nil) {
+            sub (Match:D $/ --> Nil) {
                 $*ROOM.set-modjoin: True;
             }
         ),
@@ -229,7 +237,7 @@ method new() {
             [],
             [],
             token { ^ '<div class="broadcast-blue"><strong>This room is no longer invite only!</strong><br />Anyone may now join.</div>' $ },
-            sub (Match $/ --> Nil) {
+            sub (Match:D $/ --> Nil) {
                 $*ROOM.set-modjoin: ' ';
             }
         ),
@@ -241,30 +249,22 @@ method new() {
             [],
             [],
             token { ^ $(COMMAND) $<command>=\S+ [ \s $<target>=.+ ]? $ },
-            sub (Match $/ --> Capture) {
+            sub (Match:D $/ --> Replier:_) {
                 return unless $<command>.defined;
 
-                my Str $command-name = ~$<command>;
+                my Str:D $command-name = ~$<command>;
                 return unless $command-name;
                 return unless PSBot::Commands::{$command-name}:exists;
 
-                my PSBot::Command    $command = PSBot::Commands::{$command-name};
-                my Str               $target  = $<target>.defined ?? ~$<target> !! '';
-                my Failable[Replier] $replier = $command($target);
-                if $replier.defined {
-                    $replier()
-                } elsif $replier ~~ Failure:D {
-                    my Str $output = "Invalid subcommand: {COMMAND}{$replier.exception.message}";
-                    if $*ROOM.defined {
-                        my Str $roomid = $*ROOM.id;
-                        \($output, :$roomid)
-                    } else {
-                        my Str $userid = $*USER.id;
-                        \($output, :$userid)
-                    }
-                } else {
-                    Capture
-                }
+                my PSBot::Command:D    $command = PSBot::Commands::{$command-name};
+                my Str:D               $target  = $<target>.defined ?? ~$<target> !! '';
+                my Failable[Replier:_] $replier = $command($target);
+                return $replier if $replier.defined || $replier === Nil;
+
+                my Str:D $output = "Invalid subcommand: {COMMAND}{$replier.exception.message}";
+                my Str:D $userid = $*USER.id;
+                my Str:_ $roomid = $*ROOM.id;
+                self.reply: $output, :$userid, :$roomid
              }
         )
     ];
@@ -272,32 +272,16 @@ method new() {
     self.bless: :@rules;
 }
 
-proto method parse(MessageType, Str, Str :$userid?, Str :$roomid? --> Bool) {*}
-multi method parse(MessageType $type, Str $message, Str :$roomid! --> Bool) {
-    my Bool $responded = False;
+method parse(MessageType:D $type, Str:D $message --> Bool:D) {
+    for %!cache{$type}.keys -> Rule:D $rule {
+        my Replier $replier = $rule.match: $message;
+        next unless $replier.defined;
 
-    for @!rules.grep: *.message-types ∋ $type -> Rule $rule {
-        my $output = $rule.match: $message;
-        if $output.defined {
-            $*BOT.connection.send: |$output;
-            $responded = True;
-            last;
+        if $replier() -> ResponseList:D $responses is raw {
+            .send for $responses;
+            return True;
         }
     }
 
-    $responded
-}
-multi method parse(MessageType $type, Str $message, Str :$userid! --> Bool) {
-    my Bool $responded = False;
-
-    for @!rules.grep: *.message-types ∋ $type -> Rule $rule {
-        my $output = $rule.match: $message;
-        if $output.defined {
-            $*BOT.connection.send: |$output;
-            $responded = True;
-            last;
-        }
-    }
-
-    $responded
+    False
 }

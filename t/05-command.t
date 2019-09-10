@@ -3,7 +3,7 @@ use v6.d;
 BEGIN %*ENV<TESTING> := 1;
 END   %*ENV<TESTING>:delete;
 
-use Failable;
+#use Failable;
 use PSBot;
 use PSBot::Command;
 use PSBot::Config;

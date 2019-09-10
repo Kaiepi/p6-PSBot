@@ -261,7 +261,7 @@ method message:sym<c:>(Match $/ is copy) {
     my PSBot::Room $*ROOM   := $*BOT.get-room: $roomid;
     return unless $*ROOM.defined;
 
-    $*BOT.rules.parse: MessageType('c:'), $message, :$roomid;
+    $*BOT.rules.parse: MessageType('c:'), $message;
 }
 method message:sym<pm>(Match $/ is copy) {
     my PSBot::UserInfo $from = $<from>.made;
@@ -276,7 +276,7 @@ method message:sym<pm>(Match $/ is copy) {
     my PSBot::Room $*ROOM   := PSBot::Room;
     return unless $*USER.defined;
 
-    $*BOT.rules.parse: MessageType('pm'), $message, :$userid;
+    $*BOT.rules.parse: MessageType('pm'), $message;
 }
 method message:sym<html>(Match $/) {
     return if $*INIT;
@@ -289,7 +289,7 @@ method message:sym<html>(Match $/) {
     my Str         $roomid  = $*ROOMID;
     my PSBot::Room $*ROOM  := $*BOT.get-room: $roomid;
 
-    $*BOT.rules.parse: MessageType('html'), $data, :$roomid;
+    $*BOT.rules.parse: MessageType('html'), $data;
 }
 method message:sym<popup>(Match $/) {
     return if $*INIT;
@@ -302,7 +302,7 @@ method message:sym<popup>(Match $/) {
     my Str         $roomid  = $*ROOMID;
     my PSBot::Room $*ROOM  := $*BOT.get-room: $roomid;
 
-    $*BOT.rules.parse: MessageType('popup'), $data, :$roomid;
+    $*BOT.rules.parse: MessageType('popup'), $data;
 }
 method message:sym<raw>(Match $/) {
     return if $*INIT;
@@ -315,5 +315,5 @@ method message:sym<raw>(Match $/) {
     my Str         $roomid  = $*ROOMID;
     my PSBot::Room $*ROOM  := $*BOT.get-room: $roomid;
 
-    $*BOT.rules.parse: MessageType('popup'), $data, :$roomid;
+    $*BOT.rules.parse: MessageType('popup'), $data;
 }
