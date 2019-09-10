@@ -259,7 +259,7 @@ method new() {
                 my PSBot::Command:D    $command = PSBot::Commands::{$command-name};
                 my Str:D               $target  = $<target>.defined ?? ~$<target> !! '';
                 my Failable[Replier:_] $replier = $command($target);
-                return $replier if $replier.defined || $replier === Nil;
+                return $replier if $replier !~~ Failure:D;
 
                 my Str:D $output = "Invalid subcommand: {COMMAND}{$replier.exception.message}";
                 my Str:D $userid = $*USER.id;
