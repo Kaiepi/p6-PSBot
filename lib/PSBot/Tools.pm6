@@ -13,7 +13,7 @@ my subset ResponseList
 
 my subset Replier
     is export
-    of Callable[ResponseList:D];
+    where Callable[ResponseList:D] | Nil;
 
 my subset Result
     is    export
