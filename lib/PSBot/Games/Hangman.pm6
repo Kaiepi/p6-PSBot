@@ -19,7 +19,7 @@ method name(PSBot::Games::Hangman:_: --> Str:D) { $name }
 my Symbol:D $type = Symbol($name);
 method type(PSBot::Games::Hangman:_: --> Symbol:D) { $type }
 
-method !display(PSBot::Games::Hangman:D: PSBot::Room:D $room --> Replier) {
+method !display(PSBot::Games::Hangman:D: PSBot::Room:D $room --> Replier:D) {
     my Str:D @letters = '-' xx $!word.chars;
     for $!word.comb.kv -> $i, $letter {
         @letters[$i] = $letter if $!guessed-letters ∋ $letter;
@@ -32,7 +32,7 @@ method !display(PSBot::Games::Hangman:D: PSBot::Room:D $room --> Replier) {
         :roomid($room.id)
 }
 
-multi method start(PSBot::Games::Hangman:D: PSBot::Room:D $room --> Replier) {
+multi method start(PSBot::Games::Hangman:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:D) {
     return self.reply:
         "{$room.title} is not participating in this game of {self.name}.",
         :roomid($room.id) unless $!rooms{$room.id}:exists;
@@ -44,7 +44,7 @@ multi method start(PSBot::Games::Hangman:D: PSBot::Room:D $room --> Replier) {
         :roomid($room.id);
 }
 
-multi method end(PSBot::Games::Hangman:D: PSBot::Room:D $room --> Replier) {
+multi method end(PSBot::Games::Hangman:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:D) {
     return self.reply:
         "{$room.title} is not participating in this game of {self.name}.",
         :roomid($room.id) unless $!rooms{$room.id}:exists;
@@ -54,7 +54,7 @@ multi method end(PSBot::Games::Hangman:D: PSBot::Room:D $room --> Replier) {
     self.reply: $output, :roomid($room.id)
 }
 
-method guess(PSBot::Games::Hangman:D: Str:D $target, PSBot::User:D $player, PSBot::Room:D $room --> Replier) {
+method guess(PSBot::Games::Hangman:D: Str:D $target, PSBot::User:D $player, PSBot::Room:D $room --> Replier:D) {
     my Str:D $roomid = $room.id;
 
     return self.reply:

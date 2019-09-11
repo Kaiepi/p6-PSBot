@@ -828,7 +828,7 @@ BEGIN {
                     $*USER, $*ROOM unless $game.defined;
 
                 my PSBot::Games::Hangman $hangman = $game;
-                $hangman.start: $*ROOM
+                $hangman.start: $*USER, $*ROOM
             }
         ),
         PSBot::Command.new(
@@ -857,7 +857,7 @@ BEGIN {
                     $*USER, $*ROOM unless $game.defined;
 
                 my PSBot::Games::Hangman $hangman = $game;
-                my Replier               $replier = $hangman.end: $*ROOM;
+                my Replier               $replier = $hangman.end: $*USER, $*ROOM;
                 $*ROOM.delete-game: $hangman.id;
                 $replier
             }
