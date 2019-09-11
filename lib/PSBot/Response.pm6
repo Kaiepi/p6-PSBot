@@ -15,11 +15,6 @@ method new(PSBot::Response:_: Str:D $message, Str:_ :$userid, Str:_ :$roomid, Bo
     self.bless: :$message, :$userid, :$roomid, :$raw
 }
 
-method send(PSBot::Response:D: --> Bool:D) {
-    if $!message.defined {
-        $*BOT.connection.send: $!message, :$!userid, :$!roomid, :$!raw;
-        True
-    } else {
-        False
-    }
+method send(PSBot::Response:D: --> Nil) {
+    $*BOT.connection.send: $!message, :$!userid, :$!roomid, :$!raw;
 }
