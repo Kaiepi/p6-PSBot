@@ -108,7 +108,7 @@ multi method send(*@data, Str:D :$roomid!, Bool:D :$raw where .so --> Nil) {
         }
     }
 }
-multi method send(*@data, Str:D :$roomid!, Bool:D :$raw where not *.so --> Nil) {
+multi method send(*@data, Str:D :$roomid!, Bool:D :$raw where not *.so = False --> Nil) {
     for @data -> $data {
         my Str $message = do if $data ~~ / ^ [ <[!/]> <!before <[!/]> > | '~~ ' | '>> ' | '>>> ' ] / {
             "$roomid| $data"
@@ -123,7 +123,7 @@ multi method send(*@data, Str:D :$userid!, Bool:D :$raw where .so --> Nil) {
         $!sender.emit: "|/w $userid, $data";
     }
 }
-multi method send(*@data, Str:D :$userid!, Bool:D :$raw where not *.so --> Nil) {
+multi method send(*@data, Str:D :$userid!, Bool:D :$raw where not *.so = False --> Nil) {
     for @data -> $data {
         my Str $message = do given $data {
             when / ^ '/' <!before '/'> /          { "|/w $userid, /$data" }
