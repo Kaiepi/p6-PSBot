@@ -124,11 +124,13 @@ method start() {
             whenever $!logged-in {
                 # Now that we're logged in, join any remaining rooms manually. This
                 # is in case any of them have modjoin set.
-                if +$!joinable-rooms > 11 {
-                    $!connection.send: $!joinable-rooms.keys[11..*].map({ "/join $_" }), :raw;
-                } elsif +$!joinable-rooms == 0 {
-                    $!rooms-propagated.keep;
-                }
+                $!lock.protect({
+                    if +$!joinable-rooms > 11 {
+                        $!connection.send: $!joinable-rooms.keys[11..*].map({ "/join $_" }), :raw;
+                    } elsif +$!joinable-rooms == 0 {
+                        $!rooms-propagated.keep;
+                    }
+                })
             }
             whenever $!rooms-propagated {
                 # Awaits any users waiting to get propagated, ignoring guests.
@@ -151,43 +153,43 @@ method start() {
                         if %!rooms<staff>:exists && !$!help-tickets-ignored;
                     $!connection.send: "/status {STATUS}", :raw
                         if STATUS.defined && $!message !=== STATUS;
+                });
 
-                    # Send user mail if the recipient is online. If not, wait until
-                    # they join a room the bot's in.
-                    with $!database.get-mail -> @mail {
-                        my List %mail = (%(), |@mail).reduce(-> %data, %row {
-                            my Str $userid  = %row<target>;
-                            my Str $message = "[%row<source>] %row<message>";
-                            %data{$userid}  = %data{$userid}:exists
-                                ?? (|%data{$userid}, $message)
-                                !! ($message,);
-                            %data
-                        });
-                        for %mail.kv -> $userid, @messages {
-                            if self.has-user: $userid {
-                                $!database.remove-mail: $userid;
-                                $!connection.send:
-                                    "You received {+@messages} message{+@messages == 1 ?? '' !! 's'}:",
-                                    @messages, :$userid;
+                # Send user mail if the recipient is online. If not, wait until
+                # they join a room the bot's in.
+                with $!database.get-mail -> @mail {
+                    my List %mail = (%(), |@mail).reduce(-> %data, %row {
+                        my Str $userid  = %row<target>;
+                        my Str $message = "[%row<source>] %row<message>";
+                        %data{$userid}  = %data{$userid}:exists
+                            ?? (|%data{$userid}, $message)
+                            !! ($message,);
+                        %data
+                    });
+                    for %mail.kv -> $userid, @messages {
+                        if self.has-user: $userid {
+                            $!database.remove-mail: $userid;
+                            $!connection.send:
+                                "You received {+@messages} message{+@messages == 1 ?? '' !! 's'}:",
+                                @messages, :$userid;
+                        }
+                    }
+                }
+
+                # Schedule user reminders.
+                with $!database.get-reminders -> @reminders {
+                    for @reminders -> %row {
+                        %!reminders{%row<id>} := $*SCHEDULER.cue({
+                            if %row<roomid>.defined {
+                                $!database.remove-reminder: %row<reminder>, %row<end>, %row<userid>, %row<roomid>;
+                                $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", roomid => %row<roomid>;
+                            } else {
+                                $!database.remove-reminder: %row<reminder>, %row<end>, %row<userid>;
+                                $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", userid => %row<userid>;
                             }
-                        }
+                        }, at => %row<end>);
                     }
-
-                    # Schedule user reminders.
-                    with $!database.get-reminders -> @reminders {
-                        for @reminders -> %row {
-                            %!reminders{%row<id>} := $*SCHEDULER.cue({
-                                if %row<roomid>.defined {
-                                    $!database.remove-reminder: %row<reminder>, %row<end>, %row<userid>, %row<roomid>;
-                                    $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", roomid => %row<roomid>;
-                                } else {
-                                    $!database.remove-reminder: %row<reminder>, %row<end>, %row<userid>;
-                                    $!connection.send: "%row<name>, you set a reminder %row<duration> ago: %row<reminder>", userid => %row<userid>;
-                                }
-                            }, at => %row<end>);
-                        }
-                    }
-                })
+                }
             }
             whenever $!done {
                 # The bot wants to stop. Exit the react block, then exit the loop.
