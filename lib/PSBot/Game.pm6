@@ -20,9 +20,9 @@ has Bool    $.allow-late-joins;
 
 # Creates a new game, obviously.
 my atomicint $next-id = 1;
-method new(PSBot::Game:_: Bool:D :$allow-late-joins = False --> PSBot::Game:D) {
+method new(PSBot::Game:_: Bool:D :$allow-late-joins = False, |rest --> PSBot::Game:D) {
     my Int $id = $next-id⚛++;
-    self.bless: :$id, :$allow-late-joins;
+    self.bless: :$id, :$allow-late-joins, |rest
 }
 
 # That's the name of the game, baby.
@@ -35,13 +35,13 @@ method name(PSBot::Game:_: --> Str:D) { ... }
 method type(PSBot::Game:_: --> Symbol:D) { ... }
 
 # Returns a response containing what rooms are participating in this game.
-proto method rooms(PSBot::Game:D: | --> Replier) {*}
-multi method rooms(PSBot::Game:D: PSBot::User:D $user --> Replier) {
+proto method rooms(PSBot::Game:D: | --> Replier:D) {*}
+multi method rooms(PSBot::Game:D: PSBot::User:D $user --> Replier:D) {
     self.reply:
         "The rooms participating in this game of {self.name} are: {$!rooms.keys.join: ', '}",
         :userid($user.id)
 }
-multi method rooms(PSBot::Game:D: PSBot::Room:D $room --> Replier) {
+multi method rooms(PSBot::Game:D: PSBot::Room:D $room --> Replier:D) {
     self.reply:
         "The rooms participating in this game of {self.name} are: {$!rooms.keys.join: ', '}",
         :roomid($room.id)
@@ -54,7 +54,7 @@ method has-room(PSBot::Game:D: PSBot::Room $room --> Bool:D) {
 
 # Adds a room to the list of rooms participating in this game, returning a
 # response.
-proto method add-room(PSBot::Game:D: PSBot::Room $room --> Replier) {
+proto method add-room(PSBot::Game:D: PSBot::Room $room --> Replier:D) {
     return self.reply:
         "{$room.title} is already participating in this game of {self.name}."
         :roomid($room.id) if $!rooms ∋ $room.id;
@@ -87,13 +87,13 @@ multi method delete-room(PSBot::Game:D: PSBot::Room:D $room --> Nil) {
 }
 
 # Returns a response containing what players are participating in this game.
-proto method players(PSBot::Game:D: | --> Replier) {*}
-multi method players(PSBot::Game:D: PSBot::User:D $user --> Replier) {
+proto method players(PSBot::Game:D: | --> Replier:D) {*}
+multi method players(PSBot::Game:D: PSBot::User:D $user --> Replier:D) {
     self.reply:
         "The players in this game of {self.name} are: {$!players.keys.join: ', '}",
         :userid($user.id)
 }
-multi method players(PSBot::Game:D: PSBot::Room:D $room --> Replier) {
+multi method players(PSBot::Game:D: PSBot::Room:D $room --> Replier:D) {
     self.reply:
         "The players in this game of {self.name} are: {$!players.keys.join: ', '}",
         :roomid($room.id)
@@ -106,7 +106,7 @@ method has-player(PSBot::Game:D: PSBot::User:D $user --> Bool:D) {
 
 # Adds a user to the list of players in this game given the room they're
 # joining from, returning a response.
-proto method join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room) {
+proto method join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:D) {
     my Str $userid = $user.id;
     my Str $roomid = $room.id;
 
@@ -132,7 +132,7 @@ multi method join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Ni
 
 # Removes a user from the list of players in this game given the room they're
 # leaving from, returning a response.
-proto method leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier) {
+proto method leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:D) {
     my Str $userid = $user.id;
     my Str $roomid = $room.id;
 
@@ -154,29 +154,45 @@ multi method leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> N
 }
 
 # Starts this game, returning a response.
-proto method start(PSBot::Game:D: PSBot::Room:D $room --> Replier) {
+proto method start(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:D) {
+    my Str:D $roomid = $room.id;
+
     return self.reply:
         "{$room.title} is not participating in this game of {self.name}.",
-        :roomid($room.id) unless $!rooms ∋ $room.id;
+        :$roomid unless $!rooms ∋ $room.id;
     return self.reply:
         "This game of {self.name} has already started!",
-        :roomid($room.id) if $!started;
+        :$roomid if $!started;
 
+    my Replier:_ $response = {*};
+    my Str:D     $output   = "This game of {self.name} has started.";
+    self.reply:
+        ($response.defined ?? ($output, $response) !! $output),
+        :$roomid
+}
+multi method start(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil) {
     $!started = True;
-
-    {*}
 }
 
 # Ends this game.
-proto method end(PSBot::Game:D: PSBot::Room:D $room) {
+proto method end(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:D) {
+    my Str:D $roomid = $room.id;
+
     return self.reply:
         "{$room.title} is not participating in this game of {self.name}.",
-        :roomid($room.id) unless $!rooms ∋ $room.id;
+        :$roomid unless $!rooms ∋ $room.id;
     return self.reply:
         "This game of {self.name} has already ended!",
-        :roomid($room.id) if $!finished;
-
-    $!finished = True;
+        :$roomid if $!finished;
 
     {*}
+
+    my Replier:_ $response = {*};
+    my Str:D     $output   = "This game of {self.name} has ended.";
+    self.reply:
+        ($response.defined ?? ($output, $response) !! $output),
+        :$roomid
+}
+multi method end(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil) {
+    $!finished = True;
 }
