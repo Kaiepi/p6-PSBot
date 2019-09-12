@@ -45,16 +45,16 @@ has SetHash:_      $.joinable-rooms;
 has PSBot::Game:D  %.games{Int};
 has Cancellation:D %.reminders{Int};
 
-# Bear in mind channels are concurrent, and these get sent stuff while the lock
-# is already locked, so Lock::Async.protect-or-queue-on-recursion and
-# Lock::Async.with-lock-hidden-from-recursion-check need to be used rather than
+# Stuff is emitted to these while the lock is locked, so use
+# Lock::Async.protect-or-queue-on-recursion and
+# Lock::Async.with-lock-hidden-from-recursion-list rather than
 # Lock::Async.protect.
-has Channel:D $.pending-rename .= new;
-has Channel:D $.logged-in      .= new;
-has Channel:D $.user-joined    .= new;
-has Channel:D $.room-joined    .= new;
-has Promise:D $.started        .= new;
-has Promise:D $.done           .= new;
+has Channel:D  $.pending-rename .= new;
+has Channel:D  $.logged-in      .= new;
+has Supplier:D $.user-joined    .= new;
+has Supplier:D $.room-joined    .= new;
+has Promise:D  $.started        .= new;
+has Promise:D  $.done           .= new;
 
 has Promise:D %.unpropagated-users;
 has Promise:D %.unpropagated-rooms;
@@ -95,13 +95,17 @@ method start() {
                 # PSBot::Connection handles the logic for reconnections.
                 # We want to refresh the react block since we keep promises
                 # in our state that need to be kept again after reconnecting.
-                self.reset unless $!connection.force-closed;
-                done;
+                $!lock.protect({
+                    self.reset unless $!connection.force-closed;
+                    done;
+                })
             }
             whenever $!connection.on-update-throttle -> Rat:D $throttle {
                 # Refresh $!connection.sender's whenever block now that the
                 # throttle has changed.
-                done;
+                $!lock.protect-or-queue-on-recursion({
+                    done;
+                })
             }
             whenever $!connection.receiver -> Str:D $message {
                 # We received a message; parse it.
@@ -115,6 +119,7 @@ method start() {
             whenever $!connection.sender -> Str:D $message {
                 # We want to send a message.
                 debug '[SEND]', $message;
+
                 $!connection.connection.send: $message unless $!connection.closed;
             }
             whenever $!logged-in {
@@ -128,11 +133,11 @@ method start() {
                     }
                 })
             }
-            whenever $!room-joined -> Str:D $roomid {
+            whenever $!room-joined.Supply.schedule-on: $*SCHEDULER -> Str:D $roomid {
                 # Propagate room state on join.
                 my Promise:_ $on-propagate;
 
-                $!lock.with-lock-hidden-from-recursion-check({
+                $!lock.protect-or-queue-on-recursion({
                     if %!unpropagated-rooms{$roomid}:exists {
                         $on-propagate = %!unpropagated-rooms{$roomid};
                     } else {
@@ -145,6 +150,7 @@ method start() {
                 whenever $on-propagate -> PSBot::Room:D $room {
                     $!lock.protect-or-queue-on-recursion({
                         %!unpropagated-rooms{$roomid}:delete;
+
                         $!started.keep
                             if !$!started.status
                             && !%!unpropagated-users
@@ -153,11 +159,11 @@ method start() {
                     })
                 }
             }
-            whenever $!user-joined -> Str:D $userid {
+            whenever $!user-joined.Supply.schedule-on: $*SCHEDULER -> Str:D $userid {
                 # Propagate user state on join or rename.
                 my Promise:_ $on-propagate;
 
-                $!lock.with-lock-hidden-from-recursion-check({
+                $!lock.protect-or-queue-on-recursion({
                     if %!unpropagated-users{$userid}:exists {
                         $on-propagate = %!unpropagated-users{$userid};
                     } else {
@@ -170,6 +176,7 @@ method start() {
                 whenever $on-propagate -> PSBot::User:D $user {
                     $!lock.protect-or-queue-on-recursion({
                         %!unpropagated-users{$userid}:delete;
+
                         $!started.keep
                             if !$!started
                             && !%!unpropagated-users
@@ -183,7 +190,7 @@ method start() {
                     $!lock.with-lock-hidden-from-recursion-check({
                         debug '[DEBUG]',
                               'State has been fully propagated for the first time since the bot connected; '
-                            ~ 'rules and commands can now be parsed.';
+                            ~ 'rules can now be evaluated.';
 
                         # Setup epilogue.
                         $!connection.send: '/blockchallenges', :raw
@@ -244,6 +251,15 @@ method start() {
                 # The bot received a signal from Ctrl+C, Ctrl+D, or killing the
                 # process. Stop the bot.
                 self.stop;
+            }
+            LEAVE {
+                # Setting the throttle resets the main react block, so we need to
+                # get the whenever blocks for rooms and users awaiting propagation
+                # back.
+                $!lock.protect-or-queue-on-recursion({
+                    $!room-joined.emit: $_ for %!unpropagated-rooms.keys;
+                    $!user-joined.emit: $_ for %!unpropagated-users.keys;
+                })
             }
         }
     }
@@ -331,12 +347,6 @@ method on-user-details(%data --> Nil) {
             my Map:D $groups   = Group.enums;
             my Rat:D $throttle = $groups{%data<group>} >= $groups<+> ?? 0.3 !! 0.6;
             $!connection.set-throttle: $throttle;
-
-            # Setting the throttle resets the main react block, so we need to
-            # get the whenever blocks for rooms and users awaiting propagation
-            # back.
-            $!room-joined.send: $_ for %!unpropagated-rooms.keys;
-            $!user-joined.send: $_ for %!unpropagated-users.keys;
         }
 
         if %!unpropagated-users{$userid}:exists {
@@ -378,10 +388,9 @@ method on-room-info(%data --> Promise:_) {
                 $room.join: $userinfo;
                 %!users{$userid}.on-join: $userinfo, $roomid;
             } else {
-                my PSBot::User:D $user .= new: $userinfo, $roomid;
-                %!users{$userid} = $user;
+                %!users{$userid} .= new: $userinfo, $roomid;
+                $!user-joined.emit: $userid;
             }
-            $!user-joined.send: $userid;
         }
 
         for %data<auth>.kv -> Str:D $group-str, @userids {
@@ -424,19 +433,15 @@ method get-rooms(--> Hash:D[PSBot::Room:D]) {
     })
 }
 
-method add-room(Str:D $roomid, RoomType:D $type --> Bool:D) {
-    await $!lock.lock;
-    if %!rooms{$roomid}:exists {
-        $!lock.unlock;
-        False
-    } else {
-        my PSBot::Room:D $room .= new: $roomid, $type;
-        $room.add-game: .id, .type for %!games.values.grep: *.has-room: $room;
-        %!rooms{$roomid} = $room;
-        $!lock.unlock;
-        $!room-joined.send: $roomid;
-        True
-    }
+method add-room(Str:D $roomid, RoomType:D $type --> Promise:_) {
+    $!lock.protect-or-queue-on-recursion({
+        unless %!rooms{$roomid}:exists {
+            my PSBot::Room:D $room .= new: $roomid, $type;
+            $room.add-game: .id, .type for %!games.values.grep: *.has-room: $room;
+            %!rooms{$roomid} = $room;
+            $!room-joined.emit: $roomid;
+        }
+    })
 }
 
 method delete-room(Str:D $roomid --> Bool:D) {
@@ -500,26 +505,23 @@ method get-users(--> Hash:D[PSBot::User:D]) {
     })
 }
 
-method add-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Bool:D) {
+method add-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Promise:_) {
     my Str $userid = $userinfo.id;
 
-    await $!lock.lock;
-    if %!users{$userid}:exists {
-        %!rooms{$roomid}.join: $userinfo;
-        %!users{$userid}.on-join: $userinfo, $roomid;
-        $!lock.unlock;
-        False
-    } else {
-        my PSBot::User:D $user .= new: $userinfo, $roomid;
-        $user.games{.id} = .value for %!games.values.grep(*.has-player: $user);
-        %!users{$userid} = $user;
-        $!lock.unlock;
-        $!user-joined.send: $userid;
-        True
-    }
+    $!lock.protect-or-queue-on-recursion({
+        if %!users{$userid}:exists {
+            %!rooms{$roomid}.join: $userinfo;
+            %!users{$userid}.on-join: $userinfo, $roomid;
+        } else {
+            my PSBot::User:D $user .= new: $userinfo, $roomid;
+            $user.games{.id} = .value for %!games.values.grep(*.has-player: $user);
+            %!users{$userid} = $user;
+            $!user-joined.emit: $userid;
+        }
+    })
 }
 
-method delete-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Bool:D) {
+method delete-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Nil) {
     my Str:D $userid = $userinfo.id;
 
     $!lock.protect({
@@ -527,9 +529,6 @@ method delete-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Bool:D) {
             %!rooms{$roomid}.leave: $userinfo;
             %!users{$userid}.on-leave: $roomid;
             %!users{$userid}:delete unless +%!users{$userid}.rooms;
-            True
-        } else {
-            False
         }
     })
 }
@@ -541,21 +540,20 @@ method destroy-user(Str:D $userid --> Nil) {
     })
 }
 
-method rename-user(PSBot::UserInfo:D $userinfo, Str:D $oldid, Str:D $roomid --> Nil) {
+method rename-user(PSBot::UserInfo:D $userinfo, Str:D $oldid, Str:D $roomid --> Promise:_) {
     my Str:D $userid = $userinfo.id;
 
-    await $!lock.lock;
-    if %!users{$oldid}:exists {
-        %!rooms{$roomid}.on-rename: $oldid, $userinfo;
-        %!users{$oldid}.rename: $userinfo, $roomid;
-        %!users{$userid} = %!users{$oldid}:delete;
-        $!lock.unlock;
-        $!user-joined.send: $userid;
-    } else {
-        # Already received a rename message from another room.
-        %!rooms{$roomid}.on-rename: $oldid, $userinfo;
-        $!lock.unlock;
-    }
+    $!lock.protect-or-queue-on-recursion({
+        if %!users{$oldid}:exists {
+            %!rooms{$roomid}.on-rename: $oldid, $userinfo;
+            %!users{$oldid}.rename: $userinfo, $roomid;
+            %!users{$userid} = %!users{$oldid}:delete;
+            $!user-joined.emit: $userid;
+        } else {
+            # Already received a rename message from another room.
+            %!rooms{$roomid}.on-rename: $oldid, $userinfo;
+        }
+    })
 }
 
 method has-game(Int:D $gameid --> Bool:D) {
