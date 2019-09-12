@@ -2,8 +2,8 @@ use v6.d;
 unit grammar PSBot::Grammar;
 
 token TOP {
-    :my Str  $*ROOMID := 'lobby';
-    :my Bool $*INIT   := False;
+    :my Str:D  $*ROOMID := 'lobby';
+    :my Bool:D $*INIT   := False;
     ^
     [ '>' <roomid> { $*ROOMID := ~$<roomid> } \n ]?
     [ <message> || <.data> ]+ % \n

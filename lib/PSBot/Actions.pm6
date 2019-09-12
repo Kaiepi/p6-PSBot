@@ -250,8 +250,7 @@ method message:sym<c:>(Match $/ is copy) {
     $*BOT.database.add-seen: $userid, $timestamp
         unless $userid.starts-with: 'guest';
 
-    await $*BOT.rooms-propagated;
-    await $*BOT.users-propagated;
+    await $*BOT.started;
 
     my Str         $message  = $<message>.made;
     my PSBot::User $*USER   := $*BOT.get-user: $userid;
@@ -263,12 +262,11 @@ method message:sym<c:>(Match $/ is copy) {
 
     $*BOT.rules.parse: MessageType('c:'), $message;
 }
-method message:sym<pm>(Match $/ is copy) {
+method message:sym<pm>(Match $/) {
     my PSBot::UserInfo $from = $<from>.made;
     return if $from.name === $*BOT.username;
 
-    await $*BOT.rooms-propagated;
-    await $*BOT.users-propagated;
+    await $*BOT.started;
 
     my Str         $message  = $<message>.made;
     my Str         $userid   = $from.id;
@@ -281,8 +279,7 @@ method message:sym<pm>(Match $/ is copy) {
 method message:sym<html>(Match $/) {
     return if $*INIT;
 
-    await $*BOT.rooms-propagated;
-    await $*BOT.users-propagated;
+    await $*BOT.started;
 
     my Str         $data    = $<data>.made;
     my PSBot::User $*USER  := PSBot::User;
@@ -294,8 +291,7 @@ method message:sym<html>(Match $/) {
 method message:sym<popup>(Match $/) {
     return if $*INIT;
 
-    await $*BOT.rooms-propagated;
-    await $*BOT.users-propagated;
+    await $*BOT.started;
 
     my Str         $data    = $<data>.made;
     my PSBot::User $*USER  := PSBot::User;
@@ -307,8 +303,7 @@ method message:sym<popup>(Match $/) {
 method message:sym<raw>(Match $/) {
     return if $*INIT;
 
-    await $*BOT.rooms-propagated;
-    await $*BOT.users-propagated;
+    await $*BOT.started;
 
     my Str         $data    = $<data>.made;
     my PSBot::User $*USER  := PSBot::User;
