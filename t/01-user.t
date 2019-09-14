@@ -42,6 +42,7 @@ subtest 'constructing with userinfo and roomid', {
 };
 
 # PSBot::User.on-user-details is tested in t/04-parser.t
+# XXX: LOL not anymore, unit test it here asshole.
 
 subtest 'join/leave/rename', {
     plan 6;
@@ -63,7 +64,7 @@ subtest 'join/leave/rename', {
         :name<Kpimov>,
         :group(Group(Group.enums{'+'})),
         :status(Online);
-    $user.rename: $userinfo, $roomid;
+    $user.on-rename: $userinfo, $roomid;
     is $user.name, 'Kpimov', 'can get user name on rename';
     is $user.id, 'kpimov', 'can get user id on rename';
     is $user.rooms{$roomid}.group, Group(Group.enums{'+'}), 'can get user ranks rank on rename';

@@ -125,7 +125,7 @@ method start() {
             whenever $!logged-in {
                 # Now that we're logged in, join any remaining rooms manually. This
                 # is in case any of them have modjoin set.
-                $!lock.with-lock-hidden-from-recursion-check({
+                $!lock.protect-or-queue-on-recursion({
                     if +$!joinable-rooms > 11 {
                         $!connection.send: $!joinable-rooms.keys[11..*].map({ "/join $_" }), :raw;
                     } elsif +$!joinable-rooms == 0 {
@@ -152,7 +152,7 @@ method start() {
                         %!unpropagated-rooms{$roomid}:delete;
 
                         $!started.keep
-                            if !$!started.status
+                            if !$!started
                             && !%!unpropagated-users
                             && !%!unpropagated-rooms
                             && ($!joinable-rooms.keys ∖ %!rooms.keys === ∅);
@@ -509,8 +509,11 @@ method add-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Promise:_) {
     my Str $userid = $userinfo.id;
 
     $!lock.protect-or-queue-on-recursion({
-        if %!users{$userid}:exists {
+        if %!rooms{$roomid}:exists {
             %!rooms{$roomid}.join: $userinfo;
+        }
+        if %!users{$userid}:exists {
+            # Already received a join message from another room.
             %!users{$userid}.on-join: $userinfo, $roomid;
         } else {
             my PSBot::User:D $user .= new: $userinfo, $roomid;
@@ -525,18 +528,22 @@ method delete-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Nil) {
     my Str:D $userid = $userinfo.id;
 
     $!lock.protect({
-        if %!users{$userid}:exists {
+        if %!rooms{$roomid}:exists {
             %!rooms{$roomid}.leave: $userinfo;
+        }
+        if %!users{$userid}:exists {
             %!users{$userid}.on-leave: $roomid;
-            %!users{$userid}:delete unless +%!users{$userid}.rooms;
+            %!users{$userid}:delete unless ?%!users{$userid}.rooms;
         }
     })
 }
 
 method destroy-user(Str:D $userid --> Nil) {
     $!lock.protect({
-        %!users{$userid}:delete;
-        $_.users{$userid}:delete for %!rooms.values;
+        if %!users{$userid}:exists {
+            %!users{$userid}:delete;
+            .users{$userid}:delete for %!rooms.values;
+        }
     })
 }
 
@@ -544,14 +551,16 @@ method rename-user(PSBot::UserInfo:D $userinfo, Str:D $oldid, Str:D $roomid --> 
     my Str:D $userid = $userinfo.id;
 
     $!lock.protect-or-queue-on-recursion({
+        if %!rooms{$roomid}:exists {
+            %!rooms{$roomid}.rename: $oldid, $userinfo;
+        }
         if %!users{$oldid}:exists {
-            %!rooms{$roomid}.on-rename: $oldid, $userinfo;
-            %!users{$oldid}.rename: $userinfo, $roomid;
+            %!users{$oldid}.on-rename: $userinfo, $roomid;
             %!users{$userid} = %!users{$oldid}:delete;
             $!user-joined.emit: $userid;
-        } else {
+        } elsif %!users{$userid}:exists {
             # Already received a rename message from another room.
-            %!rooms{$roomid}.on-rename: $oldid, $userinfo;
+            %!users{$userid}.on-rename: $userinfo, $roomid;
         }
     })
 }

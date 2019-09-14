@@ -29,7 +29,7 @@ my PSBot::UserInfo $userinfo .= new:
     :name<Kaiepi>,
     :group(Group(Group.enums{' '})),
     :status(Online);
-$room.on-rename: $old-userinfo.id, $userinfo;
+$room.rename: $old-userinfo.id, $userinfo;
 cmp-ok $room.users, '∌', $old-userinfo.id, 'cannot get room ranks oldid on rename';
 cmp-ok $room.users, '∋', $userinfo.id, 'can get room ranks userid on rename';
 is $room.users{$userinfo.id}.group, Group(Group.enums{' '}), 'can get room ranks rank on rename';
