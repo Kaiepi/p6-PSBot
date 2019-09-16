@@ -8,72 +8,72 @@ use PSBot::User;
 use PSBot::UserInfo;
 unit class PSBot::Actions;
 
-method TOP(Match $/) {
+method TOP(Match:D $/) {
     make $<message>».made;
 }
 
-method chunk(Match $/) {
+method chunk(Match:D $/) {
     $/.make: ~$/;
 }
-method data(Match $/) {
-    $/.make: ~$/;
-}
-
-method userid(Match $/) {
-    $/.make: ~$/;
-}
-method roomid(Match $/) {
+method data(Match:D $/) {
     $/.make: ~$/;
 }
 
-method group(Match $/) {
-    my Int $value = Group.enums{~$/} // Group.enums{' '};
-    $/.make: Group($value);
+method userid(Match:D $/) {
+    $/.make: ~$/;
 }
-method username(Match $/) {
+method roomid(Match:D $/) {
+    $/.make: ~$/;
+}
+
+method group(Match:D $/) {
+    my Group:D $group = Group(Group.enums{~$/} // Group.enums{' '});
+    $/.make: $group;
+}
+method username(Match:D $/) {
     $/.make: ~$/
 }
-method status(Match $/) {
+method status(Match:D $/) {
     $/.make: ~$/ ?? Busy !! Online;
 }
-method userinfo(Match $/) {
-    my Group  $group  = $<group>.made;
-    my Str    $name   = $<username>.made;
-    my Str    $id     = to-id $name;
-    my Status $status = $<status>.made;
+method userinfo(Match:D $/) {
+    my Group:D  $group  = $<group>.made;
+    my Str:D    $name   = $<username>.made;
+    my Str:D    $id     = to-id $name;
+    my Status:D $status = $<status>.made;
     $/.make: PSBot::UserInfo.new: :$name, :$id, :$group, :$status;
 }
 
-method timestamp(Match $/) {
+method timestamp(Match:D $/) {
     $/.make: Instant.from-posix: +$/;
 }
 
-method message:sym<updateuser>(Match $/) {
-    my PSBot::UserInfo $userinfo = $<userinfo>.made;
-    my Bool            $is-named = Bool(+$<is-named>.made);
-    my Str             $avatar   = $<avatar>.made;
-    my                 %data     = from-json $<data>.made;
+method message:sym<updateuser>(Match:D $/) {
+    my PSBot::UserInfo:D $userinfo = $<userinfo>.made;
+    my Bool:D            $is-named = Bool(+$<is-named>.made);
+    my Str:D             $avatar   = $<avatar>.made;
+    my                   %data     = from-json $<data>.made;
     $*BOT.on-update-user: $userinfo, $is-named, $avatar, %data;
 }
-method message:sym<challstr>(Match $/) {
+method message:sym<challstr>(Match:D $/) {
     return unless USERNAME;
 
-    my Str           $challenge = $<challenge>.made;
-    my Failable[Str] $assertion = $*BOT.authenticate: USERNAME // '', PASSWORD // '', $challenge;
+    my Str:D           $challenge = $<challenge>.made;
+    my Failable[Str:D] $assertion = $*BOT.authenticate: USERNAME // '', PASSWORD // '', $challenge;
     if $assertion.defined {
         $*BOT.connection.send: "/trn {USERNAME},0,$assertion", :raw;
     } elsif $assertion ~~ Failure:D {
         $assertion.throw;
     }
 }
-method message:sym<nametaken>(Match $/) {
-    my Str $username = $<username>.made;
-    my Str $reason   = $<reason>.made;
+method message:sym<nametaken>(Match:D $/) {
+    my Str:D $username = $<username>.made;
+    my Str:D $reason   = $<reason>.made;
     X::PSBot::NameTaken.new(:$username, :$reason).throw;
 }
-method message:sym<queryresponse>(Match $/) {
-    my Str $type = $<type>.made;
-    my Str $data = $<data>.made;
+method message:sym<queryresponse>(Match:D $/) {
+    my Str:D $type = $<type>.made;
+    my Str:D $data = $<data>.made;
     given $type {
         when 'userdetails' {
             my %data = from-json $data;
@@ -97,22 +97,43 @@ method message:sym<queryresponse>(Match $/) {
         }
     }
 }
-method message:sym<init>(Match $/) {
-    my RoomType $type = RoomType($<type>.made);
+method message:sym<init>(Match:D $/) {
+    my RoomType:D $type = RoomType($<type>.made);
     $*BOT.mark-room-joinable: $*ROOMID;
     $*BOT.add-room: $*ROOMID, $type;
 }
-method message:sym<deinit>(Match $/) {
+method message:sym<deinit>(Match:D $/) {
     $*BOT.mark-room-unjoinable: $*ROOMID;
     $*BOT.delete-room: $*ROOMID;
 }
-method message:sym<noinit>(Match $/) {
+method message:sym<noinit>(Match:D $/) {
     $*BOT.mark-room-unjoinable: $*ROOMID;
 }
-method message:sym<j>(Match $/) {
+method message:sym<j>(Match:D $/) {
     return if $*INIT;
 
-    my PSBot::UserInfo $userinfo = $<userinfo>.made;
+    my PSBot::UserInfo:D $userinfo = $<userinfo>.made;
+    $*BOT.add-user: $userinfo, $*ROOMID;
+    return if $userinfo.name === $*BOT.username;
+
+    my Str:D $userid = $userinfo.id;
+    return if $userid.starts-with: 'guest';
+
+    $*BOT.database.add-seen: $userid, now;
+    return unless $*BOT.has-user: $userid;
+
+    if $*BOT.database.get-mail: $userid -> @mail {
+        $*BOT.database.remove-mail: $userid;
+        $*BOT.connection.send:
+            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
+            @mail.map(-> %row { "[%row<source>] %row<message>" }),
+            :$userid;
+    }
+}
+method message:sym<J>(Match:D $/) {
+    return if $*INIT;
+
+    my PSBot::UserInfo:D $userinfo = $<userinfo>.made;
     $*BOT.add-user: $userinfo, $*ROOMID;
     return if $userinfo.name === $*BOT.username;
 
@@ -130,81 +151,38 @@ method message:sym<j>(Match $/) {
             :$userid;
     }
 }
-method message:sym<J>(Match $/) {
+method message:sym<l>(Match:D $/) {
     return if $*INIT;
 
-    my PSBot::UserInfo $userinfo = $<userinfo>.made;
-    $*BOT.add-user: $userinfo, $*ROOMID;
-    return if $userinfo.name === $*BOT.username;
-
-    my Str $userid = $userinfo.id;
+    my Str:D $userid = $<userinfo> ?? $<userinfo>.made.id !! $<userid>.made;
+    $*BOT.delete-user: $userid, $*ROOMID;
+    return if $userid === $*BOT.userid;
     return if $userid.starts-with: 'guest';
 
     $*BOT.database.add-seen: $userid, now;
-    return unless $*BOT.has-user: $userid;
-
-    if $*BOT.database.get-mail: $userid -> @mail {
-        $*BOT.database.remove-mail: $userid;
-        $*BOT.connection.send:
-            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-            @mail.map(-> %row { "[%row<source>] %row<message>" }),
-            :$userid;
-    }
 }
-method message:sym<l>(Match $/) {
+method message:sym<L>(Match:D $/) {
     return if $*INIT;
 
-    my PSBot::UserInfo $userinfo = $<userinfo>.made;
-    $*BOT.delete-user: $userinfo, $*ROOMID;
-    return if $userinfo.name === $*BOT.username;
-
-    my Str $userid = $userinfo.id;
+    my Str:D $userid = $<userinfo> ?? $<userinfo>.made.id !! $<userid>.made;
+    $*BOT.delete-user: $userid, $*ROOMID;
+    return if $userid === $*BOT.userid;
     return if $userid.starts-with: 'guest';
 
     $*BOT.database.add-seen: $userid, now;
-    return unless $*BOT.has-user: $userid;
-
-    if $*BOT.database.get-mail: $userid -> @mail {
-        $*BOT.database.remove-mail: $userid;
-        $*BOT.connection.send:
-            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-            @mail.map(-> %row { "[%row<source>] %row<message>" }),
-            :$userid;
-    }
 }
-method message:sym<L>(Match $/) {
+method message:sym<n>(Match:D $/) {
     return if $*INIT;
 
-    my PSBot::UserInfo $userinfo = $<userinfo>.made;
-    $*BOT.delete-user: $userinfo, $*ROOMID;
-    return if $userinfo.name === $*BOT.username;
-
-    my Str $userid = $userinfo.id;
-    return if $userid.starts-with: 'guest';
-
-    $*BOT.database.add-seen: $userid, now;
-    return unless $*BOT.has-user: $userid;
-
-    if $*BOT.database.get-mail: $userid -> @mail {
-        $*BOT.database.remove-mail: $userid;
-        $*BOT.connection.send:
-            "You received {+@mail} message{+@mail == 1 ?? '' !! 's'}:",
-            @mail.map(-> %row { "[%row<source>] %row<message>" }),
-            :$userid;
-    }
-}
-method message:sym<n>(Match $/) {
-    return if $*INIT;
-
-    my PSBot::UserInfo $userinfo = $<userinfo>.made;
-    my Str             $oldid    = $<oldid>.made;
+    my PSBot::UserInfo:D $userinfo = $<userinfo>.made;
+    my Str:D             $oldid    = $<oldid>.made;
     $*BOT.rename-user: $userinfo, $oldid, $*ROOMID;
     return if $userinfo.name === $*BOT.username;
 
-    my Str $userid = $userinfo.id;
+    my Str:D $userid = $userinfo.id;
     return if $userid.starts-with: 'guest';
 
-    my Instant $time = now;
+    my Instant:D $time = now;
     $*BOT.database.add-seen: $oldid, $time;
     $*BOT.database.add-seen: $userid, $time unless $userid eq $oldid;
 
@@ -216,18 +194,18 @@ method message:sym<n>(Match $/) {
             :$userid;
     }
 }
-method message:sym<N>(Match $/) {
+method message:sym<N>(Match:D $/) {
     return if $*INIT;
 
-    my PSBot::UserInfo $userinfo = $<userinfo>.made;
-    my Str             $oldid    = $<oldid>.made;
+    my PSBot::UserInfo:D $userinfo = $<userinfo>.made;
+    my Str:D             $oldid    = $<oldid>.made;
     $*BOT.rename-user: $userinfo, $oldid, $*ROOMID;
     return if $userinfo.name === $*BOT.username;
 
-    my Str $userid = $userinfo.id;
+    my Str:D $userid = $userinfo.id;
     return if $userid.starts-with: 'guest';
 
-    my Instant $time = now;
+    my Instant:D $time = now;
     $*BOT.database.add-seen: $oldid, $time;
     $*BOT.database.add-seen: $userid, $time unless $userid eq $oldid;
 
@@ -239,76 +217,76 @@ method message:sym<N>(Match $/) {
             :$userid;
     }
 }
-method message:sym<c:>(Match $/ is copy) {
+method message:sym<c:>(Match:D $/ is copy) {
     return if $*INIT;
 
-    my PSBot::UserInfo $userinfo  = $<userinfo>.made;
+    my PSBot::UserInfo:D $userinfo  = $<userinfo>.made;
     return if $userinfo.name === $*BOT.username;
 
-    my Str     $userid    = $userinfo.id;
-    my Instant $timestamp = $<timestamp>.made;
+    my Str:D     $userid    = $userinfo.id;
+    my Instant:D $timestamp = $<timestamp>.made;
     $*BOT.database.add-seen: $userid, $timestamp
         unless $userid.starts-with: 'guest';
 
     await $*BOT.started;
 
-    my Str         $message  = $<message>.made;
-    my PSBot::User $*USER   := $*BOT.get-user: $userid;
+    my Str:D         $message  = $<message>.made;
+    my PSBot::User:D $*USER   := $*BOT.get-user: $userid;
     return unless $*USER.defined;
 
-    my Str         $roomid   = $*ROOMID;
-    my PSBot::Room $*ROOM   := $*BOT.get-room: $roomid;
+    my Str:D         $roomid   = $*ROOMID;
+    my PSBot::Room:D $*ROOM   := $*BOT.get-room: $roomid;
     return unless $*ROOM.defined;
 
     $*BOT.rules.parse: MessageType('c:'), $message;
 }
-method message:sym<pm>(Match $/) {
-    my PSBot::UserInfo $from = $<from>.made;
+method message:sym<pm>(Match:D $/) {
+    my PSBot::UserInfo:D $from = $<from>.made;
     return if $from.name === $*BOT.username;
 
     await $*BOT.started;
 
-    my Str         $message  = $<message>.made;
-    my Str         $userid   = $from.id;
-    my PSBot::User $*USER   := $*BOT.get-user: $userid;
-    my PSBot::Room $*ROOM   := PSBot::Room;
+    my Str:D         $message  = $<message>.made;
+    my Str:D         $userid   = $from.id;
+    my PSBot::User:D $*USER   := $*BOT.get-user: $userid;
+    my PSBot::Room:D $*ROOM   := PSBot::Room;
     return unless $*USER.defined;
 
     $*BOT.rules.parse: MessageType('pm'), $message;
 }
-method message:sym<html>(Match $/) {
+method message:sym<html>(Match:D $/) {
     return if $*INIT;
 
     await $*BOT.started;
 
-    my Str         $data    = $<data>.made;
-    my PSBot::User $*USER  := PSBot::User;
-    my Str         $roomid  = $*ROOMID;
-    my PSBot::Room $*ROOM  := $*BOT.get-room: $roomid;
+    my Str:D         $data    = $<data>.made;
+    my PSBot::User:D $*USER  := PSBot::User;
+    my Str:D         $roomid  = $*ROOMID;
+    my PSBot::Room:D $*ROOM  := $*BOT.get-room: $roomid;
 
     $*BOT.rules.parse: MessageType('html'), $data;
 }
-method message:sym<popup>(Match $/) {
+method message:sym<popup>(Match:D $/) {
     return if $*INIT;
 
     await $*BOT.started;
 
-    my Str         $data    = $<data>.made;
-    my PSBot::User $*USER  := PSBot::User;
-    my Str         $roomid  = $*ROOMID;
-    my PSBot::Room $*ROOM  := $*BOT.get-room: $roomid;
+    my Str:D         $data    = $<data>.made;
+    my PSBot::User:D $*USER  := PSBot::User;
+    my Str:D         $roomid  = $*ROOMID;
+    my PSBot::Room:D $*ROOM  := $*BOT.get-room: $roomid;
 
     $*BOT.rules.parse: MessageType('popup'), $data;
 }
-method message:sym<raw>(Match $/) {
+method message:sym<raw>(Match:D $/) {
     return if $*INIT;
 
     await $*BOT.started;
 
-    my Str         $data    = $<data>.made;
-    my PSBot::User $*USER  := PSBot::User;
-    my Str         $roomid  = $*ROOMID;
-    my PSBot::Room $*ROOM  := $*BOT.get-room: $roomid;
+    my Str:D         $data    = $<data>.made;
+    my PSBot::User:D $*USER  := PSBot::User;
+    my Str:D         $roomid  = $*ROOMID;
+    my PSBot::Room:D $*ROOM  := $*BOT.get-room: $roomid;
 
     $*BOT.rules.parse: MessageType('popup'), $data;
 }

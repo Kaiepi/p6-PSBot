@@ -72,8 +72,8 @@ method join(PSBot::Room:D: PSBot::UserInfo:D $userinfo --> Nil) {
     %!users{$id} := UserInfo.new: :$id, :$name, :$group;
 }
 
-method leave(PSBot::Room:D: PSBot::UserInfo:D $userinfo --> Nil) {
-    %!users{$userinfo.id}:delete;
+method leave(PSBot::Room:D: Str:D $userid --> Nil) {
+    %!users{$userid}:delete;
 }
 
 method rename(PSBot::Room:D: Str:D $oldid, PSBot::UserInfo:D $userinfo --> Nil) {

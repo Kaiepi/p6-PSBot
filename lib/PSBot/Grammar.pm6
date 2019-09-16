@@ -33,8 +33,8 @@ token message:sym<deinit>        { '|' <.sym> }
 token message:sym<noinit>        { '|' <.sym> '|' <type=chunk> '|' <reason=data> }
 token message:sym<j>             { '|' <.sym> '|' <userinfo> }
 token message:sym<J>             { '|' <.sym> '|' <userinfo> }
-token message:sym<l>             { '|' <.sym> '|' <userinfo> }
-token message:sym<L>             { '|' <.sym> '|' <userinfo> }
+token message:sym<l>             { '|' <.sym> '|' [ <userid> || <userinfo> ] }
+token message:sym<L>             { '|' <.sym> '|' [ <userid> || <userinfo> ] }
 token message:sym<n>             { '|' <.sym> '|' <userinfo> '|' <oldid=userid> }
 token message:sym<N>             { '|' <.sym> '|' <userinfo> '|' <oldid=userid> }
 token message:sym<c:>            { '|' <.sym> '|' <timestamp> '|' <userinfo> '|' <message=data> }

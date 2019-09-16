@@ -34,7 +34,7 @@ cmp-ok $room.users, '∌', $old-userinfo.id, 'cannot get room ranks oldid on ren
 cmp-ok $room.users, '∋', $userinfo.id, 'can get room ranks userid on rename';
 is $room.users{$userinfo.id}.group, Group(Group.enums{' '}), 'can get room ranks rank on rename';
 
-$room.leave: $userinfo;
+$room.leave: $userinfo.id;
 cmp-ok $room.users, '∌', $userinfo.id, 'cannot get room ranks userid on leave';
 
 # vim: ft=perl6 sw=4 ts=4 sts=4 expandtab

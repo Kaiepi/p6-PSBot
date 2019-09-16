@@ -524,12 +524,10 @@ method add-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Promise:_) {
     })
 }
 
-method delete-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Nil) {
-    my Str:D $userid = $userinfo.id;
-
+method delete-user(Str:D $userid, Str:D $roomid --> Nil) {
     $!lock.protect({
         if %!rooms{$roomid}:exists {
-            %!rooms{$roomid}.leave: $userinfo;
+            %!rooms{$roomid}.leave: $userid;
         }
         if %!users{$userid}:exists {
             %!users{$userid}.on-leave: $roomid;
