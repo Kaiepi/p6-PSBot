@@ -6,23 +6,54 @@ use PSBot::User;
 unit role PSBot::Game does PSBot::ResponseHandler;
 
 # The ID of this game.
-has Int     $.id;
+has Int:_       $.id;
 # The set of room IDs for rooms participating in this game.
-has SetHash $.rooms             .= new;
+has SetHash:D   $.rooms       .= new;
+# Protects the rooms attribute. Acquire from this whenever a method expects all
+# of the game's rooms to actually exist, then post to it once it's finished.
+has Semaphore:D $!rooms-sem   .= new: 1;
 # The set of user IDs for users playing this game.
-has SetHash $.players           .= new;
-# Whether or not the game has started.
-has Bool    $.started            = False;
-# Whether or not the game has ended.
-has Bool    $.finished           = False;
+has SetHash:D   $.players     .= new;
+# Protects the players attribute. Acquire from this whenever a method expects
+# all of the game's players to actually exist, then post to it once it's finished.
+has Semaphore:D $!players-sem .= new: 1;
+
+# Kept once the game starts.
+has Promise:D $.started .= new;
+# Kept once the game ends.
+has Promise:D $.ended   .= new;
+
 # Whether or not users can join this game after it has started.
-has Bool    $.allow-late-joins;
+has Bool:_      $.permit-late-joins;
+
+# Whether or not this game allows renames.
+# When set to False, the game doesn't consider a user to be a player unless
+# they're using the name they joined with. This means any threads using
+# $!players-sem.acquire will block until they rename back to their original
+# name or leave.
+has Bool:_        $.permit-renames;
+# Map of player IDs to the player's current nick.
+# This is only defined if renames are not permitted.
+has Hash:_[Str:D] $.renamed-players;
 
 # Creates a new game, obviously.
 my atomicint $next-id = 1;
-method new(PSBot::Game:_: Bool:D :$allow-late-joins = False, |rest --> PSBot::Game:D) {
-    my Int $id = $next-id⚛++;
-    self.bless: :$id, :$allow-late-joins, |rest
+method new(
+    PSBot::Game:_:
+    Bool:D :$permit-late-joins = False,
+    Bool:D :$permit-renames    = False,
+    |rest
+    --> PSBot::Game:D
+) {
+    my Int:D         $id              = $next-id⚛++;
+    my Hash:_[Str:D] $renamed-players = $permit-renames ?? Nil !! Hash[Str:D].new;
+
+    self.bless:
+        :$id,
+        :$permit-late-joins,
+        :$permit-renames,
+        :$renamed-players,
+        |rest
 }
 
 # That's the name of the game, baby.
@@ -49,7 +80,7 @@ multi method rooms(PSBot::Game:D: PSBot::Room:D $room --> Replier:D) {
 
 # Whether or not a room is participating in this game.
 method has-room(PSBot::Game:D: PSBot::Room $room --> Bool:D) {
-    $!rooms ∋ $room.id
+    $!rooms{$room.id}:exists
 }
 
 # Adds a room to the list of rooms participating in this game, returning a
@@ -57,7 +88,7 @@ method has-room(PSBot::Game:D: PSBot::Room $room --> Bool:D) {
 proto method add-room(PSBot::Game:D: PSBot::Room $room --> Replier:D) {
     return self.reply:
         "{$room.title} is already participating in this game of {self.name}."
-        :roomid($room.id) if $!rooms ∋ $room.id;
+        :roomid($room.id) if $!rooms{$room.id}:exists;
 
     {*}
 
@@ -71,10 +102,10 @@ multi method add-room(PSBot::Game:D: PSBot::Room:D $room --> Nil) {
 
 # Removes a room from the list of rooms participating in this game, returning a
 # response.
-proto method delete-room(PSBot::Game:D: PSBot::Room:D $room --> List) {
+proto method delete-room(PSBot::Game:D: PSBot::Room:D $room --> Replier:D) {
     return self.reply:
         "{$room.title} is not participating in this game of {self.name}.",
-        :roomid($room.id) unless $!rooms ∋ $room.id;
+        :roomid($room.id) unless $!rooms{$room.id}:exists;
 
     {*}
 
@@ -101,7 +132,7 @@ multi method players(PSBot::Game:D: PSBot::Room:D $room --> Replier:D) {
 
 # Whether or not a user is a player in this game.
 method has-player(PSBot::Game:D: PSBot::User:D $user --> Bool:D) {
-    $!players ∋ $user.id
+    $!players{$user.id}:exists
 }
 
 # Adds a user to the list of players in this game given the room they're
@@ -112,13 +143,13 @@ proto method join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Re
 
     return self.reply:
         "{$room.title} is not participating in this game of {self.name}.",
-        :$userid, :$roomid unless $!rooms ∋ $room.id;
+        :$userid, :$roomid unless $!rooms{$room.id}:exists;
     return self.reply:
         "You are already a player of this game of {self.name}.",
-        :$userid, :$roomid if $!players ∋ $user.id;
+        :$userid, :$roomid if $!players{$user.id}:exists;
     return self.reply:
         "This game of {self.name} does not allow late joins.",
-        :$userid, :$roomid if $!started && !$!allow-late-joins;
+        :$userid, :$roomid if ?$!started && !$!permit-late-joins;
 
     {*}
 
@@ -138,10 +169,10 @@ proto method leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> R
 
     return self.reply:
         "{$room.title} is not participating in this game of {self.name}.",
-        :$userid, :$roomid unless $!rooms ∋ $room.id;
+        :$userid, :$roomid unless $!rooms{$room.id}:exists;
     return self.reply:
         "You are not a player of this game of {self.name}.",
-        :$userid, :$roomid if $!players ∌ $user.id;
+        :$userid, :$roomid unless $!players{$user.id}:exists;
 
     {*}
 
@@ -159,10 +190,10 @@ proto method start(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> R
 
     return self.reply:
         "{$room.title} is not participating in this game of {self.name}.",
-        :$roomid unless $!rooms ∋ $room.id;
+        :$roomid unless $!rooms{$room.id}:exists;
     return self.reply:
         "This game of {self.name} has already started!",
-        :$roomid if $!started;
+        :$roomid if ?$!started;
 
     my Replier:_ $response = {*};
     my Str:D     $output   = "This game of {self.name} has started.";
@@ -171,7 +202,7 @@ proto method start(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> R
         :$roomid
 }
 multi method start(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil) {
-    $!started = True;
+    $!started.keep;
 }
 
 # Ends this game.
@@ -180,12 +211,10 @@ proto method end(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Rep
 
     return self.reply:
         "{$room.title} is not participating in this game of {self.name}.",
-        :$roomid unless $!rooms ∋ $room.id;
+        :$roomid unless $!rooms{$room.id}:exists;
     return self.reply:
         "This game of {self.name} has already ended!",
-        :$roomid if $!finished;
-
-    {*}
+        :$roomid if ?$!ended;
 
     my Replier:_ $response = {*};
     my Str:D     $output   = "This game of {self.name} has ended.";
@@ -194,5 +223,100 @@ proto method end(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Rep
         :$roomid
 }
 multi method end(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil) {
-    $!finished = True;
+    $!ended.keep;
+}
+
+# Called when the bot receives an init message on room join.
+proto method on-init(PSBot::Game:D: PSBot::Room:D $room --> Replier:_) {*}
+multi method on-init(PSBot::Game:D: PSBot::Room:D $room --> Nil)       {
+    return unless $!rooms{$room.id}:exists;
+
+    $!rooms-sem.release;
+}
+
+# Called when the bot receives a deinit or noinit message on room leave.
+proto method on-deinit(PSBot::Game:D: PSBot::Room:D $room --> Replier:_) {*}
+multi method on-deinit(PSBot::Game:D: PSBot::Room:D $room --> Nil)       {
+    return unless $!rooms{$room.id}:exists;
+
+    $!rooms-sem.acquire;
+}
+
+# Called when the bot receives a user join message.
+proto method on-join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {*}
+multi method on-join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil)       {
+    return unless $!rooms{$room.id}:exists;
+
+    when $!permit-renames {
+        when $!players{$user.id}:exists {
+            $!players-sem.release;
+        }
+    }
+    when $!renamed-players{$user.id}:exists {
+        $!renamed-players{$user.id}:delete;
+        $!players-sem.release;
+    }
+    when $!renamed-players.values ∋ $user.id {
+        for $!renamed-players.grep(*.value eq $user.id).map(*.key) -> Str:D $playerid {
+            $!renamed-players{$playerid}:delete;
+            $!players-sem.release;
+        }
+    }
+    when $!players{$user.id}:exists {
+        $!players-sem.release;
+    }
+}
+
+# Called when the bot receives a user leave message.
+proto method on-leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {*}
+multi method on-leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil)       {
+    return unless $!rooms{$room.id}:exists;
+
+    when $!permit-renames {
+        return unless $!players{$user.id}:exists;
+
+        $!players-sem.acquire;
+    }
+    when $!renamed-players{$user.id}:exists {
+        $!renamed-players{$user.id}:delete;
+        $!players-sem.release;
+    }
+    when $!renamed-players.values ∋ $user.id {
+        # Do nothing.
+    }
+    when $!players{$user.id}:exists {
+        $!players-sem.acquire;
+    }
+}
+
+# Called when the bot receives a user rename message.
+proto method on-rename(PSBot::Game:D: Str:D $oldid, PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {*}
+multi method on-rename(PSBot::Game:D: Str:D $oldid, PSBot::User:D $user, PSBot::Room:D $room --> Nil)       {
+    return unless $!rooms{$room.id}:exists;
+
+    when $!permit-renames {
+        when $!players{$user.id}:exists {
+            # Do nothing.
+        }
+        when $!players{$oldid}:exists {
+            $!players{$oldid}:delete;
+            $!players{$user.id}++;
+        }
+    }
+    when $!renamed-players{$user.id}:exists {
+        $!renamed-players{$user.id}:delete;
+        $!players-sem.release;
+    }
+    when $!renamed-players.values ∋ $oldid {
+        for $!renamed-players.grep(*.value eq $user.id).map(*.key) -> Str:D $playerid {
+            $!renamed-players{$playerid} := $user.id;
+        }
+    }
+    when $!players{$user.id}:exists {
+        # Do nothing.
+    }
+    when $!players{$oldid}:exists {
+        $!renamed-players{$oldid} := $user.id;
+        $!players-sem.acquire;
+    }
 }

@@ -842,7 +842,7 @@ BEGIN {
 
                 my PSBot::Games::Hangman $hangman = $game;
                 my Replier               $replier = $hangman.guess: $target, $*USER, $*ROOM;
-                $*ROOM.delete-game: $hangman.id if $hangman.finished;
+                $*ROOM.delete-game: $hangman.id if ?$hangman.ended;
                 $replier
             }
         ),

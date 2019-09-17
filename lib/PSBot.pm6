@@ -427,31 +427,47 @@ method get-room(Str:D $roomid --> PSBot::Room:_) {
     })
 }
 
+# THIS IS ONLY INTENDED FOR USE WITH THE EVAL COMMAND. DO NOT USE IT IN YOUR
+# OWN CODE.
 method get-rooms(--> Hash:D[PSBot::Room:D]) {
     $!lock.protect(-> {
         %!rooms
     })
 }
 
-method add-room(Str:D $roomid, RoomType:D $type --> Promise:_) {
+method add-room(Str:D $roomid, RoomType:D $type --> Bool:D) {
     $!lock.protect-or-queue-on-recursion({
-        unless %!rooms{$roomid}:exists {
-            my PSBot::Room:D $room .= new: $roomid, $type;
-            $room.add-game: .id, .type for %!games.values.grep: *.has-room: $room;
-            %!rooms{$roomid} = $room;
-            $!room-joined.emit: $roomid;
+        return False if %!rooms{$roomid}:exists;
+
+        my PSBot::Room:D $room .= new: $roomid, $type;
+        %!rooms{$roomid} := $room;
+
+        for %!games.values.grep: *.has-room: $room -> PSBot::Game:D $game {
+            $room.add-game: $game.id, $game.type;
         }
+
+        for %!games.values -> PSBot::Game:D $game {
+            $game.on-init: $room;
+        }
+
+        $!room-joined.emit: $roomid;
+        True
     })
 }
 
 method delete-room(Str:D $roomid --> Bool:D) {
     $!lock.protect({
+        return False unless %!rooms{$roomid}:exists;
+
         my PSBot::Room:_ $room = %!rooms{$roomid}:delete;
-        return False unless $room.defined;
 
         for $room.users.keys -> $userid {
             %!users{$userid}.on-leave: $roomid;
-            %!users{$userid}:delete unless +%!users{$userid}.rooms;
+            %!users{$userid}:delete unless ?%!users{$userid}.rooms;
+        }
+
+        for %!games.values -> PSBot::Game:D $game {
+            $game.on-deinit: $room;
         }
 
         True
@@ -499,67 +515,97 @@ method get-user(Str:D $userid --> PSBot::User:_) {
     }
 }
 
+# THIS IS ONLY INTENDED FOR USE WITH THE EVAL COMMAND. DO NOT USE IT IN YOUR
+# OWN CODE.
 method get-users(--> Hash:D[PSBot::User:D]) {
     $!lock.protect(-> {
         %!users
     })
 }
 
-method add-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Promise:_) {
-    my Str $userid = $userinfo.id;
-
+method add-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Bool:D) {
     $!lock.protect-or-queue-on-recursion({
-        if %!rooms{$roomid}:exists {
-            %!rooms{$roomid}.join: $userinfo;
-        }
+        return False unless %!rooms{$roomid}:exists;
+
+        my PSBot::Room:D $room = %!rooms{$roomid};
+        $room.join: $userinfo;
+
+        my Str:D $userid = $userinfo.id;
         if %!users{$userid}:exists {
             # Already received a join message from another room.
             %!users{$userid}.on-join: $userinfo, $roomid;
-        } else {
-            my PSBot::User:D $user .= new: $userinfo, $roomid;
-            $user.games{.id} = .value for %!games.values.grep(*.has-player: $user);
-            %!users{$userid} = $user;
-            $!user-joined.emit: $userid;
+            return False;
         }
+
+        my PSBot::User:D $user .= new: $userinfo, $roomid;
+        %!users{$userid} := $user;
+
+        for %!games.values.grep: *.has-player: $user -> PSBot::Game:D $game {
+            $user.join-game: $game.id, $game.type;
+        }
+
+        for %!games.values -> PSBot::Game:D $game {
+            $game.on-join:  $user, $room;
+        }
+
+        $!user-joined.emit: $userid;
+        True
     })
 }
 
-method delete-user(Str:D $userid, Str:D $roomid --> Nil) {
+method delete-user(Str:D $userid, Str:D $roomid --> Bool:D) {
     $!lock.protect({
-        if %!rooms{$roomid}:exists {
-            %!rooms{$roomid}.leave: $userid;
+        return False unless %!rooms{$roomid}:exists;
+
+        my PSBot::Room:D $room = %!rooms{$roomid};
+        $room.leave: $userid;
+        return False unless %!users{$userid}:exists;
+
+        my PSBot::User:D $user = %!users{$userid}:delete;
+        $user.on-leave: $roomid;
+
+        for %!games.values -> PSBot::Game:D $game {
+            $game.on-leave: $user, $room;
         }
-        if %!users{$userid}:exists {
-            %!users{$userid}.on-leave: $roomid;
-            %!users{$userid}:delete unless ?%!users{$userid}.rooms;
-        }
+
+        True
     })
 }
 
-method destroy-user(Str:D $userid --> Nil) {
+method destroy-user(Str:D $userid --> Bool:D) {
     $!lock.protect({
-        if %!users{$userid}:exists {
-            %!users{$userid}:delete;
-            .users{$userid}:delete for %!rooms.values;
-        }
+        return False unless %!users{$userid}:exists;
+
+        my PSBot::User:D $user = %!users{$userid}:delete;
+        .leave: $userid for %!rooms.values;
+        True
     })
 }
 
 method rename-user(PSBot::UserInfo:D $userinfo, Str:D $oldid, Str:D $roomid --> Promise:_) {
-    my Str:D $userid = $userinfo.id;
-
     $!lock.protect-or-queue-on-recursion({
-        if %!rooms{$roomid}:exists {
-            %!rooms{$roomid}.rename: $oldid, $userinfo;
-        }
-        if %!users{$oldid}:exists {
-            %!users{$oldid}.on-rename: $userinfo, $roomid;
-            %!users{$userid} = %!users{$oldid}:delete;
-            $!user-joined.emit: $userid;
-        } elsif %!users{$userid}:exists {
+        return False unless %!rooms{$roomid}:exists;
+
+        my PSBot::Room:D $room = %!rooms{$roomid};
+        $room.rename: $oldid, $userinfo;
+
+        my Str:D $userid = $userinfo.id;
+        if %!users{$userid}:exists {
             # Already received a rename message from another room.
             %!users{$userid}.on-rename: $userinfo, $roomid;
+            return False;
         }
+
+        my PSBot::User:D $user = %!users{$oldid}:delete;
+        $user.on-rename: $userinfo, $roomid;
+        %!users{$userid} := $user;
+
+        for %!games.values -> PSBot::Game:D $game {
+            $game.on-rename: $oldid, $user, $room;
+        }
+
+        $!user-joined.emit: $userid;
+        True
     })
 }
 
@@ -575,6 +621,8 @@ method get-game(Int:D $gameid --> PSBot::Game:_) {
     })
 }
 
+# THIS IS ONLY INTENDED FOR USE WITH THE EVAL COMMAND. DO NOT USE IT IN YOUR
+# OWN CODE.
 method get-games(--> Hash:D[PSBot::Game:D, Int:D]) {
     $!lock.protect(-> {
         %!games
@@ -583,7 +631,7 @@ method get-games(--> Hash:D[PSBot::Game:D, Int:D]) {
 
 method add-game(PSBot::Game:D $game) {
     $!lock.protect({
-        %!games{$game.id} = $game;
+        %!games{$game.id} := $game;
     })
 }
 
@@ -611,6 +659,7 @@ method reset() {
 
         %!users{*}:delete;
         %!rooms{*}:delete;
+        # Do not reset %!games; they need to persist between disconnects.
 
         $!started .= new;
 

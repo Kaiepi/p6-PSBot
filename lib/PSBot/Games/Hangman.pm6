@@ -8,12 +8,12 @@ unit class PSBot::Games::Hangman does PSBot::Game;
 
 my constant WORDS = lines slurp %?RESOURCES<dictionary>;
 
-has Str     $.word;
-has Set     $.letters;
-has SetHash $.guessed-letters .= new;
-has Int     $.limbs            = 6;
+has Str:_     $.word;
+has Set:_     $.letters;
+has SetHash:D $.guessed-letters .= new;
+has Int:D     $.limbs            = 6;
 
-my Str $name = 'Hangman';
+my Str:D $name = 'Hangman';
 method name(PSBot::Games::Hangman:_: --> Str:D) { $name }
 
 my Symbol:D $type = Symbol($name);
@@ -33,25 +33,17 @@ method !display(PSBot::Games::Hangman:D: PSBot::Room:D $room --> Replier:D) {
 }
 
 multi method start(PSBot::Games::Hangman:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:D) {
-    return self.reply:
-        "{$room.title} is not participating in this game of {self.name}.",
-        :roomid($room.id) unless $!rooms{$room.id}:exists;
-
     $!word    = WORDS[floor rand * WORDS.elems];
     $!letters = set($!word.comb.grep({ m:i/<[a..z]>/ }));
-    self.reply:
-        ("The game of {self.name} has started!", |self!display: $room),
-        :roomid($room.id);
+    $!started.keep;
+
+    self!display: $room
 }
 
 multi method end(PSBot::Games::Hangman:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:D) {
-    return self.reply:
-        "{$room.title} is not participating in this game of {self.name}.",
-        :roomid($room.id) unless $!rooms{$room.id}:exists;
+    $!ended.keep;
 
-    my Str:D $output = 'The game has ended.';
-    $output ~= " The word was $!word." if $!started;
-    self.reply: $output, :roomid($room.id)
+    self.reply: "The word was $!word.", :roomid($room.id) if $!started;
 }
 
 method guess(PSBot::Games::Hangman:D: Str:D $target, PSBot::User:D $player, PSBot::Room:D $room --> Replier:D) {
