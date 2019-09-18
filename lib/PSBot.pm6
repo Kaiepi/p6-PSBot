@@ -447,7 +447,12 @@ method add-room(Str:D $roomid, RoomType:D $type --> Bool:D) {
         }
 
         for %!games.values -> PSBot::Game:D $game {
-            $game.on-init: $room;
+            my Replier:_ $replier = $game.on-init($room) // Nil;
+            next unless $replier.defined;
+
+            my ResponseList:D $responses := $replier();
+            my ::?CLASS:D   $*BOT      := self;
+            .send for $responses;
         }
 
         $!room-joined.emit: $roomid;
@@ -467,7 +472,12 @@ method delete-room(Str:D $roomid --> Bool:D) {
         }
 
         for %!games.values -> PSBot::Game:D $game {
-            $game.on-deinit: $room;
+            my Replier:_ $replier = $game.on-deinit($room) // Nil;
+            next unless $replier.defined;
+
+            my ResponseList:D $responses := $replier();
+            my ::?CLASS:D   $*BOT      := self;
+            .send for $responses;
         }
 
         True
@@ -545,7 +555,12 @@ method add-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Bool:D) {
         }
 
         for %!games.values -> PSBot::Game:D $game {
-            $game.on-join:  $user, $room;
+            my Replier:_ $replier = $game.on-join($user, $room) // Nil;
+            next unless $replier.defined;
+
+            my ResponseList:D $responses := $replier();
+            my ::?CLASS:D   $*BOT      := self;
+            .send for $responses;
         }
 
         $!user-joined.emit: $userid;
@@ -565,7 +580,12 @@ method delete-user(Str:D $userid, Str:D $roomid --> Bool:D) {
         $user.on-leave: $roomid;
 
         for %!games.values -> PSBot::Game:D $game {
-            $game.on-leave: $user, $room;
+            my Replier:_ $replier = $game.on-leave($user, $room) // Nil;
+            next unless $replier.defined;
+
+            my ResponseList:D $responses := $replier();
+            my ::?CLASS:D   $*BOT      := self;
+            .send for $responses;
         }
 
         True
@@ -601,7 +621,12 @@ method rename-user(PSBot::UserInfo:D $userinfo, Str:D $oldid, Str:D $roomid --> 
         %!users{$userid} := $user;
 
         for %!games.values -> PSBot::Game:D $game {
-            $game.on-rename: $oldid, $user, $room;
+            my Replier:_ $replier = $game.on-rename($oldid, $user, $room) // Nil;
+            next unless $replier.defined;
+
+            my ResponseList:D $responses := $replier();
+            my ::?CLASS:D   $*BOT      := self;
+            .send for $responses;
         }
 
         $!user-joined.emit: $userid;

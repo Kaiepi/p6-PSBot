@@ -274,13 +274,12 @@ method new() {
 
 method parse(MessageType:D $type, Str:D $message --> Bool:D) {
     for %!cache{$type}.keys -> Rule:D $rule {
-        my Replier $replier = $rule.match: $message;
+        my Replier:_ $replier = $rule.match($message) // Nil;
         next unless $replier.defined;
 
-        if $replier() -> ResponseList:D $responses is raw {
-            .send for $responses;
-            return True;
-        }
+        my ResponseList:D $responses := $replier();
+        .send for $responses;
+        return True;
     }
 
     False
