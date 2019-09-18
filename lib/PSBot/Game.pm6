@@ -276,11 +276,11 @@ multi method on-join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room -->
 proto method on-leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {
     when $!permit-renames {{*}}
     when %!renamed-players{$user.id}:exists {
-        %!renamed-players{$user.id}:delete;
-        $!players-sem.release;
+        # Player is renamed; do nothing.
         Nil
     }
     when %!renamed-players.values ∋ $user.id {
+        # Player is renamed; do nothing.
         Nil
     }
     default {{*}}
