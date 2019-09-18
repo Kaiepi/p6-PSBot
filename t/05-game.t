@@ -178,10 +178,10 @@ subtest 'API', {
 
         try-pass { $test.on-leave: $user, $room },
                  'can call leave callback during a rename';
-        cmp-ok   $test.renamed-players, '∌', $oldid,
-                 'unmarks a player as renamed after leaving';
-        ok       $test.can-acquire-from-players,
-                 'leave callback unblocks threads that depend on players';
+        cmp-ok   $test.renamed-players, '∋', $oldid,
+                 'player is kept marked as renamed after leaving';
+        nok      $test.can-acquire-from-players,
+                 'leave callback keeps threads that depend on players blocked';
 
         $room.rename:    $oldid, $userinfo;
         $user.on-rename: $userinfo, $room.id;

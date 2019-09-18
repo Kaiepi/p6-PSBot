@@ -243,15 +243,8 @@ multi method on-deinit(PSBot::Game:D: PSBot::Room:D $room --> Nil)       {
 }
 
 # Called when the bot receives a user join message.
-proto method on-join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {*}
-multi method on-join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil)       {
-    return unless $!rooms{$room.id}:exists;
-
-    when $!permit-renames {
-        when $!players{$user.id}:exists {
-            $!players-sem.release;
-        }
-    }
+proto method on-join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {
+    when $!permit-renames {{*}}
     when $!renamed-players{$user.id}:exists {
         $!renamed-players{$user.id}:delete;
         $!players-sem.release;
@@ -262,19 +255,21 @@ multi method on-join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room -->
             $!players-sem.release;
         }
     }
-    when $!players{$user.id}:exists {
-        $!players-sem.release;
-    }
+    default {{*}}
+}
+multi method on-join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil) {
+    return unless $!rooms{$room.id}:exists;
+    return unless $!players{$user.id}:exists;
+    $!players-sem.release;
 }
 
 # Called when the bot receives a user leave message.
 proto method on-leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {*}
-multi method on-leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil)       {
+multi method on-leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil) {
     return unless $!rooms{$room.id}:exists;
+    return unless $!players{$user.id}:exists;
 
     when $!permit-renames {
-        return unless $!players{$user.id}:exists;
-
         $!players-sem.acquire;
     }
     when $!renamed-players{$user.id}:exists {
@@ -284,25 +279,14 @@ multi method on-leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --
     when $!renamed-players.values ∋ $user.id {
         # Do nothing.
     }
-    when $!players{$user.id}:exists {
+    default {
         $!players-sem.acquire;
     }
 }
 
 # Called when the bot receives a user rename message.
-proto method on-rename(PSBot::Game:D: Str:D $oldid, PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {*}
-multi method on-rename(PSBot::Game:D: Str:D $oldid, PSBot::User:D $user, PSBot::Room:D $room --> Nil)       {
-    return unless $!rooms{$room.id}:exists;
-
-    when $!permit-renames {
-        when $!players{$user.id}:exists {
-            # Do nothing.
-        }
-        when $!players{$oldid}:exists {
-            $!players{$oldid}:delete;
-            $!players{$user.id}++;
-        }
-    }
+proto method on-rename(PSBot::Game:D: Str:D $oldid, PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {
+    when $!permit-renames {{*}}
     when $!renamed-players{$user.id}:exists {
         $!renamed-players{$user.id}:delete;
         $!players-sem.release;
@@ -312,11 +296,21 @@ multi method on-rename(PSBot::Game:D: Str:D $oldid, PSBot::User:D $user, PSBot::
             $!renamed-players{$playerid} := $user.id;
         }
     }
+    default {{*}}
+}
+multi method on-rename(PSBot::Game:D: Str:D $oldid, PSBot::User:D $user, PSBot::Room:D $room --> Nil) {
+    return unless $!rooms{$room.id}:exists;
+
     when $!players{$user.id}:exists {
         # Do nothing.
     }
     when $!players{$oldid}:exists {
-        $!renamed-players{$oldid} := $user.id;
-        $!players-sem.acquire;
+        $!players{$oldid}:delete;
+        $!players{$user.id}++;
+
+        unless $!permit-renames {
+            $!renamed-players{$oldid} := $user.id;
+            $!players-sem.acquire;
+        }
     }
 }
