@@ -43,10 +43,10 @@ multi method start(PSBot::Games::Hangman:D: PSBot::User:D $user, PSBot::Room:D $
 multi method end(PSBot::Games::Hangman:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:D) {
     $!ended.keep;
 
-    self.reply: "The word was $!word.", :roomid($room.id) if $!started;
+    self.reply: "The word was $!word.", :roomid($room.id) if ?$!started;
 }
 
-method guess(PSBot::Games::Hangman:D: Str:D $target, PSBot::User:D $player, PSBot::Room:D $room --> Replier:D) {
+method guess(PSBot::Games::Hangman:D: Str:D $target, PSBot::User:D $user, PSBot::Room:D $room --> Replier:D) {
     my Str:D $roomid = $room.id;
 
     return self.reply:
@@ -57,7 +57,7 @@ method guess(PSBot::Games::Hangman:D: Str:D $target, PSBot::User:D $player, PSBo
         :roomid($room.id) unless $!rooms{$room.id}:exists;
     return self.reply:
         'You are not a player in this game.',
-        :$roomid unless $!players ∋ $player.id;
+        :$roomid unless $!players{$user.id}:exists;
 
     my Str:D $guess = to-id $target;
     return self.reply:
@@ -67,11 +67,11 @@ method guess(PSBot::Games::Hangman:D: Str:D $target, PSBot::User:D $player, PSBo
     if $guess.chars > 1 {
         my Str:D $word = $guess.uc;
         if $word eq $!word {
-            self.reply: ('Your guess is correct!', |self.end: $room), :$roomid
+            self.reply: ('Your guess is correct!', |self.end: $user, $room), :$roomid
         } elsif --$!limbs {
             self.reply: ('Your guess is incorrect.', |self!display: $room), :$roomid
         } else {
-            self.reply: ('Your guess is incorrect.', |self.end: $room), :$roomid
+            self.reply: ('Your guess is incorrect.', |self.end: $user, $room), :$roomid
         }
     } else {
         my Str:D $letter = $guess.uc;
@@ -83,14 +83,14 @@ method guess(PSBot::Games::Hangman:D: Str:D $target, PSBot::User:D $player, PSBo
 
         if $!word.contains: $letter {
             if $!guessed-letters ⊇ $!letters {
-                self.reply: ('Your guess is correct!', |self.end: $room), :$roomid
+                self.reply: ('Your guess is correct!', |self.end: $user, $room), :$roomid
             } else {
                 self.reply: ('Your guess is correct!', |self!display: $room), :$roomid
             }
         } elsif --$!limbs {
             self.reply: ('Your guess is incorrect.', |self!display: $room), :$roomid
         } else {
-            self.reply: ('Your guess is incorrect.', |self.end: $room), :$roomid
+            self.reply: ('Your guess is incorrect.', |self.end: $user, $room), :$roomid
         }
     }
 }

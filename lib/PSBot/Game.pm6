@@ -204,9 +204,7 @@ proto method start(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> R
 
     my Replier:_ $response = {*};
     my Str:D     $output   = "This game of {self.name} has started.";
-    self.reply:
-        ($response.defined ?? ($output, $response) !! $output),
-        :$roomid
+    self.reply: ($output, $response), :$roomid
 }
 multi method start(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil) {
     $!started.keep;
@@ -225,9 +223,7 @@ proto method end(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Rep
 
     my Replier:_ $response = {*};
     my Str:D     $output   = "This game of {self.name} has ended.";
-    self.reply:
-        ($response.defined ?? ($output, $response) !! $output),
-        :$roomid
+    self.reply: ($output, $response), :$roomid
 }
 multi method end(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil) {
     $!ended.keep;
@@ -250,72 +246,62 @@ multi method on-deinit(PSBot::Game:D: PSBot::Room:D $room --> Nil)       {
 }
 
 # Called when the bot receives a user join message.
-proto method on-join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {
-    when $!permit-renames {{*}}
-    when %!renamed-players{$user.id}:exists {
-        %!renamed-players{$user.id}:delete;
-        $!players-sem.release;
-        Nil
-    }
-    when %!renamed-players.values ∋ $user.id {
-        for %!renamed-players.grep(*.value eq $user.id).map(*.key) -> Str:D $playerid {
-            %!renamed-players{$playerid}:delete;
-            $!players-sem.release;
-        }
-        Nil
-    }
-    default {{*}}
-}
+proto method on-join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {*}
 multi method on-join(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil) {
     return unless $!rooms{$room.id}:exists;
+
+    unless $!permit-renames {
+        if %!renamed-players{$user.id}:exists {
+            %!renamed-players{$user.id}:delete;
+            $!players-sem.release;
+        }
+        if %!renamed-players.values ∋ $user.id {
+            for %!renamed-players.grep(*.value eq $user.id).map(*.key) -> Str:D $playerid {
+                %!renamed-players{$playerid}:delete;
+                $!players-sem.release;
+            }
+        }
+    }
+
     return unless $!players{$user.id}:exists;
+
     $!players-sem.release;
 }
 
 # Called when the bot receives a user leave message.
-proto method on-leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {
-    when $!permit-renames {{*}}
-    when %!renamed-players{$user.id}:exists {
-        # Player is renamed; do nothing.
-        Nil
-    }
-    when %!renamed-players.values ∋ $user.id {
-        # Player is renamed; do nothing.
-        Nil
-    }
-    default {{*}}
-}
+proto method on-leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {*}
 multi method on-leave(PSBot::Game:D: PSBot::User:D $user, PSBot::Room:D $room --> Nil) {
     return unless $!rooms{$room.id}:exists;
     return unless $!players{$user.id}:exists;
+
     $!players-sem.acquire
 }
 
 # Called when the bot receives a user rename message.
-proto method on-rename(PSBot::Game:D: Str:D $oldid, PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {
-    when $!permit-renames {{*}}
-    when %!renamed-players{$user.id}:exists {
-        %!renamed-players{$user.id}:delete;
-        $!players-sem.release;
-    }
-    when %!renamed-players.values ∋ $oldid {
-        for %!renamed-players.grep(*.value eq $user.id).map(*.key) -> Str:D $playerid {
-            %!renamed-players{$playerid} := $user.id;
-        }
-    }
-    default {{*}}
-}
+proto method on-rename(PSBot::Game:D: Str:D $oldid, PSBot::User:D $user, PSBot::Room:D $room --> Replier:_) {*}
 multi method on-rename(PSBot::Game:D: Str:D $oldid, PSBot::User:D $user, PSBot::Room:D $room --> Nil) {
     return unless $!rooms{$room.id}:exists;
 
+    unless $!permit-renames {
+        if %!renamed-players{$user.id}:exists {
+            %!renamed-players{$user.id}:delete;
+            $!players-sem.release;
+        }
+        if %!renamed-players.values ∋ $oldid {
+            for %!renamed-players.grep(*.value eq $user.id).map(*.key) -> Str:D $playerid {
+                %!renamed-players{$playerid} := $user.id;
+            }
+        }
+    }
+
     when $!players{$user.id}:exists {
-        # Do nothing.
+        # The player's name didn't change; do nothing.
     }
     when $!players{$oldid}:exists {
-        $!players{$oldid}:delete;
-        $!players{$user.id}++;
-
-        unless $!permit-renames {
+        if $!permit-renames {
+            $!players{$oldid}:delete;
+            $!players{$user.id}++;
+        } else {
             %!renamed-players{$oldid} := $user.id;
             $!players-sem.acquire;
         }
