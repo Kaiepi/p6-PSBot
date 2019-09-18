@@ -298,10 +298,10 @@ multi method on-rename(PSBot::Game:D: Str:D $oldid, PSBot::User:D $user, PSBot::
         # The player's name didn't change; do nothing.
     }
     when $!players{$oldid}:exists {
-        if $!permit-renames {
-            $!players{$oldid}:delete;
-            $!players{$user.id}++;
-        } else {
+        $!players{$oldid}:delete;
+        $!players{$user.id}++;
+
+        unless $!permit-renames {
             %!renamed-players{$oldid} := $user.id;
             $!players-sem.acquire;
         }
