@@ -1,28 +1,17 @@
 use v6.d;
 use Pastebin::Shadowcat;
 use PSBot::Response;
+use nqp;
 unit module PSBot::Tools;
 
-my subset ResultListType
-    where Positional | Sequence;
-
-my subset ResponseList
-    is    export
-    of    ResultListType:D
-    where PSBot::Response ~~ all(*);
-
-my subset Replier
-    is export
-    of Callable[ResponseList:D];
-
-my subset Result
-    is    export
-    where Str | Positional | Sequence | Awaitable | Replier;
-
-my subset ResultList
-    is    export
-    of    ResultListType:D
-    where Result ~~ all(*);
+my package MetamodelX {
+    class SubsetWithMutableRefinementHOW is Metamodel::SubsetHOW {
+        method set_where($obj, $refinement) {
+            nqp::bindattr(self, Metamodel::SubsetHOW, '$!refinement', $refinement);
+            $obj
+        }
+    }
+}
 
 my enum MessageType is export (
     ChatMessage    => 'c:',
@@ -54,6 +43,27 @@ my enum RoomType is export (
     Battle    => 'battle',
     GroupChat => 'groupchat'
 );
+
+my subset ListType
+    where Positional ^ Sequence;
+
+my subset ResponseList
+    is    export
+    of    ListType:D
+    where not *.map(* !~~ PSBot::Response:D).first(*);
+
+my subset Replier
+    is export
+    of Callable[ResponseList:D];
+
+my subset Result
+    is    export
+    where Str ^ Replier ^ Awaitable ^ ListType ^ Nil;
+
+my subset ResultList
+    is    export
+    of    ListType:D
+    where not *.map(* !~~ Result).first(*);
 
 # Yes, a CPAN module exists for this already. We don't use it because it has
 # unnecessary dependencies.
