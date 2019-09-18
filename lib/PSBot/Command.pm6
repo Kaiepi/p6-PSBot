@@ -133,7 +133,7 @@ method CALL-ME(PSBot::Command:D: Str $target --> Replier) {
             "Permision denied. {COMMAND}{self.name} is disabled in {$*ROOM.title}.",
             $*USER, PSBot::Room if $disabled;
 
-        my Group $group = %!groups ∋ $*ROOM.id
+        my Group $group = %!groups{$*ROOM.id}:exists
             ?? self.get-group($*ROOM.id)
             !! self.set-group($*ROOM.id, $command<rank>:exists ?? $command<rank> !! $!default-group.key);
         return self.reply:
