@@ -4,25 +4,25 @@ use PSBot::Response;
 unit module PSBot::Tools;
 
 my subset ResultListType
-    where Positional:D | Sequence:D;
+    where Positional | Sequence;
 
 my subset ResponseList
     is    export
-    of    ResultListType
-    where PSBot::Response:D ~~ all(*);
+    of    ResultListType:D
+    where PSBot::Response ~~ all(*);
 
 my subset Replier
     is export
-    where Callable[ResponseList:D] | Nil;
+    of Callable[ResponseList:D];
 
 my subset Result
     is    export
-    where Str:D | Positional:D | Sequence:D | Awaitable:D | Replier:D | Nil;
+    where Str | Positional | Sequence | Awaitable | Replier;
 
 my subset ResultList
     is    export
-    of    ResultListType
-    where Result ~~ *.all;
+    of    ResultListType:D
+    where Result ~~ all(*);
 
 my enum MessageType is export (
     ChatMessage    => 'c:',
@@ -32,7 +32,7 @@ my enum MessageType is export (
     RawMessage     => 'raw'
 );
 
-my enum Status      is export (
+my enum Status is export (
     Online => 'Online',
     Idle   => 'Idle',
     BRB    => 'BRB',
@@ -41,15 +41,15 @@ my enum Status      is export (
     Busy   => 'Busy'
 );
 
-my enum Group       is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
+my enum Group is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
 
-my enum Visibility  is export (
+my enum Visibility is export (
     Public => 'public',
     Hidden => 'hidden',
     Secret => 'secret'
 );
 
-my enum RoomType    is export (
+my enum RoomType is export (
     Chat      => 'chat',
     Battle    => 'battle',
     GroupChat => 'groupchat'
