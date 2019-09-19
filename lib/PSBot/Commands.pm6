@@ -34,7 +34,7 @@ BEGIN {
                     my Str   $result     = (try EVAL($target).gist) // $!.gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g;
                     my Bool  $raw        = ($result.contains("\n") || (150 < $result.codes < 8194))
                                         && self.can: $src-group, $tar-group;
-                    $output.keep: $raw ?? "!code $result" !! $result.split("\n").map({ "``$_``" });
+                    $output.keep: $raw ?? "!code $result" !! $result.split("\n").map({ "``$_``" }).list;
                 }
             }
 
