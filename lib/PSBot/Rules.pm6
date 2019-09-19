@@ -274,7 +274,7 @@ method new() {
 
 method parse(MessageType:D $type, Str:D $message --> Bool:D) {
     for %!cache{$type}.keys -> Rule:D $rule {
-        my Replier:_ $replier = $rule.match($message) // Nil;
+        my Replier:_ $replier = $rule.match($message);
         next unless $replier.defined;
 
         my ResponseList:D $responses := $replier();
