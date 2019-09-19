@@ -231,12 +231,15 @@ method message:sym<c:>(Match:D $/ is copy) {
     await $*BOT.started;
 
     my Str:D         $message  = $<message>.made;
-    my PSBot::User:D $*USER   := $*BOT.get-user: $userid;
+    my PSBot::User:_ $*USER   := $*BOT.get-user: $userid;
     return unless $*USER.defined;
 
-    my Str:D         $roomid   = $*ROOMID;
-    my PSBot::Room:D $*ROOM   := $*BOT.get-room: $roomid;
+    my Str:D         $roomid  = $*ROOMID;
+    my PSBot::Room:_ $*ROOM  := $*BOT.get-room: $roomid;
     return unless $*ROOM.defined;
+
+    await $*USER.propagated;
+    await $*ROOM.propagated;
 
     $*BOT.rules.parse: MessageType('c:'), $message;
 }
@@ -248,9 +251,11 @@ method message:sym<pm>(Match:D $/) {
 
     my Str:D         $message  = $<message>.made;
     my Str:D         $userid   = $from.id;
-    my PSBot::User:D $*USER   := $*BOT.get-user: $userid;
-    my PSBot::Room:D $*ROOM   := PSBot::Room;
+    my PSBot::User:_ $*USER   := $*BOT.get-user: $userid;
+    my PSBot::Room:U $*ROOM   := PSBot::Room;
     return unless $*USER.defined;
+
+    await $*USER.propagated;
 
     $*BOT.rules.parse: MessageType('pm'), $message;
 }
@@ -260,9 +265,12 @@ method message:sym<html>(Match:D $/) {
     await $*BOT.started;
 
     my Str:D         $data    = $<data>.made;
-    my PSBot::User:D $*USER  := PSBot::User;
+    my PSBot::User:U $*USER  := PSBot::User;
     my Str:D         $roomid  = $*ROOMID;
-    my PSBot::Room:D $*ROOM  := $*BOT.get-room: $roomid;
+    my PSBot::Room:_ $*ROOM  := $*BOT.get-room: $roomid;
+    return unless $*ROOM.defined;
+
+    await $*ROOM.propagated;
 
     $*BOT.rules.parse: MessageType('html'), $data;
 }
@@ -272,9 +280,12 @@ method message:sym<popup>(Match:D $/) {
     await $*BOT.started;
 
     my Str:D         $data    = $<data>.made;
-    my PSBot::User:D $*USER  := PSBot::User;
+    my PSBot::User:U $*USER  := PSBot::User;
     my Str:D         $roomid  = $*ROOMID;
-    my PSBot::Room:D $*ROOM  := $*BOT.get-room: $roomid;
+    my PSBot::Room:_ $*ROOM  := $*BOT.get-room: $roomid;
+    return unless $*ROOM.defined;
+
+    await $*ROOM.propagated;
 
     $*BOT.rules.parse: MessageType('popup'), $data;
 }
@@ -284,9 +295,12 @@ method message:sym<raw>(Match:D $/) {
     await $*BOT.started;
 
     my Str:D         $data    = $<data>.made;
-    my PSBot::User:D $*USER  := PSBot::User;
+    my PSBot::User:U $*USER  := PSBot::User;
     my Str:D         $roomid  = $*ROOMID;
-    my PSBot::Room:D $*ROOM  := $*BOT.get-room: $roomid;
+    my PSBot::Room:_ $*ROOM  := $*BOT.get-room: $roomid;
+    return unless $*ROOM.defined;
+
+    await $*ROOM.propagated;
 
     $*BOT.rules.parse: MessageType('popup'), $data;
 }

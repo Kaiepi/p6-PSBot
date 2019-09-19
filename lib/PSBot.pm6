@@ -422,9 +422,30 @@ method has-room(Str:D $roomid --> Bool:D) {
 }
 
 method get-room(Str:D $roomid --> PSBot::Room:_) {
-    $!lock.protect({
-        %!rooms{$roomid}
-    })
+    return if $roomid eq 'global';
+
+    await $!lock.lock;
+    when %!rooms{$roomid}:exists {
+        my PSBot::Room:D $room = %!rooms{$roomid};
+        $!lock.unlock;
+        $room
+    }
+    when %!unpropagated-rooms{$roomid}:exists {
+        my Promise:D $on-propagate = %!unpropagated-rooms{$roomid};
+        $!lock.unlock;
+
+        my PSBot::Room:_ $room = try await $on-propagate;
+        $room // Failure.new: $!
+    }
+    default {
+        my Promise:D $on-propagate    .= new;
+        %!unpropagated-rooms{$roomid} := $on-propagate;
+        $!connection.send: "/cmd roominfo $roomid", :raw;
+        $!lock.unlock;
+
+        my PSBot::Room:_ $room = try await $on-propagate;
+        $room // Failure.new: $!
+    }
 }
 
 # THIS IS ONLY INTENDED FOR USE WITH THE EVAL COMMAND. DO NOT USE IT IN YOUR
@@ -504,17 +525,19 @@ method has-user(Str:D $userid --> Bool:D) {
 
 method get-user(Str:D $userid --> PSBot::User:_) {
     await $!lock.lock;
-    if %!users{$userid}:exists {
+    when %!users{$userid}:exists {
         my PSBot::User:D $user = %!users{$userid};
         $!lock.unlock;
         $user
-    } elsif %!unpropagated-users{$userid}:exists {
+    }
+    when %!unpropagated-users{$userid}:exists {
         my Promise:D $on-propagate = %!unpropagated-users{$userid};
         $!lock.unlock;
 
         my PSBot::User:_ $user = try await $on-propagate;
         $user // Failure.new: $!
-    } else {
+    }
+    default {
         my Promise:D $on-propagate    .= new;
         %!unpropagated-users{$userid} := $on-propagate;
         $!connection.send: "/cmd userdetails $userid", :raw;
