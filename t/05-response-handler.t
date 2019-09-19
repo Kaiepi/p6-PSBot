@@ -1,20 +1,13 @@
 use v6.d;
 use PSBot::Response;
 use PSBot::ResponseHandler;
-use PSBot::Tools;
+use PSBot::Tools :TYPES;
 use Test;
 
 plan 6;
 
 my PSBot::ResponseHandler $handler .= new;
 my Str                    $message  = 'i will face god and walk backwards into hell';
-
-subtest 'responding with Nil', {
-    plan 1;
-
-    my @responses = $handler.make-responses: Nil;
-    nok ?@responses, 'returns an empty List';
-};
 
 subtest 'responding with a Str', {
     plan 2;
@@ -64,6 +57,17 @@ subtest 'responding with a nested ResultList', {
     my            @responses  = $handler.make-responses: $messages;
     is +@responses, +$messages.flat, 'returns a List with as many responses as there are messages to send...';
     cmp-ok $message, '~~', all(@responses).message, '...all of which contain their corresponding message';
+};
+
+subtest 'responding with an undefined Result', {
+    my Mu:U @types = (Str, Replier, Awaitable, ResultList, Nil);
+
+    plan +@types;
+
+    for @types -> Mu:U \T {
+        my ResponseList:D $responses := $handler.make-responses: T;
+        nok ?$responses, 'returns an undefined ' ~ T.^name;
+    }
 };
 
 # vim: ft=perl6 sw=4 ts=4 sts=4 expandtab

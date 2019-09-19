@@ -3,7 +3,7 @@ use Cro::HTTP::Client;
 use Cro::HTTP::Response;
 use HTML::Entity;
 use PSBot::Config;
-use PSBot::Tools;
+use PSBot::Tools :TYPES;
 use URI::Encode;
 unit module PSBot::Plugins::YouTube;
 

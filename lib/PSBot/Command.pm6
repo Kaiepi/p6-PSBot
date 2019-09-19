@@ -5,7 +5,7 @@ use PSBot::Connection;
 use PSBot::Response;
 use PSBot::ResponseHandler;
 use PSBot::Room;
-use PSBot::Tools;
+use PSBot::Tools :TYPES, :PASTE;
 use PSBot::User;
 unit class PSBot::Command does PSBot::ResponseHandler;
 

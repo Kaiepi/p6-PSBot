@@ -3,7 +3,7 @@ use PSBot::Config;
 use HTML::Entity;
 use Cro::HTTP::Client;
 use Cro::HTTP::Response;
-use PSBot::Tools;
+use PSBot::Tools :TYPES;
 use URI::Encode;
 unit module PSBot::Plugins::Translate;
 

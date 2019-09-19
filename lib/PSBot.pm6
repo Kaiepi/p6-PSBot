@@ -8,7 +8,7 @@ use PSBot::Grammar;
 use PSBot::LoginServer;
 use PSBot::Room;
 use PSBot::Rules;
-use PSBot::Tools;
+use PSBot::Tools :TYPES, :DEBUG;
 use PSBot::User;
 use PSBot::UserInfo;
 unit class PSBot:auth<github:Kaiepi>:ver<0.0.1>;
@@ -245,6 +245,7 @@ method start() {
             }
             whenever $!done {
                 # The bot wants to stop. Exit the react block, then exit the loop.
+                sleep 1;
                 done;
             }
             whenever signal(SIGINT) | signal(SIGTERM) | signal(SIGKILL) {
@@ -268,7 +269,7 @@ method start() {
 # Stops the bot at any given time.
 method stop(--> Nil) {
     $!login-server.log-out;
-    try $!connection.send: '/logout', :raw;
+    try $!connection.connection.send: '|/logout';
     await $!pending-rename unless $!.defined;
     try await $!connection.close: :force;
     $!database.DESTROY;

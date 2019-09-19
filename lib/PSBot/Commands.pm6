@@ -9,7 +9,7 @@ use PSBot::Games::Hangman;
 use PSBot::Plugins::Translate;
 use PSBot::Plugins::YouTube;
 use PSBot::Room;
-use PSBot::Tools;
+use PSBot::Tools :TYPES, :ID, :PASTE;
 use PSBot::User;
 use Telemetry;
 use URI::Encode;
@@ -26,7 +26,7 @@ BEGIN {
         :administrative,
         anon method eval(Str $target --> Replier) {
             sub evaluate(Promise $output --> Sub) {
-                sub {
+                sub (--> Nil) {
                     use MONKEY-SEE-NO-EVAL;
 
                     my Group $src-group  = Group(Group.enums{'+'});
@@ -172,8 +172,9 @@ BEGIN {
 
     my PSBot::Command $suicide .= new:
         :administrative,
-        anon method suicide(Str $target --> Nil) {
+        anon method suicide(Str:D $target --> Replier:U) {
             $*BOT.stop;
+            Nil
         };
 
     my PSBot::Command $uptime .= new:

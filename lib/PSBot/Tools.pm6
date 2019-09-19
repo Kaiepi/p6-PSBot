@@ -1,128 +1,156 @@
 use v6.d;
 use Pastebin::Shadowcat;
 use PSBot::Response;
-use nqp;
 unit module PSBot::Tools;
 
-my enum MessageType is export (
-    ChatMessage    => 'c:',
-    PrivateMessage => 'pm',
-    PopupMessage   => 'popup',
-    HTMLMessage    => 'html',
-    RawMessage     => 'raw'
-);
+my package EXPORT::TYPES {
+    enum MessageType (
+        ChatMessage    => 'c:',
+        PrivateMessage => 'pm',
+        PopupMessage   => 'popup',
+        HTMLMessage    => 'html',
+        RawMessage     => 'raw'
+    );
 
-my enum Status is export (
-    Online => 'Online',
-    Idle   => 'Idle',
-    BRB    => 'BRB',
-    AFK    => 'AFK',
-    Away   => 'Away',
-    Busy   => 'Busy'
-);
+    enum Status (
+        Online => 'Online',
+        Idle   => 'Idle',
+        BRB    => 'BRB',
+        AFK    => 'AFK',
+        Away   => 'Away',
+        Busy   => 'Busy'
+    );
 
-my enum Group is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
+    enum Group «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
 
-my enum Visibility is export (
-    Public => 'public',
-    Hidden => 'hidden',
-    Secret => 'secret'
-);
+    enum Visibility (
+        Public => 'public',
+        Hidden => 'hidden',
+        Secret => 'secret'
+    );
 
-my enum RoomType is export (
-    Chat      => 'chat',
-    Battle    => 'battle',
-    GroupChat => 'groupchat'
-);
+    enum RoomType (
+        Chat      => 'chat',
+        Battle    => 'battle',
+        GroupChat => 'groupchat'
+    );
 
-my subset ListType
-    where Positional ^ Sequence;
+    my subset ListType
+        where Positional ^ Sequence;
 
-my subset ResponseList
-    is    export
-    of    ListType:D
-    where not *.map(* !~~ PSBot::Response:D).first(*);
+    subset ResponseList
+        of ListType:D
+     where not *.map(* !~~ PSBot::Response:D).first(*);
 
-my subset Replier
-    is export
-    of Callable[ResponseList:D];
+    subset Replier
+     where Callable:_[ResponseList:D] | Nil;
 
-my subset Result
-    is    export
-    where Str ^ Replier ^ Awaitable ^ ListType ^ Nil;
+    subset Result
+     where (Str ^ Replier ^ Awaitable ^ ListType) | Nil;
 
-my subset ResultList
-    is    export
-    of    ListType:D
-    where not *.map(* !~~ Result).first(*);
+    subset ResultList
+        of ListType:D
+     where not *.map(* !~~ Result:_).first(*);
 
-# Yes, a CPAN module exists for this already. We don't use it because it has
-# unnecessary dependencies.
-my class Symbol is export {
-    has Str $.description;
+    class Symbol {
+        has Str $.description;
 
-    method CALL-ME(Symbol:U: Str $description? --> Symbol:D) {
-        self.new: :$description
-    }
+        method CALL-ME(Symbol:U: Str $description? --> Symbol:D) {
+            self.new: :$description
+        }
 
-    my ::?CLASS %for;
-    method for(Symbol:U: Str $description? --> Symbol:D) {
-        if %for{$description}:exists {
-            %for{$description}
-        } else {
-            my ::?CLASS $symbol .= new: :$description;
-            %for{$description} := $symbol;
-            $symbol
+        my ::?CLASS:D %for;
+        method for(Symbol:U: Str $description? --> Symbol:D) {
+            if %for{$description}:exists {
+                %for{$description}
+            } else {
+                my ::?CLASS:D $symbol .= new: :$description;
+                %for{$description} := $symbol;
+                $symbol
+            }
+        }
+
+        method !stringify(Symbol:D: --> Str:D) {
+            $!description.defined
+                ?? "Symbol($!description)"
+                !! "Symbol()"
+        }
+        multi method gist(Symbol:D: --> Str:D) {
+            self!stringify
+        }
+        multi method Str(Symbol:D: --> Str:D) {
+            self!stringify
+        }
+        multi method perl(Symbol:D: --> Str:D) {
+            self!stringify
         }
     }
 
-    method !stringify(Symbol:D: --> Str:D) {
-        $!description.defined
-            ?? "Symbol($!description)"
-            !! "Symbol()"
-    }
-    multi method gist(Symbol:D: --> Str:D) {
-        self!stringify
-    }
-    multi method Str(Symbol:D: --> Str:D) {
-        self!stringify
-    }
-    multi method perl(Symbol:D: --> Str:D) {
-        self!stringify
+    BEGIN {
+        for OUTER::OUR::.kv -> Str:D $symbol, Mu:_ $type {
+            given $type {
+                when Enumeration:D {
+                    # Do nothing.
+                }
+                when Mu:U {
+                    $type.^set_name: $symbol;
+                }
+            }
+        }
     }
 }
 
-sub to-id(Str $data! --> Str) is export {
-    $data.lc.samemark(' ').subst(/ <-[a..z 0..9]>+ /, '', :g)
+my package EXPORT::ID {
+    sub to-id(Str:D $data! --> Str:D) {
+        $data.lc.samemark(' ').subst(/ <-[a..z 0..9]>+ /, '', :g)
+    }
+
+    sub to-roomid(Str:D $room! --> Str:D) {
+        $room.lc.samemark(' ').subst(/ <-[a..z 0..9 -]>+ /, '', :g)
+    }
+
+    BEGIN {
+        OUR::<&to-id>     := &to-id;
+        OUR::<&to-roomid> := &to-roomid;
+    }
 }
 
-sub to-roomid(Str $room! --> Str) is export {
-    $room.lc.samemark(' ').subst(/ <-[a..z 0..9 -]>+ /, '', :g)
+my package EXPORT::DEBUG {
+    sub debug(**@data --> Nil) {
+        return unless %*ENV<DEBUG>;
+
+        @data.head = do given @data.head {
+            when '[DEBUG]' { "\e[1;33m[DEBUG]\e[0m" }
+            when '[SEND]'  { "\e[1;32m[SEND]\e[0m"  }
+            when '[RECV]'  { "\e[1;35m[RECV]\e[0m"  }
+            default        { die "Unknown debug message type {@data.head.gist }." }
+        };
+
+        say @data».gist.join: "\n";
+    }
+
+    BEGIN {
+        OUR::<&debug> := &debug;
+    }
 }
 
-sub debug(**@data) is export {
-    return unless %*ENV<DEBUG>;
+my package EXPORT::PASTE {
+    my Pastebin::Shadowcat $pastebin .= new;
 
-    @data.head = do given @data.head {
-        when '[DEBUG]' { "\e[1;33m[DEBUG]\e[0m" }
-        when '[SEND]'  { "\e[1;32m[SEND]\e[0m"  }
-        when '[RECV]'  { "\e[1;35m[RECV]\e[0m"  }
-        default        { die "Unknown debug message type {@data.head.gist }." }
-    };
+    sub paste(Str:D $data --> Str:_) {
+        my $url = $pastebin.paste: $data;
+        return $url unless $url.defined;
+        "$url?tx=on"
+    }
 
-    say @data».gist.join("\n");
-}
+    sub fetch(Str:D $url --> Str:_) {
+        my @paste = $pastebin.fetch: $url;
+        return @paste unless @paste.defined;
+        @paste[0]
+    }
 
-sub paste(Str $data --> Str) is export {
-    state Pastebin::Shadowcat $pastebin .= new;
-    my $url = $pastebin.paste: $data;
-    return $url unless $url.defined;
-    "$url?tx=on"
-}
-
-sub fetch(Str $url --> Str) is export {
-    state Pastebin::Shadowcat $pastebin .= new;
-    my @paste = $pastebin.fetch: $url;
-    return @paste unless @paste.defined;
-    @paste[0]
+    BEGIN {
+        OUR::<&paste> := &paste;
+        OUR::<&fetch> := &fetch;
+    }
 }

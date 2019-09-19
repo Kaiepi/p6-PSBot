@@ -2,7 +2,7 @@ use v6.d;
 use PSBot::Game;
 use PSBot::Response;
 use PSBot::Room;
-use PSBot::Tools;
+use PSBot::Tools :TYPES, :ID;
 use PSBot::User;
 unit class PSBot::Games::Hangman does PSBot::Game;
 

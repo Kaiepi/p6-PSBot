@@ -3,7 +3,7 @@ use Failable;
 use JSON::Fast;
 use PSBot::Config;
 use PSBot::Room;
-use PSBot::Tools;
+use PSBot::Tools :TYPES, :ID;
 use PSBot::User;
 use PSBot::UserInfo;
 unit class PSBot::Actions;

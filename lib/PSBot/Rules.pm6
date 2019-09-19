@@ -6,7 +6,7 @@ use PSBot::Config;
 use PSBot::Plugins::YouTube;
 use PSBot::ResponseHandler;
 use PSBot::Room;
-use PSBot::Tools;
+use PSBot::Tools :TYPES, :ID, :PASTE;
 use PSBot::User;
 unit class PSBot::Rules;
 

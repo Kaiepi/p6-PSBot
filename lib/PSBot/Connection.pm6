@@ -3,7 +3,7 @@ use Cro::WebSocket::Client;
 use Cro::Uri;
 use PSBot::Config;
 use PSBot::Exceptions;
-use PSBot::Tools;
+use PSBot::Tools :DEBUG;
 unit class PSBot::Connection;
 
 has Cro::WebSocket::Client             $!client;

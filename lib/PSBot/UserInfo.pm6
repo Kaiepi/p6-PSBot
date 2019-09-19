@@ -3,7 +3,7 @@
 # for the user it represents either isn't needed or doesn't exist yet.
 
 use v6.d;
-use PSBot::Tools;
+use PSBot::Tools :TYPES;
 unit class PSBot::UserInfo;
 
 has Group  $.group;
