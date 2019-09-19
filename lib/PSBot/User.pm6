@@ -121,7 +121,3 @@ method join-game(PSBot::User:D: Int:D $gameid, Symbol:D $game-type --> Nil) {
 method leave-game(PSBot::User:D: Int:D $gameid --> Nil) {
     %!games{$gameid}:delete;
 }
-
-method propagated(PSBot::User:D: --> Bool:D) {
-    ?$!propagated
-}

@@ -116,7 +116,3 @@ method add-game(PSBot::Room:D: Int:D $gameid, Symbol:D $game-type --> Nil) {
 method delete-game(PSBot::Room:D: Int:D $gameid --> Nil) {
     %!games{$gameid}:delete
 }
-
-method propagated(PSBot::Room:D: --> Bool:D) {
-    ?$!propagated
-}
