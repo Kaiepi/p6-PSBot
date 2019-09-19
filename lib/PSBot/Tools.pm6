@@ -4,15 +4,6 @@ use PSBot::Response;
 use nqp;
 unit module PSBot::Tools;
 
-my package MetamodelX {
-    class SubsetWithMutableRefinementHOW is Metamodel::SubsetHOW {
-        method set_where($obj, $refinement) {
-            nqp::bindattr(self, Metamodel::SubsetHOW, '$!refinement', $refinement);
-            $obj
-        }
-    }
-}
-
 my enum MessageType is export (
     ChatMessage    => 'c:',
     PrivateMessage => 'pm',
