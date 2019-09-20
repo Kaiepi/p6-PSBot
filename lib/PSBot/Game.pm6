@@ -1,7 +1,8 @@
 use v6.d;
+use PSBot::ID;
+use PSBot::Response;
 use PSBot::ResponseHandler;
 use PSBot::Room;
-use PSBot::Tools :TYPES;
 use PSBot::User;
 unit role PSBot::Game does PSBot::ResponseHandler;
 

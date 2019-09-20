@@ -1,9 +1,8 @@
 use v6.d;
-use PSBot::Config;
-use HTML::Entity;
 use Cro::HTTP::Client;
 use Cro::HTTP::Response;
-use PSBot::Tools :TYPES;
+use HTML::Entity;
+use PSBot::Config;
 use URI::Encode;
 unit module PSBot::Plugins::Translate;
 

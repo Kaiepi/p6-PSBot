@@ -1,5 +1,5 @@
 use v6.d;
-use PSBot::Tools :TYPES, :ID;
+use PSBot::ID;
 use PSBot::UserInfo;
 unit class PSBot::User;
 

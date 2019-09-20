@@ -2,11 +2,12 @@ use v6.d;
 use Failable;
 use PSBot::Config;
 use PSBot::Connection;
+use PSBot::Plugins::Pastebin;
 use PSBot::Response;
 use PSBot::ResponseHandler;
 use PSBot::Room;
-use PSBot::Tools :TYPES, :PASTE;
 use PSBot::User;
+use PSBot::UserInfo;
 unit class PSBot::Command does PSBot::ResponseHandler;
 
 enum Locale is export <Room PM Everywhere>;

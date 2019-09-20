@@ -1,9 +1,23 @@
 use v6.d;
-use PSBot::Tools :TYPES, :ID;
+use PSBot::ID;
 use PSBot::UserInfo;
 unit class PSBot::Room;
 
-subset Modjoin where Str | True;
+my enum Visibility is export (
+    Public => 'public',
+    Hidden => 'hidden',
+    Secret => 'secret'
+);
+
+my enum RoomType is export (
+    Chat      => 'chat',
+    Battle    => 'battle',
+    GroupChat => 'groupchat'
+);
+
+my subset Modjoin
+       is export
+    where { $_ ~~ Str || $_ === True };
 
 class UserInfo {
     has Str:_   $.id;

@@ -1,7 +1,6 @@
 use v6.d;
 use PSBot::Response;
 use PSBot::ResponseHandler;
-use PSBot::Tools :TYPES;
 use Test;
 
 plan 6;

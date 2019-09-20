@@ -6,6 +6,27 @@
 use v6.d;
 unit class PSBot::Response;
 
+my subset ListType
+    where Positional ^ Sequence;
+
+my subset ResponseList
+       is export
+       of ListType:D
+    where not *.map(* !~~ PSBot::Response:D).first(*);
+
+my subset Replier
+       is export
+    where Callable:_[ResponseList:D] | Nil;
+
+my subset Result
+       is export
+    where (Str ^ Replier ^ Awaitable ^ ListType) | Nil;
+
+my subset ResultList
+       is export
+       of ListType:D
+    where not *.map(* !~~ Result:_).first(*);
+
 has Str:_  $.message;
 has Str:_  $.userid;
 has Str:_  $.roomid;

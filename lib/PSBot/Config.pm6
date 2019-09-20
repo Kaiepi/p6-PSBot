@@ -1,6 +1,6 @@
 use v6.d;
 use JSON::Fast;
-use PSBot::Tools :ID;
+use PSBot::ID;
 unit module PSBot::Config;
 
 my Str $path = do if %*ENV<TESTING> {

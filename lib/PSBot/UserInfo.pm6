@@ -3,10 +3,20 @@
 # for the user it represents either isn't needed or doesn't exist yet.
 
 use v6.d;
-use PSBot::Tools :TYPES;
 unit class PSBot::UserInfo;
 
-has Group  $.group;
-has Str    $.id;
-has Str    $.name;
-has Status $.status;
+my enum Group is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
+
+my enum Status is export (
+    Online => 'Online',
+    Idle   => 'Idle',
+    BRB    => 'BRB',
+    AFK    => 'AFK',
+    Away   => 'Away',
+    Busy   => 'Busy'
+);
+
+has Group:_  $.group;
+has Str:_    $.id;
+has Str:_    $.name;
+has Status:_ $.status;

@@ -25,7 +25,9 @@
 		"PSBot::Config" : "lib/PSBot/Config.pm6",
 		"PSBot::Connection" : "lib/PSBot/Connection.pm6",
 		"PSBot::Database" : "lib/PSBot/Database.pm6",
+		"PSBot::Debug" : "lib/PSBot/Debug.pm6",
 		"PSBot::Exceptions" : "lib/PSBot/Exceptions.pm6",
+		"PSBot::ID" : "lib/PSBot/ID.pm6",
 		"PSBot::Game" : "lib/PSBot/Game.pm6",
 		"PSBot::Grammar" : "lib/PSBot/Grammar.pm6",
 		"PSBot::LoginServer" : "lib/PSBot/LoginServer.pm6",
@@ -37,6 +39,7 @@
 		"PSBot::User" : "lib/PSBot/User.pm6",
 		"PSBot::UserInfo" : "lib/PSBot/UserInfo.pm6",
 		"PSBot::Games::Hangman" : "lib/PSBot/Games/Hangman.pm6",
+		"PSBot::Plugins::Pastebin" : "lib/PSBot/Plugins/Pastebin.pm6",
 		"PSBot::Plugins::Translate" : "lib/PSBot/Plugins/Translate.pm6",
 		"PSBot::Plugins::YouTube" : "lib/PSBot/Plugins/YouTube.pm6"
 	},

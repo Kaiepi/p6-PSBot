@@ -12,8 +12,8 @@ use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Room;
 use PSBot::Test::Server;
-use PSBot::Tools :TYPES;
 use PSBot::User;
+use PSBot::UserInfo;
 use Test;
 
 plan 1;

@@ -3,12 +3,23 @@ use Failable;
 use PSBot::Command;
 use PSBot::Commands;
 use PSBot::Config;
+use PSBot::ID;
+use PSBot::Plugins::Pastebin;
 use PSBot::Plugins::YouTube;
+use PSBot::Response;
 use PSBot::ResponseHandler;
 use PSBot::Room;
-use PSBot::Tools :TYPES, :ID, :PASTE;
 use PSBot::User;
+use PSBot::UserInfo;
 unit class PSBot::Rules;
+
+my enum MessageType is export (
+    ChatMessage    => 'c:',
+    PrivateMessage => 'pm',
+    PopupMessage   => 'popup',
+    HTMLMessage    => 'html',
+    RawMessage     => 'raw'
+);
 
 my class Rule does PSBot::ResponseHandler {
     has Set:_    $.message-types;

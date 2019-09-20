@@ -1,6 +1,5 @@
 use v6.d;
 use PSBot::Room;
-use PSBot::Tools :TYPES, :ID;
 use PSBot::UserInfo;
 use Test;
 

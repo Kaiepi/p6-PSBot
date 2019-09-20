@@ -3,7 +3,7 @@ use Cro::HTTP::Client;
 use Cro::HTTP::Response;
 use JSON::Fast;
 use PSBot::Config;
-use PSBot::Tools :ID;
+use PSBot::ID;
 unit class PSBot::LoginServer;
 
 has Cro::HTTP::Client $.client            .= new: :cookie-jar;

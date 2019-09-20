@@ -2,8 +2,8 @@ use v6.d;
 use Cro::WebSocket::Client;
 use Cro::Uri;
 use PSBot::Config;
+use PSBot::Debug;
 use PSBot::Exceptions;
-use PSBot::Tools :DEBUG;
 unit class PSBot::Connection;
 
 has Cro::WebSocket::Client             $!client;

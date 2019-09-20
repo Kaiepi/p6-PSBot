@@ -1,7 +1,7 @@
 use v6.d;
+use PSBot::ID;
 use PSBot::Game;
 use PSBot::Room;
-use PSBot::Tools :TYPES;
 use PSBot::User;
 use PSBot::UserInfo;
 use Test;

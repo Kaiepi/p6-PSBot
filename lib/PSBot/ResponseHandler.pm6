@@ -4,7 +4,6 @@
 
 use v6.d;
 use PSBot::Response;
-use PSBot::Tools :TYPES;
 unit role PSBot::ResponseHandler;
 
 # This takes a Result of some sort and returns a list of PSBot::Response
