@@ -8,7 +8,7 @@ use PSBot::User;
 use PSBot::Room;
 unit class PSBot::Actions;
 
-my enum MessageType is export (
+my Str enum MessageType is export (
     ChatMessage    => 'c:',
     PrivateMessage => 'pm',
     PopupMessage   => 'popup',

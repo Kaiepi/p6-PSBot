@@ -5,9 +5,9 @@
 use v6.d;
 unit class PSBot::UserInfo;
 
-my enum Group is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
+my Int enum Group is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
 
-my enum Status is export (
+my Str enum Status is export (
     Online => 'Online',
     Idle   => 'Idle',
     BRB    => 'BRB',

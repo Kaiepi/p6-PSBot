@@ -3,13 +3,13 @@ use PSBot::ID;
 use PSBot::UserInfo;
 unit class PSBot::Room;
 
-my enum Visibility is export (
+my Str enum Visibility is export (
     Public => 'public',
     Hidden => 'hidden',
     Secret => 'secret'
 );
 
-my enum RoomType is export (
+my Str enum RoomType is export (
     Chat      => 'chat',
     Battle    => 'battle',
     GroupChat => 'groupchat'

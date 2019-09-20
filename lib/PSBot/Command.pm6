@@ -10,7 +10,7 @@ use PSBot::ResponseHandler;
 use PSBot::Plugins::Pastebin;
 unit class PSBot::Command does PSBot::ResponseHandler;
 
-enum Locale is export <Room PM Everywhere>;
+my Int enum Locale is export <Room PM Everywhere>;
 
 # The name of the command. This is used by the parser to find the command. Any
 # Unicode is allowed except for spaces.
