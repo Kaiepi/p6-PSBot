@@ -783,9 +783,6 @@ fork the bot. They are a combination of a regex and a routine for parsing
 C<|c:|>, C<|pm|>, C<|html|>, C<|popup|>, and C<|raw|> messages (at the moment;
 more supported message types are in the works). For example, PSBot's command
 parser and room invite handler are implemented as rules.
-An example config file has been provided in C<config.json.example>. This is to be
-copied over to C<~/.config/PSBot/config.json>
-(C<%LOCALAPPDATA%\PSBot\config.json> on Windows) and edited to suit your needs.
 
 =head1 CONFIG
 
