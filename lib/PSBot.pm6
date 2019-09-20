@@ -821,9 +821,9 @@ than with other bots.
 
 =head1 INSTALLATION
 
-You will need to have L<Perl 6 and zef|https://rakudo.org> installed. Once
-you've done that, refer to the section pertaining to your OS for instructions
-on how to install PSBot itself.
+You will need to have L<Perl 6 and zef|https://rakudo.org> installed, as well
+as SQLite. Once this is done, refer to the section pertaining to your OS for
+instruction on how to install PSBot itself.
 
 =head2 Windows
 
