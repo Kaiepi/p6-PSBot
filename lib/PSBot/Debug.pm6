@@ -9,7 +9,8 @@ my Int enum DebugType is export (
 );
 
 proto sub debug(DebugType:D $type, **@data --> Nil) is export {
-    return unless %*ENV<PSBOT_DEBUG> +& $type;
+    return unless %*ENV<PSBOT_DEBUG>;
+    return unless try %*ENV<PSBOT_DEBUG> +& $type;
     {*}
     say @data».gist.join: "\n";
 }
