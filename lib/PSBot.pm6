@@ -733,21 +733,8 @@ PSBot - Pokémon Showdown chat bot
 
 =head1 DESCRIPTION
 
-PSBot is a Pokemon Showdown bot that will specialize in easily allowing the
-user to customize how the bot responds to messages.
-
-To run PSBot, simply run C<bin/psbot>, or in your own code, run the code in the
-synopsis. Note that C<PSBot.start> is blocking.
-
-There are a lot of bots for Pokémon Showdown out there, but PSBot has a number
-of advantages over others:
-
-=head2 User and room tracking
-
-PSBot keeps track of all information related to users and rooms that is
-possible for the bot to obtain at any rank and relevant for implementing
-features. For example, this means that it is possible to implement commands
-that only autoconfirmed users can use with PSBot.
+PSBot is a Pokémon Showdown chat bot. While many, many chat bots for Pokémon
+Showdown already exist, PSBot has several advantages over others:
 
 =head2 Better account management
 
@@ -759,6 +746,40 @@ implement in other bots.
 
 PSBot also uses the C<upkeep> login server action to handle logging in after
 reconnects. This is somewhat faster than using the C<login> action.
+
+=head2 User and room tracking
+
+PSBot keeps track of all information related to users and rooms that is
+possible for the bot to obtain at any rank and relevant for implementing
+features. For example, this means that it is possible to implement commands
+that only autoconfirmed users can use with PSBot.
+
+=head2 Powerful response handling
+
+PSBot has C<PSBot::Response> and C<PSBot::ResponseHandler>, which are
+abstractions for dealing with responses to messages received from the server.
+C<PSBot::ResponseHandler> adds a C<reply> method to whatever type uses it. This
+method accepts a message (a C<Result> of some kind), which can be any of the
+following:
+
+=item a string
+
+This is how you'd respond normally.
+
+=item a list of C<Result>
+
+This is how you'd respond if you want to send multiple messages in one response.
+
+=item an object that can be awaited (the result being another C<Result>)
+
+This is how you'd respond when what should be sent as a response needs to be
+evaluated asynchronously.
+
+=item a replier (the return value of another call to C<PSBot::ResponseHandler.reply>)
+
+This is how you'd respond in combination with lists of C<Result> when you need
+to override what user or room you're sending a response to (like when you want
+to PM a user, then send to a room).
 
 =head2 Better command handling
 
@@ -776,6 +797,12 @@ used in don't meet the criteria the command was defined with. This means you
 don't have to write any boilerplate for anything related to this yourself;
 PSBot will handle it for you.
 
+=head2 Games
+
+PSBot has a games API (C<PSBot::Game>). and it supports features for games that
+not even Pokémon Showdown itself supports, like the ability to play one game in
+an arbitrary number of rooms, and the ability to make games playable in PMs.
+
 =head2 Rules
 
 Rules make it possible to change how PSBot parses messages without needing to
@@ -783,6 +810,29 @@ fork the bot. They are a combination of a regex and a routine for parsing
 C<|c:|>, C<|pm|>, C<|html|>, C<|popup|>, and C<|raw|> messages (at the moment;
 more supported message types are in the works). For example, PSBot's command
 parser and room invite handler are implemented as rules.
+
+=head2 Testable
+
+PSBot is designed in such a way that it's possible to unit test. Users, rooms,
+games, responses, response handlers, and commands are the features of PSBot
+that currently have unit tests, and tests for other parts of the bot are
+planned. This means developing with PSBot should be faster and easier to do
+than with other bots.
+
+=head1 USAGE
+
+To install PSBot, install L<Rakudo Star|https://rakudo.org>, clone this
+repository, and run this from the repository's new directory in a terminal:
+
+=for code
+$ zef install .
+
+Afterwards, to start the bot, simply run:
+
+=for code
+$ psbot
+
+Before running the bot, you need to configure it. Refer to the section below.
 
 =head1 CONFIG
 

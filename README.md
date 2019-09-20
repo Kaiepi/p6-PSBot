@@ -16,16 +16,7 @@ SYNOPSIS
 DESCRIPTION
 ===========
 
-PSBot is a Pokemon Showdown bot that will specialize in easily allowing the user to customize how the bot responds to messages.
-
-To run PSBot, simply run `bin/psbot`, or in your own code, run the code in the synopsis. Note that `PSBot.start` is blocking.
-
-There are a lot of bots for Pokémon Showdown out there, but PSBot has a number of advantages over others:
-
-User and room tracking
-----------------------
-
-PSBot keeps track of all information related to users and rooms that is possible for the bot to obtain at any rank and relevant for implementing features. For example, this means that it is possible to implement commands that only autoconfirmed users can use with PSBot.
+PSBot is a Pokémon Showdown chat bot. While many, many chat bots for Pokémon Showdown already exist, PSBot has several advantages over others:
 
 Better account management
 -------------------------
@@ -33,6 +24,32 @@ Better account management
 All requests made to the login server are handled using an instance of the `PSBot::LoginServer` class, which is available in all of PSBot's code that is invoked from the parser, rather than just the parts of the parser that need it. The nick command is an example of something that would be more difficult to implement in other bots.
 
 PSBot also uses the `upkeep` login server action to handle logging in after reconnects. This is somewhat faster than using the `login` action.
+
+User and room tracking
+----------------------
+
+PSBot keeps track of all information related to users and rooms that is possible for the bot to obtain at any rank and relevant for implementing features. For example, this means that it is possible to implement commands that only autoconfirmed users can use with PSBot.
+
+Powerful response handling
+--------------------------
+
+PSBot has `PSBot::Response` and `PSBot::ResponseHandler`, which are abstractions for dealing with responses to messages received from the server. `PSBot::ResponseHandler` adds a `reply` method to whatever type uses it. This method accepts a message (a `Result` of some kind), which can be any of the following:
+
+  * a string
+
+This is how you'd respond normally.
+
+  * a list of `Result`
+
+This is how you'd respond if you want to send multiple messages in one response.
+
+  * an object that can be awaited (the result being another `Result`)
+
+This is how you'd respond when what should be sent as a response needs to be evaluated asynchronously.
+
+  * a replier (the return value of another call to `PSBot::ResponseHandler.reply`)
+
+This is how you'd respond in combination with lists of `Result` when you need to override what user or room you're sending a response to (like when you want to PM a user, then send to a room).
 
 Better command handling
 -----------------------
@@ -49,10 +66,33 @@ Commands in PSBot are a combination of a method and command metadata. At the mom
 
 PSBot's command handler uses this information to automatically respond with why a command can't be used if the user (and, optionally, the room) the command was used in don't meet the criteria the command was defined with. This means you don't have to write any boilerplate for anything related to this yourself; PSBot will handle it for you.
 
+Games
+-----
+
+PSBot has a games API (`PSBot::Game`). and it supports features for games that not even Pokémon Showdown itself supports, like the ability to play one game in an arbitrary number of rooms, and the ability to make games playable in PMs.
+
 Rules
 -----
 
 Rules make it possible to change how PSBot parses messages without needing to fork the bot. They are a combination of a regex and a routine for parsing `|c:|`, `|pm|`, `|html|`, `|popup|`, and `|raw|` messages (at the moment; more supported message types are in the works). For example, PSBot's command parser and room invite handler are implemented as rules.
+
+Testable
+--------
+
+PSBot is designed in such a way that it's possible to unit test. Users, rooms, games, responses, response handlers, and commands are the features of PSBot that currently have unit tests, and tests for other parts of the bot are planned. This means developing with PSBot should be faster and easier to do than with other bots.
+
+USAGE
+=====
+
+To install PSBot, install [Rakudo Star](https://rakudo.org), clone this repository, and run this from the repository's new directory in a terminal:
+
+    $ zef install .
+
+Afterwards, to start the bot, simply run:
+
+    $ psbot
+
+Before running the bot, you need to configure it. Refer to the section below.
 
 CONFIG
 ======
