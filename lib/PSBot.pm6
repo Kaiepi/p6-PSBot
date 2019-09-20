@@ -819,22 +819,55 @@ that currently have unit tests, and tests for other parts of the bot are
 planned. This means developing with PSBot should be faster and easier to do
 than with other bots.
 
-=head1 USAGE
+=head1 INSTALLATION
 
-To install PSBot, install L<Rakudo Star|https://rakudo.org>, clone this
-repository, and run this from the repository's new directory in a terminal:
+You will need to have L<Perl 6 and zef|https://rakudo.org> installed. Once
+you've done that, refer to the section pertaining to your OS for instructions
+on how to install PSBot itself.
+
+=head2 Windows
+
+Clone this repository, then run this from the repository's directory in a
+terminal:
+
+=for code
+zef install .
+
+Next, you will need to create an empty file for PSBot's database:
+
+=for code
+fsutil file createnew resources\database.sqlite3 0
+
+Afterwards, you will need to configure PSBot. Refer to the config section of
+this README for information on how to do this.
+
+Finally, to start the bot, run:
+
+=for code
+psbot
+
+=head2 Mac OS X, Linux, *BSD, and Solaris
+
+Clone this repository, then run this from the repository's directory in a
+terminal:
 
 =for code
 $ zef install .
 
-Afterwards, to start the bot, simply run:
+Next, you will need to create an empty file for PSBot's database:
+
+=for code
+$ touch resources/database.sqlite3
+
+Afterwards, you will need to configure PSBot. Refer to the configuration
+section of this README for information on how to do this.
+
+Finally, to start the bot, run:
 
 =for code
 $ psbot
 
-Before running the bot, you need to configure it. Refer to the section below.
-
-=head1 CONFIG
+=head1 CONFIGURATION
 
 An example config file has been provided in C<config.json.example>. This is to be
 copied over to C<~/.config/PSBot/config.json>

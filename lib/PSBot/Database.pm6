@@ -33,13 +33,9 @@ submethod DESTROY() {
 }
 
 method new() {
-    my Str $filename = %?RESOURCES<database.sqlite3>.Str;
-    $*DISTRO.is-win
-        ?? qqx[fsutil file createnew $filename 0]
-        !! qqx[touch -- $filename] unless $filename.IO.e;
-
-    my DB::SQLite             $sqlite .= new: :$filename;
-    my DB::SQLite::Connection $db      = $sqlite.connect;
+    my Str                    $filename  = %?RESOURCES<database.sqlite3>.Str;
+    my DB::SQLite             $sqlite   .= new: :$filename;
+    my DB::SQLite::Connection $db        = $sqlite.connect;
     unless $db.conn.threadsafe {
         warn 'SQLite must be compiled to be threadsafe in order for PSBot to run properly. '
            ~ 'PSBot will continue to run, but do not expect it to be stable.'
