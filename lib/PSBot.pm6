@@ -1,20 +1,17 @@
 use v6.d;
-# Modules used cannot be sorted alphabetically here like they are in the rest
-# of PSBot. They are sorted based on which other modules these modules use
-# instead.
 use PSBot::Debug;
 use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Database;
 use PSBot::LoginServer;
-use PSBot::Grammar;
-use PSBot::Actions;
 use PSBot::UserInfo;
 use PSBot::User;
 use PSBot::Room;
 use PSBot::Response;
 use PSBot::Game;
 use PSBot::Rules;
+use PSBot::Grammar;
+use PSBot::Actions;
 unit class PSBot:auth<github:Kaiepi>:ver<0.0.1>;
 
 has PSBot::Connection:_  $.connection;
