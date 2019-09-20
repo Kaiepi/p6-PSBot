@@ -1,13 +1,20 @@
 use v6.d;
 use Failable;
 use JSON::Fast;
-use PSBot::Config;
 use PSBot::ID;
-use PSBot::Room;
-use PSBot::Rules;
-use PSBot::User;
+use PSBot::Config;
 use PSBot::UserInfo;
+use PSBot::User;
+use PSBot::Room;
 unit class PSBot::Actions;
+
+my enum MessageType is export (
+    ChatMessage    => 'c:',
+    PrivateMessage => 'pm',
+    PopupMessage   => 'popup',
+    HTMLMessage    => 'html',
+    RawMessage     => 'raw'
+);
 
 method TOP(Match:D $/) {
     make $<message>».made;

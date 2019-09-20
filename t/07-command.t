@@ -1,19 +1,19 @@
 use v6.d;
 
-BEGIN %*ENV<TESTING> := 1;
-END   %*ENV<TESTING>:delete;
+BEGIN %*ENV<PSBOT_TESTING> := 1;
+END   %*ENV<PSBOT_TESTING>:delete;
 
 use lib $?FILE.IO.parent.child: 'lib';
 
 use Failable;
-use PSBot;
-use PSBot::Command;
 use PSBot::Config;
 use PSBot::Connection;
-use PSBot::Room;
-use PSBot::Test::Server;
-use PSBot::User;
 use PSBot::UserInfo;
+use PSBot::User;
+use PSBot::Room;
+use PSBot::Command;
+use PSBot;
+use PSBot::Test::Server;
 use Test;
 
 plan 1;

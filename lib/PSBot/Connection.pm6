@@ -1,9 +1,9 @@
 use v6.d;
 use Cro::WebSocket::Client;
 use Cro::Uri;
-use PSBot::Config;
 use PSBot::Debug;
 use PSBot::Exceptions;
+use PSBot::Config;
 unit class PSBot::Connection;
 
 has Cro::WebSocket::Client             $!client;
@@ -56,13 +56,13 @@ method closed(--> Bool) {
 }
 
 method connect() {
-    debug '[DEBUG]', 'Connecting...';
+    debug CONNECTION, "Connecting to {self.uri}...";
     $!connection = try await $!client.connect;
     when $!.defined {
-        debug '[DEBUG]', "Connection to {self.uri} failed: {$!.message}";
+        debug CONNECTION, "Error: {$!.message}";
         $*SCHEDULER.cue({ self.reconnect });
     }
-    debug '[DEBUG]', "Connected to {self.uri}";
+    debug CONNECTION, "Success!";
 
     # Reset the reconnect timeout now that we've successfully connected.
     $!timeout      = 1;
@@ -83,7 +83,7 @@ method connect() {
 }
 
 method reconnect() {
-    debug '[DEBUG]', "Reconnecting in $!timeout seconds...";
+    debug CONNECTION, "Reconnecting in $!timeout seconds...";
 
     X::PSBot::ReconnectFailure.new(
         attempts => MAX_RECONNECT_ATTEMPTS,
@@ -139,7 +139,7 @@ multi method send(*@data, Bool:D :$raw where .so --> Nil) {
         my Str $message = "|$data";
         if $data.starts-with('/cmd userdetails') || $data.starts-with('>> ') {
             # These commands are not throttled.
-            debug '[SEND]', $message;
+            debug SEND, $message;
             $*SCHEDULER.cue({ $!connection.send: $message });
         } else {
             $!sender.emit: $message;

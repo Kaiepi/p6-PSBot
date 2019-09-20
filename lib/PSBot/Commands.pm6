@@ -1,21 +1,21 @@
 use v6.d;
+use Telemetry;
 use Cro::HTTP::Client;
 use Cro::HTTP::Response;
 use Failable;
-use PSBot::Command;
-use PSBot::Config;
+use URI::Encode;
 use PSBot::Exceptions;
-use PSBot::Games::Hangman;
 use PSBot::ID;
+use PSBot::Config;
+use PSBot::Response;
+use PSBot::UserInfo;
+use PSBot::User;
+use PSBot::Room;
+use PSBot::Command;
+use PSBot::Games::Hangman;
 use PSBot::Plugins::Pastebin;
 use PSBot::Plugins::Translate;
 use PSBot::Plugins::YouTube;
-use PSBot::Response;
-use PSBot::Room;
-use PSBot::User;
-use PSBot::UserInfo;
-use Telemetry;
-use URI::Encode;
 unit module PSBot::Commands;
 
 BEGIN {

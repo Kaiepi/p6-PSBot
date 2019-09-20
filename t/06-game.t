@@ -1,9 +1,9 @@
 use v6.d;
 use PSBot::ID;
-use PSBot::Game;
-use PSBot::Room;
-use PSBot::User;
 use PSBot::UserInfo;
+use PSBot::User;
+use PSBot::Room;
+use PSBot::Game;
 use Test;
 
 plan 1;

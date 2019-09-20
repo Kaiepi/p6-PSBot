@@ -3,7 +3,7 @@ use JSON::Fast;
 use PSBot::ID;
 unit module PSBot::Config;
 
-my Str $path = do if %*ENV<TESTING> {
+my Str $path = do if %*ENV<PSBOT_TESTING> {
     %?RESOURCES<test/config.json>.Str
 } elsif $*DISTRO.is-win {
     Qh[%*ENV<LOCALAPPDATA>\PSBot\config.json]

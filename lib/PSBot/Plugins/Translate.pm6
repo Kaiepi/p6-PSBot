@@ -2,8 +2,8 @@ use v6.d;
 use Cro::HTTP::Client;
 use Cro::HTTP::Response;
 use HTML::Entity;
-use PSBot::Config;
 use URI::Encode;
+use PSBot::Config;
 unit module PSBot::Plugins::Translate;
 
 my Set $languages;

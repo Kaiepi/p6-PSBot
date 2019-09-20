@@ -1,17 +1,20 @@
 use v6.d;
-use PSBot::Actions;
+# Modules used cannot be sorted alphabetically here like they are in the rest
+# of PSBot. They are sorted based on which other modules these modules use
+# instead.
+use PSBot::Debug;
 use PSBot::Config;
 use PSBot::Connection;
 use PSBot::Database;
-use PSBot::Debug;
-use PSBot::Game;
-use PSBot::Grammar;
 use PSBot::LoginServer;
-use PSBot::Response;
-use PSBot::Room;
-use PSBot::Rules;
-use PSBot::User;
+use PSBot::Grammar;
+use PSBot::Actions;
 use PSBot::UserInfo;
+use PSBot::User;
+use PSBot::Room;
+use PSBot::Response;
+use PSBot::Game;
+use PSBot::Rules;
 unit class PSBot:auth<github:Kaiepi>:ver<0.0.1>;
 
 has PSBot::Connection:_  $.connection;
@@ -110,7 +113,7 @@ method start() {
             }
             whenever $!connection.receiver -> Str:D $message {
                 # We received a message; parse it.
-                debug '[RECV]', $message;
+                debug RECEIVE, $message;
 
                 $*SCHEDULER.cue({
                     my ::?CLASS $*BOT := self;
@@ -119,7 +122,7 @@ method start() {
             }
             whenever $!connection.sender -> Str:D $message {
                 # We want to send a message.
-                debug '[SEND]', $message;
+                debug SEND, $message;
 
                 $!connection.connection.send: $message unless $!connection.closed;
             }
@@ -189,7 +192,7 @@ method start() {
             unless ?$!started {
                 whenever $!started {
                     $!lock.with-lock-hidden-from-recursion-check({
-                        debug '[DEBUG]',
+                        debug GENERIC,
                               'State has been fully propagated for the first time since the bot connected; '
                             ~ 'rules can now be evaluated.';
 
@@ -737,14 +740,63 @@ PSBot is a Pokemon Showdown bot that will specialize in easily allowing the
 user to customize how the bot responds to messages.
 
 To run PSBot, simply run C<bin/psbot>, or in your own code, run the code in the
-synopsis. Note that C<PSBot.start> is blocking. Debug logging can be enabled by
-setting the C<DEBUG> environment variable to 1.
+synopsis. Note that C<PSBot.start> is blocking.
+
+There are a lot of bots for Pokémon Showdown out there, but PSBot has a number
+of advantages over others:
+
+=head2 User and room tracking
+
+PSBot keeps track of all information related to users and rooms that is
+possible for the bot to obtain at any rank and relevant for implementing
+features. For example, this means that it is possible to implement commands
+that only autoconfirmed users can use with PSBot.
+
+=head2 Better account management
+
+All requests made to the login server are handled using an instance of the
+C<PSBot::LoginServer> class, which is available in all of PSBot's code that is
+invoked from the parser, rather than just the parts of the parser that need it.
+The nick command is an example of something that would be more difficult to
+implement in other bots.
+
+PSBot also uses the C<upkeep> login server action to handle logging in after
+reconnects. This is somewhat faster than using the C<login> action.
+
+=head2 Better command handling
+
+Commands in PSBot are a combination of a method and command metadata. At the
+moment, this includes:
+
+=item whether or not the command requires you to be a bot administrator
+=item whether or not the command requires autoconfirmed status
+=item whether the commnd can be used in rooms, PMs, or everywhere
+=item what rank the command should require by default
+
+PSBot's command handler uses this information to automatically respond with why
+a command can't be used if the user (and, optionally, the room) the command was
+used in don't meet the criteria the command was defined with. This means you
+don't have to write any boilerplate for anything related to this yourself;
+PSBot will handle it for you.
+
+=head2 Rules
+
+Rules make it possible to change how PSBot parses messages without needing to
+fork the bot. They are a combination of a regex and a routine for parsing
+C<|c:|>, C<|pm|>, C<|html|>, C<|popup|>, and C<|raw|> messages (at the moment;
+more supported message types are in the works). For example, PSBot's command
+parser and room invite handler are implemented as rules.
+An example config file has been provided in C<config.json.example>. This is to be
+copied over to C<~/.config/PSBot/config.json>
+(C<%LOCALAPPDATA%\PSBot\config.json> on Windows) and edited to suit your needs.
+
+=head1 CONFIG
 
 An example config file has been provided in C<config.json.example>. This is to be
 copied over to C<~/.config/PSBot/config.json>
 (C<%LOCALAPPDATA%\PSBot\config.json> on Windows) and edited to suit your needs.
 
-The following are the available config options:
+These are the config options available:
 
 =item Str I<username>
 
@@ -816,51 +868,33 @@ command.
 The API key for Google Translate. Set to null if you don't want to use the
 translate and badtranslate commands.
 
-=head2 Why use PSBot?
+=head1 DEBUGGING
 
-There are a lot of bots for Pokémon Showdown out there, but PSBot has a number
-of advantages over others:
+PSBot features a debug logger, which is active if the C<PSBOT_DEBUG>
+environment variable is set appropriately. PSBot uses a bitmask to determine
+which debug log types should be made. To enable debug logging, set
+C<PSBOT_DEBUG> to C<0> to start out with, then follow what the instructions for
+using each debug log type you want below say (you should end up with a number
+between C<1> and C<15>):
 
-=head3 User and room tracking
+=item [DEBUG]
 
-PSBot keeps track of all information related to users and rooms that is
-possible for the bot to obtain at any rank and relevant for implementing
-features. For example, this means that it is possible to implement commands
-that only autoconfirmed users can use with PSBot.
+This is used to log generic debug messages. To enable this type of debug
+logging, XOR C<PSBOT_DEBUG> with 1.
 
-=head3 Better account management
+=item [CONNECTION]
 
-All requests made to the login server are handled using an instance of the
-C<PSBot::LoginServer> class, which is available in all of PSBot's code that is
-invoked from the parser, rather than just the parts of the parser that need it.
-The nick command is an example of something that would be more difficult to
-implement in other bots.
+This is used to log when the bot connects to or disconnects from the server. To
+enable this type of debug logging, XOR C<PSBOT_DEBUG> with 2.
 
-PSBot also uses the C<upkeep> login server action to handle logging in after
-reconnects. This is somewhat faster than using the C<login> action.
+=item [SEND]
 
-=head3 Better command handling
+This is used to log messages sent to the server. To enable this type of debug
+logging, XOR C<PSBOT_DEBUG> with 4.
 
-Commands in PSBot are a combination of a method and command metadata. At the
-moment, this includes:
+=item [RECEIVE]
 
-=item whether or not the command requires you to be a bot administrator
-=item whether or not the command requires autoconfirmed status
-=item whether the commnd can be used in rooms, PMs, or everywhere
-=item what rank the command should require by default
-
-PSBot's command handler uses this information to automatically respond with why
-a command can't be used if the user (and, optionally, the room) the command was
-used in don't meet the criteria the command was defined with. This means you
-don't have to write any boilerplate for anything related to this yourself;
-PSBot will handle it for you.
-
-=head3 Rules
-
-Rules make it possible to change how PSBot parses messages without needing to
-fork the bot. They are a combination of a regex and a routine for parsing
-C<|c:|>, C<|pm|>, C<|html|>, C<|popup|>, and C<|raw|> messages (at the moment;
-more supported message types are in the works). For example, PSBot's command
-parser and room invite handler are implemented as rules.
+This is used to log messages received from the server. To enable this type of
+debug logging, XOR C<PSBOT_DEBUG> with 8.
 
 =end pod

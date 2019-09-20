@@ -1,25 +1,18 @@
 use v6.d;
 use Failable;
-use PSBot::Command;
-use PSBot::Commands;
-use PSBot::Config;
 use PSBot::ID;
-use PSBot::Plugins::Pastebin;
-use PSBot::Plugins::YouTube;
+use PSBot::Config;
+use PSBot::UserInfo;
+use PSBot::User;
+use PSBot::Room;
 use PSBot::Response;
 use PSBot::ResponseHandler;
-use PSBot::Room;
-use PSBot::User;
-use PSBot::UserInfo;
+use PSBot::Command;
+use PSBot::Commands;
+use PSBot::Actions;
+use PSBot::Plugins::Pastebin;
+use PSBot::Plugins::YouTube;
 unit class PSBot::Rules;
-
-my enum MessageType is export (
-    ChatMessage    => 'c:',
-    PrivateMessage => 'pm',
-    PopupMessage   => 'popup',
-    HTMLMessage    => 'html',
-    RawMessage     => 'raw'
-);
 
 my class Rule does PSBot::ResponseHandler {
     has Set:_    $.message-types;

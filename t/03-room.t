@@ -1,6 +1,6 @@
 use v6.d;
-use PSBot::Room;
 use PSBot::UserInfo;
+use PSBot::Room;
 use Test;
 
 plan 8;

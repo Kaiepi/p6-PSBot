@@ -1,9 +1,9 @@
 use v6.d;
-use PSBot::Game;
 use PSBot::ID;
-use PSBot::Response;
-use PSBot::Room;
 use PSBot::User;
+use PSBot::Room;
+use PSBot::Response;
+use PSBot::Game;
 unit class PSBot::Games::Hangman does PSBot::Game;
 
 my constant WORDS = lines slurp %?RESOURCES<dictionary>;

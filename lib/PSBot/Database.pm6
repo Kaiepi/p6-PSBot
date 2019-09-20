@@ -15,7 +15,7 @@ has Int %!userid-cache;
 has Int %!roomid-cache;
 
 submethod BUILD(:$!db) {
-    if %*ENV<TESTING> {
+    if %*ENV<PSBOT_TESTING> {
         my Junction $method-matcher = any self.^attributes.map(*.name.substr: 2);
         my Callable @methods        = self.^methods.grep(*.name ne $method-matcher);
         for @methods -> &method {

@@ -1,9 +1,9 @@
 use v6.d;
 use PSBot::ID;
+use PSBot::User;
+use PSBot::Room;
 use PSBot::Response;
 use PSBot::ResponseHandler;
-use PSBot::Room;
-use PSBot::User;
 unit role PSBot::Game does PSBot::ResponseHandler;
 
 # The ID of this game.

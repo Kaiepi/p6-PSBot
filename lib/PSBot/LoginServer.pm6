@@ -2,8 +2,8 @@ use v6.d;
 use Cro::HTTP::Client;
 use Cro::HTTP::Response;
 use JSON::Fast;
-use PSBot::Config;
 use PSBot::ID;
+use PSBot::Config;
 unit class PSBot::LoginServer;
 
 has Cro::HTTP::Client $.client            .= new: :cookie-jar;
@@ -13,7 +13,7 @@ has Str               $.account            = '';
 has Cancellation      $!login-expiration;
 
 submethod BUILD(Str :$!serverid) {
-    if %*ENV<TESTING> {
+    if %*ENV<PSBOT_TESTING> {
         $_.wrap(anon method (|) {
             return;
         }) for self.^methods.grep({
