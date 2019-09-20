@@ -18,53 +18,10 @@ DESCRIPTION
 
 PSBot is a Pokémon Showdown chat bot. While many, many chat bots for Pokémon Showdown already exist, PSBot has several advantages over others:
 
-Better account management
--------------------------
-
-All requests made to the login server are handled using an instance of the `PSBot::LoginServer` class, which is available in all of PSBot's code that is invoked from the parser, rather than just the parts of the parser that need it. The nick command is an example of something that would be more difficult to implement in other bots.
-
-PSBot also uses the `upkeep` login server action to handle logging in after reconnects. This is somewhat faster than using the `login` action.
-
 User and room tracking
 ----------------------
 
-PSBot keeps track of all information related to users and rooms that is possible for the bot to obtain at any rank and relevant for implementing features. For example, this means that it is possible to implement commands that only autoconfirmed users can use with PSBot.
-
-Powerful response handling
---------------------------
-
-PSBot has `PSBot::Response` and `PSBot::ResponseHandler`, which are abstractions for dealing with responses to messages received from the server. `PSBot::ResponseHandler` adds a `reply` method to whatever type uses it. This method accepts a message (a `Result` of some kind), which can be any of the following:
-
-  * a string
-
-This is how you'd respond normally.
-
-  * a list of `Result`
-
-This is how you'd respond if you want to send multiple messages in one response.
-
-  * an object that can be awaited (the result being another `Result`)
-
-This is how you'd respond when what should be sent as a response needs to be evaluated asynchronously.
-
-  * a replier (the return value of another call to `PSBot::ResponseHandler.reply`)
-
-This is how you'd respond in combination with lists of `Result` when you need to override what user or room you're sending a response to (like when you want to PM a user, then send to a room).
-
-Better command handling
------------------------
-
-Commands in PSBot are a combination of a method and command metadata. At the moment, this includes:
-
-  * whether or not the command requires you to be a bot administrator
-
-  * whether or not the command requires autoconfirmed status
-
-  * whether the commnd can be used in rooms, PMs, or everywhere
-
-  * what rank the command should require by default
-
-PSBot's command handler uses this information to automatically respond with why a command can't be used if the user (and, optionally, the room) the command was used in don't meet the criteria the command was defined with. This means you don't have to write any boilerplate for anything related to this yourself; PSBot will handle it for you.
+PSBot keeps track of all information related to users and rooms that is possible for the bot to obtain at any rank and relevant for implementing features. For example, this means that it is possible to implement commands that only autoconfirmed users can use with PSBot. PSBot will handle it for you.
 
 Games
 -----
