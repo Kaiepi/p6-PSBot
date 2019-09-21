@@ -50,12 +50,12 @@ has Cancellation:D %.reminders{Int};
 # Lock::Async.protect-or-queue-on-recursion and
 # Lock::Async.with-lock-hidden-from-recursion-list rather than
 # Lock::Async.protect.
-has Channel:D  $.pending-rename .= new;
-has Channel:D  $.logged-in      .= new;
-has Supplier:D $.user-joined    .= new;
-has Supplier:D $.room-joined    .= new;
-has Promise:D  $.started        .= new;
-has Promise:D  $.done           .= new;
+has Channel:D $.pending-rename .= new;
+has Channel:D $.logged-in      .= new;
+has Channel:D $.user-joined    .= new;
+has Channel:D $.room-joined    .= new;
+has Promise:D $.started        .= new;
+has Promise:D $.done           .= new;
 
 has Promise:D %.unpropagated-users;
 has Promise:D %.unpropagated-rooms;
@@ -134,7 +134,7 @@ method start() {
                     }
                 })
             }
-            whenever $!room-joined.Supply.schedule-on: $*SCHEDULER -> Str:D $roomid {
+            whenever $!room-joined -> Str:D $roomid {
                 # Propagate room state on join.
                 my Promise:_ $on-propagate;
 
@@ -160,7 +160,7 @@ method start() {
                     })
                 }
             }
-            whenever $!user-joined.Supply.schedule-on: $*SCHEDULER -> Str:D $userid {
+            whenever $!user-joined -> Str:D $userid {
                 # Propagate user state on join or rename.
                 my Promise:_ $on-propagate;
 
@@ -259,8 +259,8 @@ method start() {
                 # get the whenever blocks for rooms and users awaiting propagation
                 # back.
                 $!lock.protect-or-queue-on-recursion({
-                    $!room-joined.emit: $_ for %!unpropagated-rooms.keys;
-                    $!user-joined.emit: $_ for %!unpropagated-users.keys;
+                    $!room-joined.send: $_ for %!unpropagated-rooms.keys;
+                    $!user-joined.send: $_ for %!unpropagated-users.keys;
                 })
             }
         }
@@ -391,7 +391,7 @@ method on-room-info(%data --> Promise:_) {
                 %!users{$userid}.on-join: $userinfo, $roomid;
             } else {
                 %!users{$userid} .= new: $userinfo, $roomid;
-                $!user-joined.emit: $userid;
+                $!user-joined.send: $userid;
             }
         }
 
@@ -478,7 +478,7 @@ method add-room(Str:D $roomid, RoomType:D $type --> Bool:D) {
             .send for $responses;
         }
 
-        $!room-joined.emit: $roomid;
+        $!room-joined.send: $roomid;
         True
     })
 }
@@ -588,7 +588,7 @@ method add-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Bool:D) {
             .send for $responses;
         }
 
-        $!user-joined.emit: $userid;
+        $!user-joined.send: $userid;
         True
     })
 }
@@ -635,27 +635,37 @@ method rename-user(PSBot::UserInfo:D $userinfo, Str:D $oldid, Str:D $roomid --> 
         $room.rename: $oldid, $userinfo;
 
         my Str:D $userid = $userinfo.id;
-        if %!users{$userid}:exists {
-            # Already received a rename message from another room.
+
+        when %!users{$userid}:exists {
+            # We either already received a rename message from another room, or
+            # the user just changed group or status without changing their
+            # name. Update user state.
             %!users{$userid}.on-rename: $userinfo, $roomid;
-            return False;
+            False
         }
+        when %!users{$oldid}:exists {
+            my PSBot::User:D $user = %!users{$oldid}:delete;
+            $user.on-rename: $userinfo, $roomid;
+            %!users{$userid} := $user;
 
-        my PSBot::User:D $user = %!users{$oldid}:delete;
-        $user.on-rename: $userinfo, $roomid;
-        %!users{$userid} := $user;
+            for %!games.values -> PSBot::Game:D $game {
+                my Replier:_ $replier = $game.on-rename($oldid, $user, $room) // Nil;
+                next unless $replier.defined;
 
-        for %!games.values -> PSBot::Game:D $game {
-            my Replier:_ $replier = $game.on-rename($oldid, $user, $room) // Nil;
-            next unless $replier.defined;
+                my ResponseList:D $responses := $replier();
+                my ::?CLASS:D     $*BOT      := self;
+                .send for $responses;
+            }
 
-            my ResponseList:D $responses := $replier();
-            my ::?CLASS:D     $*BOT      := self;
-            .send for $responses;
+            $!user-joined.send: $userid;
+            True
         }
-
-        $!user-joined.emit: $userid;
-        True
+        default {
+            debug GENERIC,
+                  'Received a rename message from a user PSBot is seemingly unaware of:',
+                  "$oldid => " ~ $userinfo.group ~ $userinfo.name;
+            False
+        }
     })
 }
 
