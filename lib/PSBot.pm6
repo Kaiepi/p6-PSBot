@@ -43,8 +43,8 @@ has Bool:D $.help-tickets-ignored = False;
 has PSBot::User:D  %.users;
 has PSBot::Room:D  %.rooms;
 has SetHash:_      $.joinable-rooms;
-has PSBot::Game:D  %.games{Int};
-has Cancellation:D %.reminders{Int};
+has PSBot::Game:D  %.games{Int:D};
+has Cancellation:D %.reminders{Int:D};
 
 # Stuff is emitted to these while the lock is locked, so use
 # Lock::Async.protect-or-queue-on-recursion and
