@@ -575,11 +575,8 @@ method add-user(PSBot::UserInfo:D $userinfo, Str:D $roomid --> Bool:D) {
         my PSBot::User:D $user .= new: $userinfo, $roomid;
         %!users{$userid} := $user;
 
-        for %!games.values.grep: *.has-player: $user -> PSBot::Game:D $game {
-            $user.join-game: $game.id, $game.type;
-        }
-
         for %!games.values -> PSBot::Game:D $game {
+            $user.join-game: $game.id, $game.type if $game.has-player: $user;
             my Replier:_ $replier = $game.on-join($user, $room) // Nil;
             next unless $replier.defined;
 
