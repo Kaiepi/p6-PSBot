@@ -305,11 +305,11 @@ method on-update-user(PSBot::UserInfo:D $userinfo, Bool:D $is-named, Str:D $avat
         $!userid               = $userinfo.id;
         $!is-guest             = not $is-named;
         $!avatar               = $avatar;
-        $!is-staff             = %data<isStaff>         // False;
-        $!is-sysop             = %data<isSysop>         // False;
-        $!pms-blocked          = %data<blockPMs>        // False;
-        $!challenges-blocked   = %data<blockChallenges> // False;
-        $!help-tickets-ignored = %data<ignoreTickets>   // False;
+        $!is-staff             = %data<isStaff>         if %data<isStaff>.defined;
+        $!is-sysop             = %data<isSysop>         if %data<isSysop>.defined;
+        $!pms-blocked          = %data<blockPMs>        if %data<blockPMs>.defined;
+        $!challenges-blocked   = %data<blockChallenges> if %data<blockChallenges>.defined;
+        $!help-tickets-ignored = %data<ignoreTickets>   if %data<ignoreTickets>.defined;
 
         $!pending-rename.send: $!userid;
         $!logged-in.send: $!userid
