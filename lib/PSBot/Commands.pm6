@@ -183,31 +183,28 @@ BEGIN {
     my PSBot::Command $uptime .= new:
         :administrative,
         anon method uptime(Str $target --> Replier) is pure {
-            my Int $remainder = (now - $*INIT-INSTANT).Int;
-            my Str @res  = (
-                (),
-                'second' => 60,
-                'minute' => 60,
-                'hour'   => 24,
-                'day'    => 7,
-                'week'   => 1
-            ).reduce(-> @times, $time {
-                my Int $diff = $remainder % $time.value;
-                if $diff {
-                    my @ret = ($diff ~ ' ' ~ $time.key ~ ($diff == 1 ?? '' !! 's'), |@times);
-                    $remainder div= $time.value;
-                    @ret
-                } else {
-                    $remainder div= $time.value;
-                    @times
+            my Str @times = gather {
+                my Int  $remainder = (now - $*INIT-INSTANT).Int;
+                my Pair @divisors  = ('second' => 60, 'minute' => 60, 'hour' => 24, 'day' => 7);
+
+                for @divisors -> Pair $divisor {
+                    my Int $diff = $remainder % $divisor.value;
+                    $remainder div= $divisor.value;
+                    take $diff ~ ' ' ~ $divisor.key ~ ($diff == 1 ?? '' !! 's')
+                         if $diff;
+                    last unless $remainder;
                 }
-            });
-            my Str $res   = $*BOT.username ~ "'s uptime is " ~ do given +@res {
-                when 1  { @res.head                                      }
-                when 2  { @res.join: ' and '                             }
-                default { @res[0..*-2].join(', ') ~ ', and ' ~ @res[*-1] }
+
+                take $remainder ~ ' week' ~ ($remainder == 1 ?? '' !! 's')
+                     if $remainder;
+            }.reverse;
+
+            my Str $response = $*BOT.username ~ "'s uptime is " ~ do given +@times {
+                when 1  { @times.head }
+                when 2  { @times.join: ' and ' }
+                default { @times[0..*-2].join(', ') ~ ', and ' ~ @times[*-1] }
             } ~ '.';
-            self.reply: $res, $*USER, $*ROOM;
+            self.reply: $response, $*USER, $*ROOM;
         };
 
     my PSBot::Command $git .= new:
