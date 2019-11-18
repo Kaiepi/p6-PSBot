@@ -103,10 +103,6 @@ method locale(PSBot::Command:D: --> Locale:D) {
 
 method set-root(PSBot::Command:D: ::?CLASS:D $!root --> Nil) {}
 
-method is-group(PSBot::Command:D: Str:D $group --> Bool:D) {
-    PSBot::Group.enums{$group}:exists
-}
-
 # For regular commands, run the command and return its result. For commands
 # with subcommands, extract the subcommand name from the target and run it, or
 # fail with the command chain's full name if the subcommand doesn't exist to

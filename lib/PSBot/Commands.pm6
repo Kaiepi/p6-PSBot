@@ -611,7 +611,8 @@ BEGIN {
             return self.reply: 'No group was given.', $*USER, $*ROOM unless $target-group;
 
             $target-group = ' ' if $target-group eq 'regular user';
-            return self.reply: qq["$target-group" is not a group.], $*USER, $*ROOM unless self.is-group: $target-group;
+            return self.reply: qq["$target-group" is not a group.], $*USER, $*ROOM
+            unless $target-group ~~ PSBot::Group;
 
             my Int $idx          = $command-chain.index: ' ';
             my Str $root-command = $idx.defined ?? $command-chain.substr(0, $idx) !! $command-chain;

@@ -50,6 +50,13 @@ my class PSBot::Group::Value {
 }
 
 my role PSBot::Group::Enumeration {
+    multi method ACCEPTS(::?CLASS:U: Str:D $rank --> Bool:D) {
+        so self.^enum_value_list.any.value.symbol eq $rank
+    }
+    multi method ACCEPTS(::?CLASS:D: Str:D $rank --> Bool:D) {
+        self.value.symbol eq $rank
+    }
+
     multi method CALL-ME(::?CLASS:U: Str:D $rank) {
         given self.^enum_value_list -> @values {
             @values.first(*.symbol eq $rank) // @values.first(*.symbol eq ' ')

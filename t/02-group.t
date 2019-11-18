@@ -2,7 +2,7 @@ use v6.d;
 use PSBot::Group;
 use Test;
 
-plan 10;
+plan 12;
 
 is Regular.symbol,  ' ',            'can get the symbol for a group';
 is Regular.name,    'Regular User', 'can get the name of a group';
@@ -16,6 +16,11 @@ cmp-ok Regular, '<',  Administrator,
   'can compare groups as numbers';
 cmp-ok Regular, 'eq', ' ',
   'can compare groups as strings';
+
+cmp-ok ' ', '~~', PSBot::Group,
+  'can check if a string is a group symbol using ACCEPTS';
+cmp-ok ' ', '~~', Regular,
+  'can check if a string matches the symbol for a group using ACCEPTS';
 
 is PSBot::Group('~'), Administrator,
   'can get a group through CALL-ME using its symbol';
