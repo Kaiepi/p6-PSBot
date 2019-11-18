@@ -101,7 +101,7 @@ method new() {
             },
             method (Match:D $/ --> Replier:_) is pure {
                 my Str:D                   $roomid = $*ROOM.id;
-                my PSBot::User::RoomInfo:D $ri     = $*USER.rooms{$roomid};
+                my PSBot::User::RoomInfo:_ $ri     = $*USER.rooms{$roomid};
                 return unless $ri.defined
                            && $ri.broadcast-timeout.defined
                            && $ri.broadcast-command.defined;
