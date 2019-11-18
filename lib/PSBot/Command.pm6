@@ -91,8 +91,8 @@ method get-group(PSBot::Command:D: Str:D $roomid  --> PSBot::Group:D) {
     $!default-group
 }
 
-method set-group(PSBot::Command:D: Str:D $roomid, Str:D $group --> PSBot::Group:D) {
-    %!groups{$roomid} := PSBot::Group($group);
+method set-group(PSBot::Command:D: Str:D $roomid, PSBot::Group:D $group --> PSBot::Group:D) {
+    %!groups{$roomid} := $group
 }
 
 method locale(PSBot::Command:D: --> Locale:D) {
@@ -139,9 +139,7 @@ method CALL-ME(PSBot::Command:D: Str:D $target --> Replier:_) {
     }
 
     if self.autoconfirmed {
-        my Bool:D $is-unlocked = self.can:
-            PSBot::Group(' '),
-            ($*ROOM ?? $*USER.rooms{$*ROOM.id}.group !! $*USER.group);
+        my Bool:D $is-unlocked = self.can: Regular, $*ROOM ?? $*USER.rooms{$*ROOM.id}.group !! $*USER.group;
         return self.reply:
             "Permission denied. {COMMAND}{self.name} requires your account to be autoconfirmed.",
             $*USER, PSBot::Room unless $*USER.autoconfirmed && $is-unlocked;
@@ -154,9 +152,12 @@ method CALL-ME(PSBot::Command:D: Str:D $target --> Replier:_) {
             "Permision denied. {COMMAND}{self.name} is disabled in {$*ROOM.title}.",
             $*USER, PSBot::Room if $disabled;
 
-        my PSBot::Group:D $group = %!groups{$*ROOM.id}:exists
-            ?? self.get-group($*ROOM.id)
-            !! self.set-group($*ROOM.id, $command<rank>:exists ?? $command<rank> !! $!default-group.Str);
+        my PSBot::Group:D $group = do if %!groups{$*ROOM.id}:exists {
+            self.get-group: $*ROOM.id
+        } else {
+            my PSBot::Group:D $group = $command<rank>:exists ?? PSBot::Group($command<rank>) !! $!default-group;
+            self.set-group: $*ROOM.id, $group
+        };
         return self.reply:
             qq[Permission denied. {COMMAND}{self.name} requires at least rank "$group".],
             $*USER, PSBot::Room unless self.can: $group, $*USER.rooms{$*ROOM.id}.group;
