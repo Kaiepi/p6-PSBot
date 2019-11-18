@@ -3,9 +3,8 @@
 # for the user it represents either isn't needed or doesn't exist yet.
 
 use v6.d;
+use PSBot::Group;
 unit class PSBot::UserInfo;
-
-my Int enum Group is export «'‽' '!' ' ' '+' '%' '@' '*' '☆' '#' '&' '~'»;
 
 my Str enum Status is export (
     Online => 'Online',
@@ -16,7 +15,7 @@ my Str enum Status is export (
     Busy   => 'Busy'
 );
 
-has Group:_  $.group;
-has Str:_    $.id;
-has Str:_    $.name;
-has Status:_ $.status;
+has PSBot::Group:D $.group  is required;
+has Str:D          $.id     is required;
+has Str:D          $.name   is required;
+has Status:D       $.status is required;

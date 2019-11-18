@@ -1,5 +1,6 @@
 use v6.d;
 use PSBot::ID;
+use PSBot::Group;
 use PSBot::UserInfo;
 use PSBot::User;
 use PSBot::Room;
@@ -53,12 +54,12 @@ subtest 'API', {
     my PSBot::UserInfo $old-userinfo .= new:
         :id<morfent>,
         :name<Morfent>,
-        :group(Group(Group.enums{'@'})),
+        :group(Moderator),
         :status(Online);
     my PSBot::UserInfo $userinfo     .= new:
         :id<kaiepi>,
         :name<Kaiepi>,
-        :group(Group(Group.enums{'+'})),
+        :group(Voice),
         :status(Online);
 
     my PSBot::User:D $user .= new: $old-userinfo, $room.id;

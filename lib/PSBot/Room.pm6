@@ -1,5 +1,6 @@
 use v6.d;
 use PSBot::ID;
+use PSBot::Group;
 use PSBot::UserInfo;
 unit class PSBot::Room;
 
@@ -20,13 +21,13 @@ my subset Modjoin
     where { $_ ~~ Str || $_ === True };
 
 class UserInfo {
-    has Str:_   $.id;
-    has Str:_   $.name;
-    has Group:_ $.group;
+    has Str:D          $.id    is required;
+    has Str:D          $.name  is required;
+    has PSBot::Group:D $.group is required;
 
-    method set-group(UserInfo:D: Group:D $!group) {}
+    method set-group(UserInfo:D: PSBot::Group:D $!group) { }
 
-    method rename(UserInfo:D: Str:D :$!id, Str:D :$!name, Group:D :$!group) {}
+    method rename(UserInfo:D: Str:D :$!id, Str:D :$!name, PSBot::Group:D :$!group) { }
 }
 
 has Str:_        $.id;
@@ -50,7 +51,7 @@ method modjoin(PSBot::Room:D: --> Str:D) {
     $!modjoin ~~ Bool:D ?? $!modchat !! $!modjoin
 }
 
-method set-group(PSBot::Room:D: Str:D $userid, Group:D $group --> Nil) {
+method set-group(PSBot::Room:D: Str:D $userid, PSBot::Group:D $group --> Nil) {
     %!users{$userid}.set-group: $group;
 }
 
@@ -71,7 +72,7 @@ method on-room-info(PSBot::Room:D: %data --> Nil) {
         $rank => Array[Str:D].new: @userids
     });
     %!users      = %data<users>.flat.map(-> $userinfo {
-        my Group:D $group = Group(Group.enums{$userinfo.substr: 0, 1} // Group.enums{' '});
+        my PSBot::Group:D $group = PSBot::Group($userinfo.substr: 0, 1);
         my Str:D   $name  = $userinfo.substr: 1;
         my Str:D   $id    = to-id $name;
         $id => UserInfo.new: :$id, :$name, :$group;
@@ -80,9 +81,9 @@ method on-room-info(PSBot::Room:D: %data --> Nil) {
 }
 
 method join(PSBot::Room:D: PSBot::UserInfo:D $userinfo --> Nil) {
-    my Str:D   $id    = $userinfo.id;
-    my Str:D   $name  = $userinfo.name;
-    my Group:D $group = $userinfo.group;
+    my Str:D          $id    = $userinfo.id;
+    my Str:D          $name  = $userinfo.name;
+    my PSBot::Group:D $group = $userinfo.group;
     %!users{$id} := UserInfo.new: :$id, :$name, :$group;
 }
 
@@ -91,10 +92,9 @@ method leave(PSBot::Room:D: Str:D $userid --> Nil) {
 }
 
 method rename(PSBot::Room:D: Str:D $oldid, PSBot::UserInfo:D $userinfo --> Nil) {
-    my Str:D   $id    = $userinfo.id;
-    my Str:D   $name  = $userinfo.name;
-    my Group:D $group = $userinfo.group;
-
+    my Str:D          $id    = $userinfo.id;
+    my Str:D          $name  = $userinfo.name;
+    my PSBot::Group:D $group = $userinfo.group;
     when %!users{$id}:exists {
         %!users{$id}.rename: :$id, :$name, :$group;
     }

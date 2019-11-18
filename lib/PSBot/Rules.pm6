@@ -2,6 +2,7 @@ use v6.d;
 use Failable;
 use PSBot::ID;
 use PSBot::Config;
+use PSBot::Group;
 use PSBot::UserInfo;
 use PSBot::User;
 use PSBot::Room;
@@ -173,9 +174,7 @@ method new() {
             method (Match:D $/ --> Replier:_) {
                 my Str:D $roomid = ~$<roomid>;
                 return if $roomid.starts-with: 'battle-';
-
-                my Map:D $groups = Group.enums;
-                return unless $groups{$*USER.group} >= $groups<%>;
+                return unless $*USER.group.staff;
 
                 my Str:D $output = "/join $roomid";
                 my Str:D $userid = $*USER.id;

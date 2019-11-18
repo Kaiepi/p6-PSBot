@@ -1,4 +1,5 @@
 use v6.d;
+use PSBot::Group;
 use PSBot::UserInfo;
 use PSBot::Room;
 use Test;
@@ -17,7 +18,7 @@ is $room.type, $type, 'can set room type attribute';
 my PSBot::UserInfo $old-userinfo .= new:
     :id<kpimov>,
     :name<Kpimov>,
-    :group(Group(Group.enums{'+'})),
+    :group(Voice),
     :status(Online);
 $room.join: $old-userinfo;
 cmp-ok $room.users, '∋', $old-userinfo.id, 'can get room users ID on join';
@@ -26,12 +27,12 @@ is $room.users{$old-userinfo.id}.group, $old-userinfo.group, 'can get room users
 my PSBot::UserInfo $userinfo .= new:
     :id<kaiepi>,
     :name<Kaiepi>,
-    :group(Group(Group.enums{' '})),
+    :group(Regular),
     :status(Online);
 $room.rename: $old-userinfo.id, $userinfo;
 cmp-ok $room.users, '∌', $old-userinfo.id, 'cannot get room ranks oldid on rename';
 cmp-ok $room.users, '∋', $userinfo.id, 'can get room ranks userid on rename';
-is $room.users{$userinfo.id}.group, Group(Group.enums{' '}), 'can get room ranks rank on rename';
+is $room.users{$userinfo.id}.group, Regular, 'can get room ranks rank on rename';
 
 $room.leave: $userinfo.id;
 cmp-ok $room.users, '∌', $userinfo.id, 'cannot get room ranks userid on leave';

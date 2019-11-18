@@ -3,6 +3,7 @@ use Failable;
 use JSON::Fast;
 use PSBot::ID;
 use PSBot::Config;
+use PSBot::Group;
 use PSBot::UserInfo;
 use PSBot::User;
 use PSBot::Room;
@@ -35,8 +36,7 @@ method roomid(Match:D $/) {
 }
 
 method group(Match:D $/) {
-    my Group:D $group = Group(Group.enums{~$/} // Group.enums{' '});
-    $/.make: $group;
+    $/.make: PSBot::Group(~$/);
 }
 method username(Match:D $/) {
     $/.make: ~$/
@@ -45,10 +45,10 @@ method status(Match:D $/) {
     $/.make: ~$/ ?? Busy !! Online;
 }
 method userinfo(Match:D $/) {
-    my Group:D  $group  = $<group>.made;
-    my Str:D    $name   = $<username>.made;
-    my Str:D    $id     = to-id $name;
-    my Status:D $status = $<status>.made;
+    my PSBot::Group:D $group  = $<group>.made;
+    my Str:D          $name   = $<username>.made;
+    my Str:D          $id     = to-id $name;
+    my Status:D       $status = $<status>.made;
     $/.make: PSBot::UserInfo.new: :$name, :$id, :$group, :$status;
 }
 

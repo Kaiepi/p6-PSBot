@@ -2,6 +2,7 @@ use v6.d;
 use Failable;
 use PSBot::Config;
 use PSBot::Connection;
+use PSBot::Group;
 use PSBot::UserInfo;
 use PSBot::User;
 use PSBot::Room;
@@ -14,18 +15,18 @@ my Int enum Locale is export <Room PM Everywhere>;
 
 # The name of the command. This is used by the parser to find the command. Any
 # Unicode is allowed except for spaces.
-has Str:_    $.name;
+has Str:_           $.name;
 # Whether or not the user running the command should be a bot admin.
-has Bool:_   $.administrative;
+has Bool:_          $.administrative;
 # Whether or not the user running the command should be autoconfirmed.
-has Bool:_   $.autoconfirmed;
+has Bool:_          $.autoconfirmed;
 # The default group required to run the command.
-has Group:_  $.default-group;
+has PSBot::Group:_  $.default-group;
 # The actual groups required to run the command.
-has Group:_  %!groups;
+has PSBot::Group:_  %!groups;
 # Where the command can be used, depending on where the message containing the
 # command was sent from.
-has Locale:_ $.locale;
+has Locale:_        $.locale;
 
 # The routine to run when CALL-ME is invoked. It must have this signature:
 # (Str, PSBot::User, PSBot::Room, PSBot::StateManager, PSBot::Connection --> Replier)
@@ -38,14 +39,31 @@ has Map:_      $.subcommands;
 has ::?CLASS:_ $.root;
 
 proto method new(PSBot::Command:_: |) {*}
-multi method new(PSBot::Command:_: &command, Str:D :$name = &command.name, Bool:D :$administrative = False,
-        Bool:D :$autoconfirmed = False, Str:D :$default-group = ' ', Locale:D :$locale = Everywhere) {
-    self.bless: :$name, :$administrative, :$autoconfirmed, :default-group(Group(Group.enums{$default-group}) // Group(Group.enums{' '})), :$locale, :&command;
+multi method new(
+    PSBot::Command:_:
+              &command,
+    Str:D    :$name                             = &command.name,
+    Bool:D   :$administrative                   = False,
+    Bool:D   :$autoconfirmed                    = False,
+    Str:D    :default-group($default-group-str) = ' ',
+    Locale:D :$locale                           = Everywhere
+) {
+    my PSBot::Group:D $default-group = PSBot::Group($default-group-str);
+    self.bless: :$name, :$administrative, :$autoconfirmed, :$default-group, :$locale, :&command
 }
-multi method new(PSBot::Command:_: +@subcommands, Str:D :$name!, Bool:D :$administrative = False,
-        Bool:D :$autoconfirmed = False, Str:D :$default-group = ' ', Locale:D :$locale = Everywhere) {
-    my Map:D            $subcommands .= new: @subcommands.map(-> $sc { $sc.name => $sc });
-    my PSBot::Command:D $command      = self.bless: :$name, :$administrative, :$autoconfirmed, :default-group(Group(Group.enums{$default-group})), :$locale, :$subcommands;
+multi method new(
+    PSBot::Command:_:
+             +@subcommands,
+    Str:D    :$name!,
+    Bool:D   :$administrative                   = False,
+    Bool:D   :$autoconfirmed                    = False,
+    Str:D    :default-group($default-group-str) = ' ',
+    Locale:D :$locale                           = Everywhere
+) {
+    my Map:D            $subcommands   .= new: @subcommands.map(-> $sc { $sc.name => $sc });
+    my PSBot::Group:D   $default-group  = PSBot::Group($default-group-str);
+    my PSBot::Command:D $command        = self.bless:
+        :$name, :$administrative, :$autoconfirmed, :$default-group, :$locale, :$subcommands;
     .set-root: $command for @subcommands;
     $command
 }
@@ -66,15 +84,15 @@ method autoconfirmed(PSBot::Command:D: --> Bool:D) {
     $!autoconfirmed
 }
 
-method get-group(PSBot::Command:D: Str:D $roomid  --> Group:D) {
+method get-group(PSBot::Command:D: Str:D $roomid  --> PSBot::Group:D) {
     return %!groups{$roomid} if %!groups{$roomid}:exists
-                             && %!groups{$roomid} !=== Group(Group.enums{' '});
+                             && %!groups{$roomid} !=== PSBot::Group(' ');
     return $!root.get-group: $roomid if $!root.defined;
     $!default-group
 }
 
-method set-group(PSBot::Command:D: Str:D $roomid, Str:D $group --> Group:D) {
-    %!groups{$roomid} := Group(Group.enums{$group} // Group.enums{' '});
+method set-group(PSBot::Command:D: Str:D $roomid, Str:D $group --> PSBot::Group:D) {
+    %!groups{$roomid} := PSBot::Group($group);
 }
 
 method locale(PSBot::Command:D: --> Locale:D) {
@@ -86,12 +104,12 @@ method locale(PSBot::Command:D: --> Locale:D) {
 method set-root(PSBot::Command:D: ::?CLASS:D $!root --> Nil) {}
 
 method is-group(PSBot::Command:D: Str:D $group --> Bool:D) {
-    Group.enums{$group}:exists
+    PSBot::Group.enums{$group}:exists
 }
 
 # Check if a user's rank is at or above the required rank. Used for permission
 # checking.
-method can(PSBot::Command:D: Group:D $required, Group:D $target --> Bool:D) {
+method can(PSBot::Command:D: PSBot::Group:D $required, PSBot::Group:D $target --> Bool:D) {
     $target >= $required
 }
 
@@ -122,7 +140,7 @@ method CALL-ME(PSBot::Command:D: Str:D $target --> Replier:_) {
 
     if self.autoconfirmed {
         my Bool:D $is-unlocked = self.can:
-            Group(Group.enums{' '}),
+            PSBot::Group(' '),
             ($*ROOM ?? $*USER.rooms{$*ROOM.id}.group !! $*USER.group);
         return self.reply:
             "Permission denied. {COMMAND}{self.name} requires your account to be autoconfirmed.",
@@ -136,9 +154,9 @@ method CALL-ME(PSBot::Command:D: Str:D $target --> Replier:_) {
             "Permision denied. {COMMAND}{self.name} is disabled in {$*ROOM.title}.",
             $*USER, PSBot::Room if $disabled;
 
-        my Group:D $group = %!groups{$*ROOM.id}:exists
+        my PSBot::Group:D $group = %!groups{$*ROOM.id}:exists
             ?? self.get-group($*ROOM.id)
-            !! self.set-group($*ROOM.id, $command<rank>:exists ?? $command<rank> !! $!default-group.key);
+            !! self.set-group($*ROOM.id, $command<rank>:exists ?? $command<rank> !! $!default-group.Str);
         return self.reply:
             qq[Permission denied. {COMMAND}{self.name} requires at least rank "$group".],
             $*USER, PSBot::Room unless self.can: $group, $*USER.rooms{$*ROOM.id}.group;

@@ -1,30 +1,31 @@
 use v6.d;
 use PSBot::ID;
+use PSBot::Group;
 use PSBot::UserInfo;
 unit class PSBot::User;
 
 class RoomInfo {
-    has Str:_     $.id;
-    has Group:_   $.group;
+    has Str:D          $.id    is required;
+    has PSBot::Group:D $.group is required;
 
     has Str:_     $.broadcast-command is rw;
     has Instant:_ $.broadcast-timeout is rw;
 
-    method set-group(RoomInfo:D: Group:D :$!group) {}
+    method set-group(RoomInfo:D: PSBot::Group:D :$!group) {}
 
-    method on-rename(RoomInfo:D: Group:D :$!group) {}
+    method on-rename(RoomInfo:D: PSBot::Group:D :$!group) {}
 }
 
-has Group:_    $.group;
-has Str:_      $.id;
-has Str:_      $.name;
-has Status:_   $.status;
-has Str:_      $.message;
-has Str:_      $.avatar;
-has Bool:_     $.autoconfirmed;
-has RoomInfo:D %.rooms;
-has Symbol:D   %.games{Int:D};
-has Promise:D  $.propagated .= new;
+has PSBot::Group:_ $.group;
+has Str:_          $.id;
+has Str:_          $.name;
+has Status:_       $.status;
+has Str:_          $.message;
+has Str:_          $.avatar;
+has Bool:_         $.autoconfirmed;
+has RoomInfo:D     %.rooms;
+has Symbol:D       %.games{Int:D};
+has Promise:D      $.propagated .= new;
 
 proto method new(PSBot::User:_: |) {*}
 multi method new(PSBot::User:_: PSBot::UserInfo:D $userinfo) {
@@ -33,14 +34,14 @@ multi method new(PSBot::User:_: PSBot::UserInfo:D $userinfo) {
     self.bless: :$id, :$name;
 }
 multi method new(PSBot::User:_: PSBot::UserInfo:D $userinfo, Str:D $roomid) {
-    my Str:D      $id    = $userinfo.id;
-    my Str:D      $name  = $userinfo.name;
-    my Group:D    $group = $userinfo.group;
-    my RoomInfo:D %rooms = %($roomid => RoomInfo.new: :id($roomid), :$group);
+    my Str:D          $id    = $userinfo.id;
+    my Str:D          $name  = $userinfo.name;
+    my PSBot::Group:D $group = $userinfo.group;
+    my RoomInfo:D     %rooms = %($roomid => RoomInfo.new: :id($roomid), :$group);
     self.bless: :$id, :$name, :%rooms
 }
 
-method set-group(PSBot::User:D: Str:D $roomid, Group:D $group --> Nil) {
+method set-group(PSBot::User:D: Str:D $roomid, PSBot::Group:D $group --> Nil) {
     %!rooms{$roomid}.set-group: :$group;
 }
 
@@ -49,7 +50,7 @@ method is-guest(PSBot::User:D: --> Bool:D) {
 }
 
 method on-user-details(PSBot::User:D: %data --> Nil) {
-    $!group         = Group(Group.enums{%data<group> // ' '} // Group.enums{' '});
+    $!group         = PSBot::Group(%data<group> // ' ');
     $!avatar        = ~%data<avatar>;
     $!autoconfirmed = %data<autoconfirmed>;
 
@@ -74,7 +75,7 @@ method on-user-details(PSBot::User:D: %data --> Nil) {
 
 method on-join(PSBot::User:D: PSBot::UserInfo:D $userinfo, Str:D $roomid --> Nil) {
     unless %!rooms{$roomid}:exists {
-        my Group:D $group = $userinfo.group;
+        my PSBot::Group:D $group = $userinfo.group;
         %!rooms{$roomid} := RoomInfo.new: :id($roomid), :$group;
     }
 }
@@ -87,8 +88,7 @@ method on-rename(PSBot::User:D: PSBot::UserInfo:D $userinfo, Str:D $roomid --> N
     $!id   = $userinfo.id;
     $!name = $userinfo.name;
 
-    my Group:D $group = $userinfo.group;
-
+    my PSBot::Group:D $group = $userinfo.group;
     if %!rooms{$roomid}:exists {
         %!rooms{$roomid}.on-rename: :$group;
     } else {

@@ -1,9 +1,7 @@
 use v6.d;
 use PSBot::Debug;
 use PSBot::Config;
-use PSBot::Connection;
-use PSBot::Database;
-use PSBot::LoginServer;
+use PSBot::Group;
 use PSBot::UserInfo;
 use PSBot::User;
 use PSBot::Room;
@@ -12,6 +10,9 @@ use PSBot::Game;
 use PSBot::Rules;
 use PSBot::Grammar;
 use PSBot::Actions;
+use PSBot::Connection;
+use PSBot::Database;
+use PSBot::LoginServer;
 unit class PSBot:auth<github:Kaiepi>:ver<0.0.1>;
 
 has PSBot::Connection:_  $.connection;
@@ -23,14 +24,14 @@ has PSBot::Database:_    $.database;
 # This protects all of the following attributes.
 has Lock::Async:D $!lock .= new;
 
-has Str:_    $.challstr;
-has Group:_  $.group;
-has Str:_    $.guest-username;
-has Str:_    $.username;
-has Str:_    $.userid;
-has Status:_ $.status;
-has Str:_    $.message;
-has Str:_    $.avatar;
+has Str:_          $.challstr;
+has PSBot::Group:_ $.group;
+has Str:_          $.guest-username;
+has Str:_          $.username;
+has Str:_          $.userid;
+has Status:_       $.status;
+has Str:_          $.message;
+has Str:_          $.avatar;
 
 has Bool:D $.autoconfirmed        = False;
 has Bool:D $.is-guest             = False;
@@ -327,7 +328,7 @@ method on-user-details(%data --> Nil) {
         }
 
         if $userid === $!userid {
-            $!group         = Group(Group.enums{%data<group>});
+            $!group         = PSBot::Group(%data<group>);
             $!avatar        = ~%data<avatar>;
             $!autoconfirmed = %data<autoconfirmed>;
             if %data<status>:exists {
@@ -346,8 +347,7 @@ method on-user-details(%data --> Nil) {
                 $!message = '';
             }
 
-            my Map:D $groups   = Group.enums;
-            my Rat:D $throttle = $groups{%data<group>} >= $groups<+> ?? 0.3 !! 0.6;
+            my Rat:D $throttle = $!group >= Voice ?? 0.3 !! 0.6;
             $!connection.set-throttle: $throttle;
         }
 
@@ -358,7 +358,7 @@ method on-user-details(%data --> Nil) {
                 } else {
                     my Str:D             $id        = $userid;
                     my Str:D             $name      = %data<name> // $userid;
-                    my Group:D           $group     = Group(Group.enums{%data<group>} // Group.enums{' '});
+                    my PSBot::Group:D    $group     = PSBot::Group(%data<group>);
                     my Status:D          $status    = Online;
                     my PSBot::UserInfo:D $userinfo .= new: :$id, :$name, :$group, :$status;
                     my PSBot::User:D     $user     .= new: $userinfo;
@@ -401,7 +401,7 @@ method on-room-info(%data --> Promise:_) {
                     my PSBot::User:D     $user      = %!users{$userid};
                     my Str:D             $id        = $user.id;
                     my Str:D             $name      = $user.name;
-                    my Group:D           $group     = Group(Group.enums{$group-str} // Group.enums{' '});
+                    my PSBot::Group:D    $group     = PSBot::Group($group-str);
                     my Status:D          $status    = Online;
                     my PSBot::UserInfo:D $userinfo .= new: :$id, :$name, :$group, :$status;
                     $room.join: $userinfo;

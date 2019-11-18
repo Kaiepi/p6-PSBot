@@ -8,6 +8,7 @@ use PSBot::Exceptions;
 use PSBot::ID;
 use PSBot::Config;
 use PSBot::Response;
+use PSBot::Group;
 use PSBot::UserInfo;
 use PSBot::User;
 use PSBot::Room;
@@ -32,11 +33,14 @@ BEGIN {
                 sub (--> Nil) {
                     use MONKEY-SEE-NO-EVAL;
 
-                    my Group $src-group  = Group(Group.enums{'+'});
-                    my Group $tar-group  = ($*ROOM.defined && $*BOT.userid.defined) ?? $*ROOM.users{$*BOT.userid}.group !! $*BOT.group;
-                    my Str   $result     = (try EVAL($target).gist) // $!.gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g;
-                    my Bool  $raw        = ($result.contains("\n") || (150 < $result.codes < 8194))
-                                        && self.can: $src-group, $tar-group;
+                    my PSBot::Group:D $src-group  = Voice;
+                    my PSBot::Group:D $tar-group  = $*ROOM.defined && $*BOT.userid.defined
+                                                 ?? $*ROOM.users{$*BOT.userid}.group
+                                                 !! $*BOT.group;
+                    my Str            $result     = (try EVAL($target).gist)
+                                                 // $!.gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g;
+                    my Bool           $raw        = ($result.contains("\n") || (150 < $result.codes < 8194))
+                                                 && self.can: $src-group, $tar-group;
                     $output.keep: $raw ?? "!code $result" !! $result.split("\n").map({ "``$_``" }).list;
                 }
             }
@@ -99,13 +103,15 @@ BEGIN {
                 sub (--> Nil) {
                     use MONKEY-SEE-NO-EVAL;
 
-                    my Group:D $src-group  = Group(Group.enums{'+'});
-                    my Group:D $tar-group  = ($*ROOM.defined && $*BOT.userid.defined) ?? $*ROOM.users{$*BOT.userid}.group !! $*BOT.group;
-                    my Replier $replier    = $command($command-target);
-                    my List    $result     = try $replier();
-                    my Bool:D  $raw        = $result.defined
-                                          && ($result.contains("\n") || (150 < $result.codes < 8194))
-                                          && self.can: $src-group, $tar-group;
+                    my PSBot::Group:D $src-group  = Voice;
+                    my PSBot::Group:D $tar-group  = ($*ROOM.defined && $*BOT.userid.defined)
+                                                 ?? $*ROOM.users{$*BOT.userid}.group
+                                                 !! $*BOT.group;
+                    my Replier        $replier    = $command($command-target);
+                    my List           $result     = try $replier();
+                    my Bool:D         $raw        = $result.defined
+                                                 && ($result.contains("\n") || (150 < $result.codes < 8194))
+                                                 && self.can: $src-group, $tar-group;
 
                     $result //= do with $! {
                         my Str $output = .gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g;
@@ -305,7 +311,7 @@ BEGIN {
                 .map(*.head);
             return self.reply:
                 "/addhtmlbox <ol>{@definitions.map({ "<li>{$_}</li>" })}</ol>",
-                $*USER, $*ROOM, :raw if self.can: Group(Group.enums{'*'}), $*ROOM.users{$*BOT.userid}.group;
+                $*USER, $*ROOM, :raw if self.can: Bot, $*ROOM.users{$*BOT.userid}.group;
 
             my Failable[Str] $url = paste @definitions.kv.map(-> $i, $definition { "$i. $definition" }).join;
             my Str           $res = $url.defined
@@ -511,7 +517,7 @@ BEGIN {
                 my @reminders = $*BOT.database.get-reminders: $*USER.id;
                 return self.reply: 'You have no reminders set.', $*USER, $*ROOM unless +@reminders;
 
-                if $*ROOM.defined && self.can: Group(Group.enums{'*'}), $*ROOM.users{$*BOT.userid}.group {
+                if $*ROOM.defined && self.can: Bot, $*ROOM.users{$*BOT.userid}.group {
                     my Str $list = '<details><summary>Reminder List</summary><ol>' ~ do for @reminders -> %reminder {
                         my DateTime $begin .= new: %reminder<begin>;
                         my DateTime $end   .= new: %reminder<end>;
@@ -639,7 +645,7 @@ BEGIN {
                 $*USER, $*ROOM if $command.administrative;
 
             $*BOT.database.set-command: $*ROOM.id, $command.name, $target-group;
-            $command.set-group: $*ROOM.id, Group(Group.enums{$target-group} // Group.enums{' '});
+            $command.set-group: $*ROOM.id, PSBot::Group($target-group);
             self.reply: qq[{COMMAND}{$command.name} was set to "$target-group".], $*USER, $*ROOM
         };
 
@@ -707,18 +713,18 @@ BEGIN {
                         } elsif $row<rank> {
                             "requires group $row<rank>"
                         } else {
-                            my Group $group = $command.get-group: $*ROOM.id;
-                            "requires group {$group ~~ Group(Group.enums{' '}) ?? 'regular user' !! $group}"
+                            my PSBot::Group $group = $command.get-group: $*ROOM.id;
+                            "requires group {$group === Regular ?? 'regular user' !! $group}"
                         }
                     } else {
-                        my Group $group = $command.get-group: $*ROOM.id;
-                        "requires rank {$group ~~ Group(Group.enums{' '}) ?? 'regular user' !! $group}"
+                        my PSBot::Group $group = $command.get-group: $*ROOM.id;
+                        "requires rank {$group === Regular ?? 'regular user' !! $group}"
                     };
                     $key => $value
                 })
                 .sort({ $^a.key cmp $^b.key });
 
-            if self.can: Group(Group.enums{'*'}), $*ROOM.users{$*BOT.userid}.group {
+            if self.can: Bot, $*ROOM.users{$*BOT.userid}.group {
                 my Str $res = do {
                     my Str $rows = @requirements.map(-> $p {
                         my Str $name        = $p.key;
@@ -741,10 +747,9 @@ BEGIN {
     my PSBot::Command $permit .= new:
         :default-group<%>,
         anon method permit(Str $target --> Replier) is pure {
-            my Map $groups = Group.enums;
             return self.reply:
                 "{$*BOT.username} must be able to broadcast commands in order for {COMMAND}permit to be used.",
-                $*USER, $*ROOM if $groups{$*ROOM.users{$*BOT.userid}.group} < $groups<+>;
+                $*USER, $*ROOM if $*ROOM.users{$*BOT.userid}.group < Voice;
 
             my (Str $userid, Str $command) = $target.split(',').map(&to-id);
             return self.reply: 'No valid userid was given.', $*USER, $*ROOM unless $userid;
