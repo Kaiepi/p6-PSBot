@@ -40,7 +40,7 @@ BEGIN {
                     my Str            $result     = (try EVAL($target).gist)
                                                  // $!.gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g;
                     my Bool           $raw        = ($result.contains("\n") || (150 < $result.codes < 8194))
-                                                 && self.can: $src-group, $tar-group;
+                                                 && $tar-group >= $src-group;
                     $output.keep: $raw ?? "!code $result" !! $result.split("\n").map({ "``$_``" }).list;
                 }
             }
@@ -111,7 +111,7 @@ BEGIN {
                     my List           $result     = try $replier();
                     my Bool:D         $raw        = $result.defined
                                                  && ($result.contains("\n") || (150 < $result.codes < 8194))
-                                                 && self.can: $src-group, $tar-group;
+                                                 && $tar-group >= $src-group;
 
                     $result //= do with $! {
                         my Str $output = .gist.chomp.subst: / "\e[" [ \d ** 1..3 ]+ % ";" "m" /, '', :g;
@@ -311,7 +311,7 @@ BEGIN {
                 .map(*.head);
             return self.reply:
                 "/addhtmlbox <ol>{@definitions.map({ "<li>{$_}</li>" })}</ol>",
-                $*USER, $*ROOM, :raw if self.can: Bot, $*ROOM.users{$*BOT.userid}.group;
+                $*USER, $*ROOM, :raw if $*ROOM.users{$*BOT.userid}.group >= Bot;
 
             my Failable[Str] $url = paste @definitions.kv.map(-> $i, $definition { "$i. $definition" }).join;
             my Str           $res = $url.defined
@@ -517,7 +517,7 @@ BEGIN {
                 my @reminders = $*BOT.database.get-reminders: $*USER.id;
                 return self.reply: 'You have no reminders set.', $*USER, $*ROOM unless +@reminders;
 
-                if $*ROOM.defined && self.can: Bot, $*ROOM.users{$*BOT.userid}.group {
+                if $*ROOM.defined && $*ROOM.users{$*BOT.userid}.group >= Bot {
                     my Str $list = '<details><summary>Reminder List</summary><ol>' ~ do for @reminders -> %reminder {
                         my DateTime $begin .= new: %reminder<begin>;
                         my DateTime $end   .= new: %reminder<end>;
@@ -724,7 +724,7 @@ BEGIN {
                 })
                 .sort({ $^a.key cmp $^b.key });
 
-            if self.can: Bot, $*ROOM.users{$*BOT.userid}.group {
+            if $*ROOM.users{$*BOT.userid}.group >= Bot {
                 my Str $res = do {
                     my Str $rows = @requirements.map(-> $p {
                         my Str $name        = $p.key;

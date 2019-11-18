@@ -107,12 +107,6 @@ method is-group(PSBot::Command:D: Str:D $group --> Bool:D) {
     PSBot::Group.enums{$group}:exists
 }
 
-# Check if a user's rank is at or above the required rank. Used for permission
-# checking.
-method can(PSBot::Command:D: PSBot::Group:D $required, PSBot::Group:D $target --> Bool:D) {
-    $target >= $required
-}
-
 # For regular commands, run the command and return its result. For commands
 # with subcommands, extract the subcommand name from the target and run it, or
 # fail with the command chain's full name if the subcommand doesn't exist to
@@ -139,10 +133,10 @@ method CALL-ME(PSBot::Command:D: Str:D $target --> Replier:_) {
     }
 
     if self.autoconfirmed {
-        my Bool:D $is-unlocked = self.can: Regular, $*ROOM ?? $*USER.rooms{$*ROOM.id}.group !! $*USER.group;
+        my PSBot::Group:D $group = $*ROOM ?? $*USER.rooms{$*ROOM.id}.group !! $*USER.group;
         return self.reply:
             "Permission denied. {COMMAND}{self.name} requires your account to be autoconfirmed.",
-            $*USER, PSBot::Room unless $*USER.autoconfirmed && $is-unlocked;
+            $*USER, PSBot::Room unless $*USER.autoconfirmed && !$group.punishment;
     }
 
     if $*ROOM.defined {
@@ -152,15 +146,16 @@ method CALL-ME(PSBot::Command:D: Str:D $target --> Replier:_) {
             "Permision denied. {COMMAND}{self.name} is disabled in {$*ROOM.title}.",
             $*USER, PSBot::Room if $disabled;
 
-        my PSBot::Group:D $group = do if %!groups{$*ROOM.id}:exists {
+        my PSBot::Group:D $src-group = do if %!groups{$*ROOM.id}:exists {
             self.get-group: $*ROOM.id
         } else {
             my PSBot::Group:D $group = $command<rank>:exists ?? PSBot::Group($command<rank>) !! $!default-group;
             self.set-group: $*ROOM.id, $group
         };
+        my PSBot::Group:D $tar-group = $*USER.rooms{$*ROOM.id}.group;
         return self.reply:
-            qq[Permission denied. {COMMAND}{self.name} requires at least rank "$group".],
-            $*USER, PSBot::Room unless self.can: $group, $*USER.rooms{$*ROOM.id}.group;
+            qq[Permission denied. {COMMAND}{self.name} requires at least rank "$src-group".],
+            $*USER, PSBot::Room unless $tar-group >= $src-group;
     }
 
     return &!command(self, $target) if &!command;
