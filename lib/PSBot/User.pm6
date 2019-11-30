@@ -4,6 +4,31 @@ use PSBot::Group;
 use PSBot::UserInfo;
 unit class PSBot::User;
 
+class RoomInfo { ... }
+
+grammar RoomInfo::Grammar {
+    token TOP {
+        :my @*GROUPS = state $ = PSBot::Group.enums.values.map: *.symbol;
+        <group> <id>
+    }
+    token group { @*GROUPS || <?> }
+    token id    { <[a..z 0..9 -]>+ }
+}
+
+class RoomInfo::Actions {
+    method TOP(::?CLASS:_: RoomInfo::Grammar:D $/) {
+        my PSBot::Group:D $group .= $<group>.ast;
+        my Str:D          $id     = $<id>.ast;
+        make Roominfo.new: :$group, :$id;
+    }
+    method group(::?CLASS:_: RoomInfo::Grammar:D $/) {
+        make PSBot::Group($<group>.&[//].(' ').Str)
+    }
+    method id(::?CLASS:_: RoomInfo::Grammar:D $/) {
+        make ~$/;
+    }
+}
+
 class RoomInfo {
     has Str:D          $.id    is required;
     has PSBot::Group:D $.group is required;
@@ -14,6 +39,12 @@ class RoomInfo {
     method set-group(RoomInfo:D: PSBot::Group:D :$!group) {}
 
     method on-rename(RoomInfo:D: PSBot::Group:D :$!group) {}
+
+    method from-user-details(RoomInfo:U: %data --> Array:D[RoomInfo:D]) {
+        my RoomInfo:D @ = do with %data<rooms> {
+            .map({ RoomInfo::Grammar.parse: $_, actions => RoomInfo::Actions })
+        } else [];
+    }
 }
 
 has PSBot::Group:_ $.group;
@@ -53,7 +84,6 @@ method on-user-details(PSBot::User:D: %data --> Nil) {
     $!group         = PSBot::Group(%data<group> // ' ');
     $!avatar        = ~%data<avatar>;
     $!autoconfirmed = %data<autoconfirmed>;
-
     if %data<status>:exists {
         my Str $status = %data<status>;
         my Int $lidx   = $status.index: '(';
@@ -69,7 +99,7 @@ method on-user-details(PSBot::User:D: %data --> Nil) {
         $!status  = Online;
         $!message = '';
     }
-
+    %!rooms{$_.id} := $_ for RoomInfo.from-user-details: %data;
     $!propagated.keep unless ?$!propagated;
 }
 
