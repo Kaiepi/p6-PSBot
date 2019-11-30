@@ -51,20 +51,31 @@ my class PSBot::Group::Value {
 
 my role PSBot::Group::Enumeration {
     multi method ACCEPTS(::?CLASS:U: Str:D $rank --> Bool:D) {
-        so self.^enum_value_list.any.value.symbol eq $rank
+        so self.list.any.Str eq $rank
     }
     multi method ACCEPTS(::?CLASS:D: Str:D $rank --> Bool:D) {
-        self.value.symbol eq $rank
+        self.Str eq $rank
     }
 
     multi method CALL-ME(::?CLASS:U: Str:D $rank) {
         given self.^enum_value_list -> @values {
-            @values.first(*.symbol eq $rank) // @values.first(*.symbol eq ' ')
+            @values.first(*.Str eq $rank)
+         // (state $ = @values.first(*.Str eq ' '))
         }
     }
 
     multi method Str(::?CLASS:D: --> Str:D) {
-        self.value.Str
+        $.value.Str
+    }
+
+    multi method Seq(::?CLASS:U: --> Seq:D) {
+        self.^enum_value_list.map: *.value
+    }
+    multi method List(::?CLASS:U: --> List:D) {
+        self.Seq.List
+    }
+    multi method list(::?CLASS:U: --> List:D) {
+        self.List
     }
 }
 

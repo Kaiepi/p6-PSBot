@@ -1,19 +1,57 @@
 use v6.d;
+use PSBot::Debug;
 use PSBot::ID;
 use PSBot::Group;
 use PSBot::UserInfo;
 unit class PSBot::User;
 
 class RoomInfo {
+    grammar Grammar {
+        token TOP {
+            :my Str:D @*GROUPS = state Str:D @ = PSBot::Group.list».Str;
+            <group> <id>
+        }
+        token group {
+            || @*GROUPS
+            || <-[ a..z 0..9 - ]>
+            || <?>
+        }
+        token id {
+            <[ a..z 0..9 - ]>+
+        }
+    }
+
+    class Actions {
+        method TOP(::?CLASS:D: RoomInfo::Grammar:D $/) {
+            my PSBot::Group:D $group = $<group>.ast;
+            my Str:D          $id    = $<id>.ast;
+            make RoomInfo.new: :$group, :$id;
+        }
+        method id(::?CLASS:D: RoomInfo::Grammar:D $/) {
+            make ~$/;
+        }
+        method group(::?CLASS:D: RoomInfo::Grammar:D $/) {
+            make PSBot::Group($/ ?? ~$/ !! ' ');
+        }
+    }
+
     has Str:D          $.id    is required;
     has PSBot::Group:D $.group is required;
 
     has Str:_     $.broadcast-command is rw;
     has Instant:_ $.broadcast-timeout is rw;
 
-    method set-group(RoomInfo:D: PSBot::Group:D :$!group) {}
+    method set-group(::?CLASS:D: PSBot::Group:D :$!group) {}
 
-    method on-rename(RoomInfo:D: PSBot::Group:D :$!group) {}
+    method on-rename(::?CLASS:D: PSBot::Group:D :$!group) {}
+
+    method from-user-details(RoomInfo:U: %data --> Array:D[RoomInfo:D]) {
+        state RoomInfo::Actions:D $actions .= new;
+
+        my RoomInfo:D @ = do with %data<rooms> { .pairs.map({
+            RoomInfo::Grammar.parse(.key, :$actions).ast
+        }) } else { [] };
+    }
 }
 
 has PSBot::Group:_ $.group;
@@ -53,7 +91,6 @@ method on-user-details(PSBot::User:D: %data --> Nil) {
     $!group         = PSBot::Group(%data<group> // ' ');
     $!avatar        = ~%data<avatar>;
     $!autoconfirmed = %data<autoconfirmed>;
-
     if %data<status>:exists {
         my Str $status = %data<status>;
         my Int $lidx   = $status.index: '(';
@@ -69,7 +106,7 @@ method on-user-details(PSBot::User:D: %data --> Nil) {
         $!status  = Online;
         $!message = '';
     }
-
+    %!rooms{$_.id} := $_ for RoomInfo.from-user-details: %data;
     $!propagated.keep unless ?$!propagated;
 }
 
