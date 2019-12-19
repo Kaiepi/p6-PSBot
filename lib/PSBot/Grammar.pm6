@@ -2,7 +2,7 @@ use v6.d;
 unit grammar PSBot::Grammar;
 
 token TOP {
-    :my Str:D  $*ROOMID := 'global';
+    :my Str:D  $*ROOMID := 'lobby';
     :my Bool:D $*INIT   := False;
     ^
     [ '>' <roomid> { $*ROOMID := ~$<roomid> } \n ]?
