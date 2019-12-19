@@ -79,7 +79,12 @@ method start() {
         # The bot wants to stop. Exit the loop.
         last if ?$!done;
 
-        react {
+        # Setting the throttle resets the main react block, so we need to get
+        # get the whenever blocks for rooms and users awaiting propagation back.
+        react whenever $!lock.protect-or-queue-on-recursion({
+            $!room-joined.send: $_ for %!unpropagated-rooms.keys;
+            $!user-joined.send: $_ for %!unpropagated-users.keys;
+        }) {
             whenever $!connection.on-connect {
                 # Setup prologue.
                 $!lock.protect({
@@ -97,10 +102,8 @@ method start() {
                 # PSBot::Connection handles the logic for reconnections.
                 # We want to refresh the react block since we keep promises
                 # in our state that need to be kept again after reconnecting.
-                $!lock.protect({
-                    self.reset unless $!connection.force-closed;
-                    done;
-                })
+                self.reset unless $!connection.force-closed;
+                done;
             }
             whenever $!connection.on-update-throttle -> Rat:D $throttle {
                 # Refresh $!connection.sender's whenever block now that the
@@ -245,24 +248,13 @@ method start() {
                     })
                 }
             }
-            whenever $!done {
-                # The bot wants to stop. Exit the react block, then exit the loop.
-                sleep 1;
-                done;
-            }
-            whenever signal(SIGINT) | signal(SIGTERM) | signal(SIGKILL) {
-                # The bot received a signal from Ctrl+C, Ctrl+D, or killing the
-                # process. Stop the bot.
+            whenever signal(SIGINT) | signal(SIGTERM) {
+                # The bot was signalled to stop.
                 self.stop;
             }
-            LEAVE {
-                # Setting the throttle resets the main react block, so we need to
-                # get the whenever blocks for rooms and users awaiting propagation
-                # back.
-                $!lock.protect-or-queue-on-recursion({
-                    $!room-joined.send: $_ for %!unpropagated-rooms.keys;
-                    $!user-joined.send: $_ for %!unpropagated-users.keys;
-                })
+            whenever $!done {
+                # The bot was stopped. Exit the loop.
+                done;
             }
         }
     }
