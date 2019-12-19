@@ -69,30 +69,32 @@ method connect() {
     $!force-closed = False;
 
     # Pass any received messages back to PSBot to pass to the parser.
-    $!messages-tap = $!connection.messages.on-close({
-        $!on-disconnect.send: True;
-        $*SCHEDULER.cue({ self.reconnect }) unless $!force-closed;
-    }).tap(-> $data {
+    $!messages-tap = $!connection.messages.tap(-> $data {
         if $data.is-text {
-            my Str $text = await $data.body-text;
+            my Str:D $text = await $data.body-text;
             $!receiver.emit: $text;
         }
+    }, done => {
+        $!on-disconnect.send: True;
+        $*SCHEDULER.cue({ self.reconnect });
     });
 
     $!on-connect.send: True;
 }
 
-method reconnect() {
+method reconnect(--> Bool:D) {
+    return False if $!force-closed;
+
     debug CONNECTION, "Reconnecting in $!timeout seconds...";
 
     X::PSBot::ReconnectFailure.new(
         attempts => MAX_RECONNECT_ATTEMPTS,
         uri      => self.uri
-    ).throw if $!timeout == 2 ** MAX_RECONNECT_ATTEMPTS;
+    ).throw if $!timeout >= 2 ** MAX_RECONNECT_ATTEMPTS;
 
     $*SCHEDULER.cue({ self.connect }, in => $!timeout);
-
     $!timeout *= 2;
+    True
 }
 
 proto method send(| --> Nil) {*}
@@ -157,17 +159,12 @@ multi method send(*@data, Bool:D :$raw where not *.so --> Nil) {
     }
 }
 
-method close(Bool :$force = False --> Promise) {
-    return Promise.start({ Nil }) if self.closed;
-
-    $!force-closed = $force;
-
-    if $force {
+method close(Bool :force($!force-closed) = False --> Promise) {
+    return start { Nil } if $.closed;
+    if $!force-closed {
         $!sender.done;
         $!receiver.done;
     }
-
     $!messages-tap.close;
-
     $!connection.close
 }
