@@ -39,7 +39,7 @@ method on-update-throttle(--> Supply) {
 }
 
 method sender(--> Supply) {
-    $!sender.Supply.schedule-on($*SCHEDULER).serialize.throttle(1, $!throttle)
+    $!sender.Supply.throttle(1, $!throttle)
 }
 
 method receiver(--> Supply) {
