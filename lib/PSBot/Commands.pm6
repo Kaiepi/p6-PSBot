@@ -23,7 +23,7 @@ BEGIN {
     my PSBot::Command $echo .= new:
         :administrative,
         anon method echo(Str $target --> Replier) is pure {
-            self.reply: $target, $*USER, $*ROOM
+            self.reply: $target, $*USER, $*ROOM, :raw
         };
 
     my PSBot::Command $eval .= new:
