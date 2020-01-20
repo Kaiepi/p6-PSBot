@@ -35,3 +35,4 @@ sub term:<DICTIONARY_API_ID>      is export { %config<dictionary_api_id>        
 sub term:<DICTIONARY_API_KEY>     is export { %config<dictionary_api_key>         }
 sub term:<YOUTUBE_API_KEY>        is export { %config<youtube_api_key>            }
 sub term:<TRANSLATE_API_KEY>      is export { %config<translate_api_key>          }
+sub term:<CAT_API_KEY>            is export { %config<cat_api_key>                }

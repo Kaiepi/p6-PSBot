@@ -4,6 +4,7 @@ use Cro::HTTP::Client;
 use Cro::HTTP::Response;
 use Failable;
 use URI::Encode;
+use PSBot::Debug;
 use PSBot::Exceptions;
 use PSBot::ID;
 use PSBot::Config;
@@ -15,6 +16,7 @@ use PSBot::Room;
 use PSBot::Command;
 use PSBot::Games::Hangman;
 use PSBot::Plugins::Pastebin;
+use PSBot::Plugins::TheCatAPI;
 use PSBot::Plugins::Translate;
 use PSBot::Plugins::YouTube;
 unit module PSBot::Commands;
@@ -450,6 +452,14 @@ BEGIN {
                 $*USER, $*ROOM unless $output.defined;
 
             self.reply: $output, $*USER, $*ROOM
+        };
+
+    my PSBot::Command $cat .= new:
+        :default-group<+>,
+        anon method cat(Str:D $target --> Replier:D) is pure {
+            my Failable[Cat:D] $cat    = get-cat;
+            my Str:D           $output = $cat.defined ?? "/addhtmlbox $cat" !! $cat.exception.message;
+            self.reply: $output, $*USER, $*ROOM, :raw;
         };
 
     my PSBot::Command $reminder .= new:
@@ -912,6 +922,10 @@ BEGIN {
 
                     - badtranslate <query>
                       Runs the given query through Google Translate 10 times using random languages before translating back to English.
+                      Requires at least rank + by default.
+
+                    - cat
+                      Embeds a random cat image in chat.
                       Requires at least rank + by default.
 
                     - reminder

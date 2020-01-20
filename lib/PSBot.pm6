@@ -189,7 +189,7 @@ method start() {
             }
             unless ?$!started {
                 whenever $!started {
-                    $!lock.protect-or-queue-on-recursion({
+                    $!lock.with-lock-hidden-from-recursion-check({
                         debug GENERIC,
                               'State has been fully propagated for the first time since the bot connected; '
                             ~ 'rules can now be evaluated.';
@@ -887,6 +887,10 @@ command.
 
 The API key for Google Translate. Set to null if you don't want to use the
 translate and badtranslate commands.
+
+=item Str I<cat_api_key>
+
+The API key for TheCatAPI. Set to null if you don't want to use the cat command.
 
 =head1 DEBUGGING
 
