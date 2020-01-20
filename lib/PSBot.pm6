@@ -105,7 +105,9 @@ method start() {
             whenever $!connection.on-update-throttle -> Rat:D $throttle {
                 # Refresh $!connection.sender's whenever block now that the
                 # throttle has changed.
-                done;
+                $!lock.protect-or-queue-on-recursion({
+                    done;
+                })
             }
             whenever $!connection.receiver -> Str:D $message {
                 # We received a message; parse it.
