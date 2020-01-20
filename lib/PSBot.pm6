@@ -307,7 +307,7 @@ method on-update-user(PSBot::UserInfo:D $userinfo, Bool:D $is-named, Str:D $avat
 
 method on-user-details(%data --> Nil) {
     $!lock.protect-or-queue-on-recursion({
-        my Str:D $userid = %data<userid>;
+        my Str:D $userid = %data<id>;
 
         if %!users{$userid}:exists {
             my PSBot::User $user = %!users{$userid};
