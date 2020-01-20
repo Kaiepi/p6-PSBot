@@ -75,10 +75,7 @@ method new(Str:D :$host = HOST, Int:D :$port = PORT, Str:D :$serverid = SERVERID
 method start() {
     $!connection.connect;
 
-    loop {
-        # The bot wants to stop. Exit the loop.
-        last if ?$!done;
-
+    until ?$!done {
         # Setting the throttle resets the main react block, so we need to get
         # get the whenever blocks for rooms and users awaiting propagation back.
         react whenever $!lock.protect-or-queue-on-recursion({
@@ -190,7 +187,7 @@ method start() {
             }
             unless ?$!started {
                 whenever $!started {
-                    $!lock.with-lock-hidden-from-recursion-check({
+                    $!lock.protect-or-queue-on-recursion({
                         debug GENERIC,
                               'State has been fully propagated for the first time since the bot connected; '
                             ~ 'rules can now be evaluated.';
