@@ -12,16 +12,6 @@ has Lock::Async       $!account-mux       .= new;
 has Str               $.account            = '';
 has Cancellation      $!login-expiration;
 
-submethod BUILD(Str :$!serverid) {
-    if %*ENV<PSBOT_TESTING> {
-        $_.wrap(anon method (|) {
-            return;
-        }) for self.^methods.grep({
-            .name ne any self.^attributes.map({ .name.substr: 2 })
-        });
-    }
-}
-
 method account(--> Str) is rw {
     Proxy.new(
         FETCH => -> $ {
@@ -102,3 +92,22 @@ method upkeep(Str $challstr --> Str) {
 
     %data<assertion>
 }
+
+# Prevents this class from doing anything during unit tests by wrapping its
+# methods with noops at compile-time after it has been composed.
+CHECK if %*ENV<PSBOT_TESTING> {
+    $?CLASS.^attributes(:local)
+==> grep(*.has_accessor)
+==> map(*.name.substr: 2)
+==> my Str:D @accessors;
+
+    for $?CLASS.^methods(:local).grep({
+        !.isa(Submethod) & (.name ne @accessors.any)
+    }) -> Method:D $method {
+        my &wrapper := my method (| --> Nil) { };
+        &wrapper.set_name: $method.name;
+        $method.wrap: &wrapper;
+    }
+
+    $?CLASS.^publish_method_cache;
+};
