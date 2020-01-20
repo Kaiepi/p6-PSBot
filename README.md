@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.org/Kaiepi/p6-PSBot.svg?branch=master)](https://travis-ci.org/Kaiepi/p6-PSBot)
-
 NAME
 ====
 
@@ -147,6 +145,10 @@ The API key for Youtube. Set to null if you don't want to use the youtube comman
   * Str *translate_api_key*
 
 The API key for Google Translate. Set to null if you don't want to use the translate and badtranslate commands.
+
+  * Str *cat_api_key*
+
+The API key for TheCatAPI. Set to null if you don't want to use the cat command.
 
 DEBUGGING
 =========
