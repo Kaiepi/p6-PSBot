@@ -138,7 +138,6 @@ method start() {
             whenever $!room-joined -> Str:D $roomid {
                 # Propagate room state on join.
                 my Promise:_ $on-propagate;
-
                 $!lock.protect-or-queue-on-recursion({
                     if %!unpropagated-rooms{$roomid}:exists {
                         $on-propagate = %!unpropagated-rooms{$roomid};
@@ -148,11 +147,9 @@ method start() {
                         $!connection.send: "/cmd roominfo $roomid", :raw;
                     }
                 });
-
                 whenever $on-propagate -> PSBot::Room:D $room {
-                    $!lock.protect-or-queue-on-recursion({
+                    $!lock.with-lock-hidden-from-recursion-check({
                         %!unpropagated-rooms{$roomid}:delete;
-
                         $!started.keep
                             if !$!started
                             && !%!unpropagated-users
@@ -164,7 +161,6 @@ method start() {
             whenever $!user-joined -> Str:D $userid {
                 # Propagate user state on join or rename.
                 my Promise:_ $on-propagate;
-
                 $!lock.protect-or-queue-on-recursion({
                     if %!unpropagated-users{$userid}:exists {
                         $on-propagate = %!unpropagated-users{$userid};
@@ -174,11 +170,9 @@ method start() {
                         $!connection.send: "/cmd userdetails $userid", :raw;
                     }
                 });
-
                 whenever $on-propagate -> PSBot::User:D $user {
-                    $!lock.protect-or-queue-on-recursion({
+                    $!lock.with-lock-hidden-from-recursion-check({
                         %!unpropagated-users{$userid}:delete;
-
                         $!started.keep
                             if !$!started
                             && !%!unpropagated-users
